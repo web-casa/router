@@ -1,27 +1,42 @@
-# 文档站群开发方案（v0.5 · OpenWrt 首站版）
+# 文档站群开发方案（v0.6 · OpenWrt 首站 / Codex 复审修订）
 
-> 状态：方向与范围已确认；首站定为 **Router.Homes（https://router.homes）**，内容为 **OpenWrt 中文文档**；域名尚未绑定，Phase 0–4 先本地构建 + Pages 预览，Phase 5 绑定后再做生产验收。
+> 状态：首站 **Router.Homes（https://router.homes）**，内容为 **OpenWrt 中文文档**；域名尚未绑定；v0.5 经 Codex 只读复审，10 条 P0/P1 已纳入本版。
 > 参考：`~/centosfan`（生产多站系统）、`starlight-multi-site`（原型，不采用）、`astro-fleet`（monorepo 工程参考，非 Starlight）。
-> 变更摘要：**DeepSeek Harness 外部写作；v1 不做内容包；首站 8–10 页 OpenWrt 文档；E3 按“规格 E1 / 步骤 E2 / 实测 E3”执行；域名未绑定，生产部署门禁到绑定后再开。**
+> 核心边界：DeepSeek Harness 外部写作；仓库不做模型 API/自动批量；v1 不做内容包；人工批准 + claims/evidence + `contentRevision` + dedup/独立性门禁；未绑定域名只做 preview。
 
 ---
 
-## 0. 已确认决策
+## 0. 决策与复审处置
 
 | ID | 决策 | 选择 |
 |---|---|---|
 | ADR-001 | 架构 | Monorepo，每站独立 Astro/Starlight 项目 |
 | ADR-002 | 内容模型 | 每站独立内容；v1 不做跨站内容包 |
-| ADR-003 | 站点差异 | 结构差异：每站独立 sidebar/首页/栏目 |
+| ADR-003 | 站点差异 | 每站独立 sidebar/首页/栏目 |
 | ADR-004 | 部署 | Cloudflare Pages 每站一项目 + Actions 直传 |
 | ADR-005 | 规模 | 首发 3–5 站，12 个月 10–20 站 |
-| ADR-006 | 内容生产 | DeepSeek Harness 外部产出 + 人工审核 + 严格门禁，**不做自动化 AI 生成流水线** |
-| ADR-007 | 首站内容 | **Router.Homes（router.homes）OpenWrt 中文文档**，直接 8–10 页，走完整生产内容 canary |
-| ADR-008 | 证据策略 | 规格 E1；可复现步骤 E2；吞吐/覆盖/“我们实测” E3；首站至少 2–3 页有 E3 |
-| ADR-009 | 跨站分发 | v1 不做；出现真实复用页后再评估 v1.1 |
-| ADR-010 | 域名状态 | `router.homes` **尚未绑定**；Phase 0–4 只做本地构建与 Pages 预览，生产部署在绑定并验收后开启 |
+| ADR-006 | 内容生产 | DeepSeek Harness 外部产出 + 人工批准 + 严格门禁 |
+| ADR-007 | 首站内容 | Router.Homes（router.homes）OpenWrt 中文文档；最终 8–10 页，生产先发 4–6 页 |
+| ADR-008 | 证据策略 | 规格 E1；可复现步骤 E2；吞吐/覆盖/“我们实测” E3；首站至少 2 页 E3 |
+| ADR-009 | 跨站分发 | v1 不做；出现真实复用页后再评估 |
+| ADR-010 | 域名状态 | `unbound → binding → verified → live` 四态；未绑定只允许 preview，不允许正式内容生产部署 |
+| ADR-011 | 批准机制 | 第二人 PR approval；solo 用受信 `workflow_dispatch` 批准，绑定 actor/revision/policy；破坏性页面必须第二人或降级为来源整理 |
+| ADR-012 | OpenWrt 版本 | 以一个已验证的 25.12.x 稳定版为主；24.10.x 只写差异段，不复制双套文章 |
 
-**Codex review 处置**：v0.2 的 10 条 P0/P1 仍保留（审核绑定、MDX/执行安全、claims/evidence、CI、隔离边界、页面级索引、dedup 校准、canary、部署回滚、门禁/工期）。v0.4 只移除“provider 适配、自动批量生成、provider 预算、内容包”相关工程，不降低审核与发布门禁。
+**Codex v0.5 复审处置**：
+
+| # | 级别 | 问题 | 处置 |
+|---|---|---|---|
+| 1 | P0 | GitHub 不允许 PR 作者自批，solo review 机制不可实现 | 采纳：solo 改为受信 workflow 批准；破坏性页面第二人或降级 |
+| 2 | P0 | preview / 首次生产 / 绑定验收状态死锁 | 采纳：域名四态 + `--target preview|production`；首次发布占位 |
+| 3 | P1 | preview canonical 校验与生产规则冲突 | 采纳：canonical 始终完整生产路径；未绑定时只校验本地路由 |
+| 4 | P0 | CI 未表达可信部署边界 | 采纳：trusted run/commit/artifact + digest + approval；active/lastHealthy |
+| 5 | P0 | 刷机/恢复写成通用流程 | 采纳：限定一个已验证型号/修订；三类恢复分开；E3 才可操作 |
+| 6 | P1 | 25.12 apk / 24.10 opkg 口径过宽 | 采纳：25.12.x 主版本 + 24.10 差异段；`testedVersions` 等字段 |
+| 7 | P1 | Wi-Fi 过宽；防火墙/隔离缺负向验收 | 采纳：收缩 Wi-Fi；补 IPv4/IPv6 隔离负向测试 |
+| 8 | P1 | revision 未覆盖证据语义；导入信任字段 | 采纳：`evidenceManifestHash`；import 剥离外部批准 |
+| 9 | P1 | 15–21 人日只适合砍范围 | 采纳：完整范围 20–30 工程 + 8–15 内容/测试人日；先发 4–6 页 |
+| 10 | P1 | 合规/运营缺责任与时限 | 采纳：owner/告警人、许可字段、数据边界、RTO/RPO、撤稿时限 |
 
 ---
 
@@ -32,19 +47,21 @@
 1. 首发 3–5 站，设计容量 20（硬上限 50）；每站独立域名、内容、sidebar/首页、品牌。
 2. 单站可独立开发、构建、预览、部署；单站故障不阻塞其他站。
 3. 一条命令构建全部；一条命令构建指定站；CI 只构建受影响站点，但跨站检查全库运行。
-4. 内容由 DeepSeek Harness 在仓库外生成，进入 `content/drafts/` 后走统一的检查、评审、promote。
-5. 首站 `router.homes`（Router.Homes）写 8–10 页 OpenWrt 中文文档，全部人工审核；域名暂未绑定，先预览验证，绑定后再做生产 canary 并观察 2–4 周。
-6. 每站门禁可测量：schema、claims/evidence、revision 绑定、dedup、独立性、链接、sitemap、canonical、产物。
-7. 生产可运维：部署可追溯、可回滚；每站独立 Pages 项目；密钥最小权限。
+4. 内容由 DeepSeek Harness 在仓库外生成，进入 `content/drafts/` 后走 `import → check → approve → promote`。
+5. 首站 Router.Homes 最终 8–10 页 OpenWrt 文档；生产先发 4–6 页（含至少 2 页 E3），稳定后再补齐。
+6. 域名未绑定期间只做 preview；绑定、TLS、路由验收后才允许正式内容部署。
+7. 每站门禁可测量：schema、claims/evidence、revision 绑定、批准、dedup、独立性、链接、sitemap、canonical、产物。
+8. 生产可运维：部署可追溯、可回滚；每站独立 Pages 项目；密钥最小权限。
 
 ### 1.2 非目标（v1 不做）
 
-- 仓库内调用模型 API、自动批量生成、provider 适配/切换。
-- 跨站内容包 `add/sync/check/prune`；v1 每站独立写。
-- `mirror`、`localized`、多语言、文档版本化。
-- CMS、跨站统一搜索。
-- 无人值守的自动发布。
+- 仓库内模型 API、自动批量生成、provider 适配。
+- 跨站内容包 `add/sync/check/prune`。
+- `mirror`/`localized`/多语言/文档版本化。
+- 802.11r/802.11s/多 AP 漫游、完整双版本教程、snapshot 支持。
+- CMS、跨站统一搜索、无人值守自动发布。
 - 50 站编排、自动账号拆分、VPS 替代部署。
+- 第二套主题、大范围 Starlight 组件覆盖、Lighthouse 硬阈值。
 
 ---
 
@@ -52,13 +69,9 @@
 
 ### 2.1 选型与隔离边界
 
-选 **Monorepo，每站独立 Astro/Starlight 项目**。内容、路由、产物、部署、回滚独立；依赖版本（catalog + 单 lockfile）、docs-kit、CI 工作流、共享门禁仍耦合。
+Monorepo，每站独立 Astro/Starlight 项目。内容、路由、产物、部署、回滚独立；依赖版本（catalog + 单 lockfile）、docs-kit、CI 工作流、共享门禁仍耦合。共享依赖升级默认触发全站验证，生产可分批。
 
-因此：
-
-- 共享依赖升级默认触发**全站验证**，生产部署可分批。
-- 不要把“单站发布”说成“单站升级完全不影响别人”。
-- centosfan 的单项目多载体不混入本仓库；若未来出现“同一知识网络、70% 共享”的站群，单独建 B 仓。
+centosfan 的单项目多载体不混入本仓库；若未来出现“同一知识网络、70% 共享”的站群，单独建 B 仓。
 
 ### 2.2 目录结构
 
@@ -71,51 +84,40 @@ docs-fleet/
 │  ├─ docs-kit/                    # createDocsConfig、主题、共享组件；构建到 dist
 │  └─ content-kit/                 # 共享 MDX 片段（可选，v1 可空）
 ├─ content/
-│  ├─ briefs/<site>/<slug>.yaml    # 写作前的查询/意图/大纲/来源计划
-│  ├─ drafts/<site>/<slug>.mdx     # DeepSeek Harness 产出或手写草稿
+│  ├─ briefs/<site>/<slug>.yaml
+│  ├─ drafts/<site>/<slug>.mdx
 │  ├─ drafts/<site>/<slug>.claims.json
-│  ├─ evidence/<site>/<slug>/      # 证据清单、哈希、截图/日志
-│  ├─ reviews/<site>/<slug>.md     # 审计记录（不是发布授权）
-│  ├─ query-registry.json          # 查询→primary 页面归属
-│  └─ policies/                    # 来源白名单、证据等级、审核清单
-├─ sites/
-│  └─ router-homes/
-│     ├─ astro.config.ts
-│     ├─ site.meta.ts
-│     ├─ package.json
-│     ├─ src/content.config.ts     # docsSchema({ extend })
-│     ├─ src/content/docs/
-│     ├─ src/styles/theme.css
-│     └─ public/
+│  ├─ evidence/<site>/<slug>/      # 证据清单、原始产物哈希、脱敏副本
+│  ├─ reviews/<site>/<slug>.md     # 审计记录
+│  ├─ query-registry.json
+│  └─ policies/                    # 来源、证据、许可、审核清单
+├─ sites/router-homes/
+│  ├─ astro.config.ts
+│  ├─ site.meta.ts
+│  ├─ package.json
+│  ├─ src/content.config.ts
+│  ├─ src/content/docs/
+│  ├─ src/styles/theme.css
+│  └─ public/
 ├─ scripts/
-│  ├─ fleet.ts                     # CLI 入口：content / deploy / validate
+│  ├─ fleet.ts
 │  ├─ new-site.ts
 │  ├─ validate.ts
-│  ├─ content/{import,check,review,promote}.ts
+│  ├─ content/{import,check,approve,promote}.ts
 │  ├─ deploy.ts
 │  ├─ stamp.ts
 │  ├─ ci-matrix.ts
 │  └─ checks/{claims,mdx,security,dedup,independence,links,smoke,canonical,global,site,review}.ts
-├─ ops/deployments.json            # 每站已部署 revision/deploymentId
+├─ ops/
+│  ├─ approvals.json               # 受信批准记录（actor/revision/policy）
+│  └─ deployments.json             # active/lastHealthy deployment
 ├─ templates/site/
-└─ .github/workflows/{ci,deploy}.yml
+└─ .github/workflows/{ci,deploy,approve-production}.yml
 ```
 
-**注册表用 JSON**：`new-site` 直接追加，不需要 AST 改写；类型由 `packages/docs-kit/src/registry.ts` 的 zod schema 推导。
+注册表用 JSON，`new-site` 直接追加；类型由 `packages/docs-kit/src/registry.ts` 的 zod schema 推导。
 
-### 2.3 字段唯一来源
-
-| 字段 | 唯一来源 |
-|---|---|
-| id、domain、title、description、locale | `fleet.config.json` |
-| deploy.enabled、deploy.project、minPages | `fleet.config.json` |
-| audience、angle、primaryTopics | `fleet.config.json` |
-| sidebar、首页、栏目、主题、插件 | `sites/<id>/site.meta.ts` |
-| 正文、frontmatter、claims | `sites/<id>/src/content/docs/` |
-
-`site.meta.ts` 通过 `getSite(id)` 读注册表，不复制 title/domain。
-
-首站注册表示例：
+### 2.3 注册表、域名状态与权限
 
 ```json
 {
@@ -127,6 +129,7 @@ docs-fleet/
   "audience": "想在家用路由器上使用 OpenWrt 的用户",
   "angle": "按真实设备与固件版本验证的 OpenWrt 操作文档",
   "minPages": 8,
+  "approvalMode": "solo",
   "deploy": {
     "enabled": false,
     "project": "router-homes",
@@ -135,124 +138,120 @@ docs-fleet/
 }
 ```
 
-`deploy.enabled=false` 直到域名绑定并验收；Phase 0–4 只允许 preview 分支部署。
+**域名状态**：
 
-### 2.4 docs-kit、schema 与构建
+| 状态 | 允许行为 |
+|---|---|
+| `unbound` | 本地构建；指定 preview 分支部署；禁止正式内容生产部署 |
+| `binding` | 配置 DNS/Custom Domain；允许一次**无内容、noindex 的占位生产部署**验证路由 |
+| `verified` | DNS/TLS/域名路由验收通过；允许首批正式内容部署 |
+| `live` | 正式内容 smoke 通过；提交 sitemap，开始观察 |
+
+`deploy.enabled=false` 只表示“未批准正式内容生产部署”，不阻止 preview；CLI 必须显式 `--target preview` 或 `--target production`，生产分支必须与 Pages 项目设置一致。
+
+### 2.4 字段唯一来源
+
+| 字段 | 唯一来源 |
+|---|---|
+| id、domain、title、description、locale | `fleet.config.json` |
+| deploy.enabled/project/domainStatus、minPages、approvalMode | `fleet.config.json` |
+| audience、angle、primaryTopics | `fleet.config.json` |
+| sidebar、首页、栏目、主题、插件 | `sites/<id>/site.meta.ts` |
+| 正文、frontmatter、claims | `sites/<id>/src/content/docs/` |
+
+`site.meta.ts` 通过 `getSite(id)` 读注册表，不复制 title/domain。
+
+### 2.5 docs-kit、schema 与构建
 
 - `docs-kit` 用 `tsc` 构建到 `dist/`；站点 `astro.config.ts` 导入构建产物。
-- 站点用 `astro.config.ts`，让 Astro 配置加载器处理 `site.meta.ts`。
-- 每站显式依赖 `@fleet/docs-kit: workspace:*`，不要只用相对路径 import。
-- 自定义 frontmatter 通过 `docsSchema({ extend: ... })` 接入。
+- 每站显式依赖 `@fleet/docs-kit: workspace:*`。
+- 自定义 frontmatter 通过 `docsSchema({ extend })` 接入。
 - v1 不重写 Starlight 的 Header/Breadcrumbs/SEOHead；先保留原生能力。
 - Sitemap：先确认 Starlight 内置行为，再决定是否额外注册 `@astrojs/sitemap`。
-- Turbo：`build` 声明 `dependsOn: ["^build"]`、`outputs: ["dist/**"]`；deploy/在线来源检查 `cache:false`；stamp 在缓存恢复后执行，绑定输入摘要与产物 digest。
+- Turbo：`build` 声明 `dependsOn: ["^build"]`、`outputs: ["dist/**"]`；deploy/在线来源检查 `cache:false`；stamp 在缓存恢复后执行，绑定输入摘要与产物 digest；digest 排除 stamp 自身。
 
 ---
 
 ## 3. 内容系统
 
-### 3.1 写作流程（DeepSeek Harness 外部产出）
+### 3.1 写作、导入与批准流程
 
-1. **Brief**：在 `content/briefs/<site>/<slug>.yaml` 写清目标查询、意图、读者、uniqueAngle、大纲、来源、内链。
-2. **Draft**：在 DeepSeek Harness 中生成，保存到 `content/drafts/<site>/<slug>.mdx`；同目录放 `claims.json`。
-3. **Import**：`pnpm fleet content import --site router-homes --slug <slug> --file <path>` 规范 frontmatter、检查编码/路径、生成 claims 模板。
-4. **Check → Review → Promote**：见 §3.4、§3.5。
+1. **Brief**：`content/briefs/<site>/<slug>.yaml`，写目标查询、意图、读者、uniqueAngle、大纲、来源、内链、版本范围。
+2. **Draft**：DeepSeek Harness 生成，存 `content/drafts/<site>/<slug>.mdx` + `claims.json`。
+3. **Import**：`pnpm fleet content import --site router-homes --slug <slug> --file <path>`：
+   - 规范 frontmatter/编码/路径；
+   - **剥离**外部自带的 `verifiedBy`、`human_verified`、部署状态、批准字段；
+   - 记录 `importedBy`、`importedAt`、`originalFileSha256`、生成工具/模型标识；
+   - 路径归一化，拒绝越界与 symlink 越界；
+   - MDX 可执行内容检查在首次编译前完成。
+4. **Check → Approve → Promote**：见 §3.4。
 
-仓库不调用模型 API，不保存 provider key，不做自动批量生成。生成工具在仓库外，产出视为不可信输入。
+仓库不调用模型 API，不保存 provider key；外部工具产出视为不可信输入。
 
 ### 3.2 每站独立内容
 
 - `sites/<id>/src/content/docs/**` 是唯一正文来源。
-- 每站独立 sidebar/首页/栏目，`site.meta.ts` 显式声明。
-- 写作规范 `docs/writing-guide.md`；站内相对链接，跨站绝对 URL。
-- 手写页面同样需要 review 与 `contentRevision`。
-- **v1 不做跨站内容包**；没有真实复用页之前，不引入分发、锁文件、canonical 例外。
+- 每站独立 sidebar/首页/栏目；手写页面同样需要批准与 `contentRevision`。
+- v1 不做跨站内容包；没有真实复用页之前，不引入分发、锁文件、canonical 例外。
 
-### 3.3 Claims / evidence 契约
+### 3.3 Claims、evidence 与 OpenWrt 版本口径
 
-**Claim**：
+**Claim** 字段：`id、bodyLocator、claimType、text、product、version、region、observedAt、validUntil、evidenceIds、verificationStatus、verifiedBy`。
 
-```json
-{
-  "id": "c1",
-  "bodyLocator": "h2:关键差异/p:2",
-  "claimType": "spec|test|price|compatibility|policy",
-  "text": "Wi-Fi 7 的 6 GHz 信道支持 320 MHz 频宽",
-  "product": "Wi-Fi 7",
-  "version": "802.11be",
-  "region": "global",
-  "observedAt": "2026-10-01",
-  "validUntil": "2027-04-01",
-  "evidenceIds": ["e1"],
-  "verificationStatus": "machine_checked|human_verified|rejected",
-  "verifiedBy": "human:<id>"
-}
-```
+**Evidence** 字段：`id、sourceUrl、finalUrl、publisher、retrievedAt、locator、excerpt、contentHash、testEnvironment、testRecipe、rights、licenseId、licenseUrl、attribution、modified、access`。
 
-**Evidence**：
-
-```json
-{
-  "id": "e1",
-  "sourceUrl": "https://example.org/spec",
-  "finalUrl": "https://example.org/spec",
-  "publisher": "IEEE",
-  "retrievedAt": "2026-10-01",
-  "locator": "Table 3",
-  "excerpt": "...",
-  "contentHash": "sha256:...",
-  "testEnvironment": null,
-  "testRecipe": null,
-  "rights": "quote-only|public-domain|licensed",
-  "access": "public|licensed"
-}
-```
-
-**证据适配**（ADR-008）：
+**证据适配**：
 
 | 内容 | 最低证据 | 说明 |
 |---|---|---|
 | 规格、标准、协议 | E1 | 官方文档/标准文本 |
-| 配置步骤、命令 | E1 + E2 | E2 = VM/模拟器/固定测试配方可重放；路由 Web UI 用截图 + 固件版本 + 日期 |
-| 吞吐、覆盖、稳定性、“我们实测” | **E3** | 真实设备/真实网络；无 E3 就写“厂商标称/未实测”，不能用第一人称实测口吻 |
-| 价格、库存 | E1 + 日期 | 7 天新鲜度 |
+| 配置步骤、命令 | E1 + E2 | E2 = OpenWrt x86 VM/固定测试配方可重放；真实 Web UI 用截图 + 固件版本 + 日期 |
+| 吞吐、覆盖、稳定性、“我们实测” | **E3** | 真实设备/真实网络；无 E3 写“厂商标称/未实测”，不能用第一人称实测口吻 |
 | 版本/兼容性 | E1 | 30 天新鲜度 |
 | 稳定标准/长期政策 | E1 | 180 天新鲜度 |
 
-`router.homes` 首站建议：至少 2–3 页有 E3（刷机与恢复、Wi-Fi 吞吐/覆盖、VLAN/PPPoE 之一），其余用 E1/E2；没有实测设备的页面明确标 `tested: false`，避免“我们测试了”的表述。
+**OpenWrt 版本口径**：
 
-**OpenWrt 版本口径**：OpenWrt 25.12+ 使用 `apk`，24.10 使用 `opkg`；同一命令页必须标注适用版本，不能混写。E2 优先用 OpenWrt x86 VM（可重放 `apk/opkg`、LuCI、fw4 操作）；真实路由 Web UI 用截图 + 固件版本 + 日期。E3 只用于真实设备上的刷机/启动、Wi-Fi 吞吐/覆盖、VLAN/PPPoE 等结论。刷机页必须包含设备兼容性、精确镜像、校验和、恢复方式（TFTP/failsafe）与断电风险；没有真实设备就标注“未实测”，不能写“我们已刷机验证”。
+- 首站以一个已验证的 **25.12.x 稳定版**为主；24.10.x 只写明确标识的差异段，不复制双套文章。
+- 页面 frontmatter 增加 `testedVersions`、`testedTargets`、`lastVerifiedAt`、`knownLimitations`。
+- 包管理页覆盖 `update/add|install/remove`、空间、签名、源版本匹配；明确不能混用 Alpine 软件源或跨 OpenWrt 版本换源。
+- 不把 `apk upgrade` / `opkg upgrade` 批量升级作为推荐维护路径；系统维护指向受支持的固件升级流程。
+- DSA 依据设备/target 判断，不按版本一刀切；设备是 swconfig 时明确退出本教程。
 
-**规则**：
+**刷机/恢复边界**：
 
-- `verificationStatus` 由工具/人工写入，模型不能自填 `human_verified`。
-- 站点 frontmatter 通过 `docsSchema({ extend })` 增加 `tested`、`evidenceLevel`、`claims`、`reviewedRevision` 等字段；不能直接写未注册字段。
-- 正文 claim 标记与 claims 双向校验：悬空/未使用均报错；自动断言识别只做提示，事实支持由人确认。
-- `highRisk=true`（医疗/金融/法律）v1 阻断生成与发布；以后开放必须先有第二评审人。
-- “可重放”= 输入、参数、环境、原始输出可追溯，不承诺同输入同文本。
+- 第 3 页只写**一个已验证型号与硬件修订**的操作案例；通用前置检查另列。
+- 强制记录：型号/修订、target/subtarget/profile、当前固件、目标版本、镜像 URL/类型/SHA-256、设备官方安装页。
+- 分开写 failsafe、factory reset、bootloader/TFTP recovery；不能把 failsafe 当任意砖机恢复工具。
+- 第 9 页改名“备份、升级与恢复路径”；区分配置备份、完整固件、设备校准数据。
+- 默认不保留配置跨版本降级；DSA 等迁移单独核实。
+- 操作前必须有有线管理路径、离线恢复说明和备份；不提供 `sysupgrade -F` 绕过校验的常规步骤。
+- 操作型刷机案例必须有该硬件的 E3；`tested:false` 只能支持概览或官方指引。
 
-### 3.4 contentRevision 与可信审核
-
-**contentRevision**：
+### 3.4 contentRevision 与批准
 
 ```text
-SHA256(canonicalJson({
+contentRevision = SHA256(canonicalJson({
   briefHash,
-  pageHash,              // frontmatter + body
+  pageHash,
   claimsHash,
-  evidence: [{ id, contentHash }],
+  evidenceManifestHash,   // 来源、定位、摘录、等级、测试环境、原始产物、许可、权利
   assets: [{ path, hash }]
 }))
 ```
 
-生命周期/部署字段不参与哈希。
+`evidenceManifestHash` 必须覆盖证据语义，而不只是源文件哈希。排除字段明确列出（生命周期、部署状态、`contentRevision/reviewedRevision` 等派生值），避免循环。
 
-**Review 绑定** `siteId + pageId + contentRevision + policyVersion`。review 文件只是审计记录，不能自行授予发布权。发布批准来自：
+**批准模式**：
 
-- 受保护 PR 上的 review（solo 模式下允许本人 review，但必须留下 checklist + 时间 + revision）；
-- 修改 brief/draft/claims/evidence/asset 后自动撤销批准；
-- CI 校验站点正文 revision 与被批准 revision 一致；
-- 生成模型不能签 review；`highRisk` 需要第二人，否则阻断。
+- **第二人模式**：受保护 PR 上由非作者的 reviewer 批准；修改 brief/draft/claims/evidence/asset 后自动撤销。
+- **solo 模式**：GitHub 不允许作者自批，因此用受信 `workflow_dispatch`（`approve-production.yml`，受 GitHub Environment 保护）记录：
+  - `actor`（GitHub 身份认证）、`siteId`、`pageId`、`contentRevision`、`policyVersion`、`commit`、`approvedAt`；
+  - 内容变化后重新批准；部署前验证批准覆盖最终构建输入；
+  - 明确承认 solo 只提供身份与可追溯性，不提供独立复核。
+- **破坏性页面**（刷机、恢复、破坏性网络配置）：必须有第二人 reviewer；没有第二人时，降级为“官方来源整理 + 兼容性检查”，不写第一人称操作步骤，不声称已刷机。
+
+Review 文件只是审计记录，不是发布授权；批准记录写 `ops/approvals.json`，由受信 workflow 生成，内容脚本不能写。
 
 **状态机**：
 
@@ -267,95 +266,96 @@ ready → deployed → refreshed / retired
 | planned | brief schema 通过；站点/查询已登记 |
 | drafted | 草稿 + claims + meta 存在；结构 schema 通过 |
 | sourced | claims/evidence 完整；来源/证据检查通过 |
-| reviewed | 受保护 PR 批准；revision 匹配 |
+| reviewed | 第二人 PR 或受信 solo 批准；revision 匹配 |
 | ready | promote 到站点内容；构建/门禁通过 |
-| deployed | 部署成功；写入 `ops/deployments.json` |
-| refreshed / retired | 新 revision 替换 / 下线并登记 404/301 |
+| deployed | 部署成功；写 `activeDeployment`/`lastHealthyDeployment` |
+| refreshed/retired | 新 revision 替换 / 下线并登记 404 |
 
-**反例验收**：伪造 reviewer、改 claims、改线上正文、改图片、直接新增未登记页面 → 都不能上线；review 后改一个标点 → review 失效。
+**反例验收**：伪造 reviewer、改 claims、改正文、改图片、只改证据定位/测试设备/许可、直接新增未登记页面 → 均不能上线或使批准失效。
 
-### 3.5 MDX 与内容安全
+### 3.5 导入与内容安全
 
-- 默认 `.md`；需要 MDX 时只允许固定组件/属性（`Aside`、`Card` 等），拒绝任意 `import/export`、表达式、`<script>`、事件处理器、危险 URL。
-- `check-mdx.ts` 用 AST 检查，不靠正则。
-- DeepSeek Harness 的提示词/来源视为不可信输入；不把仓库、其他站点内容、密钥上传给外部工具。
-- 来源抓取：仅 HTTPS；逐跳检查重定向与解析地址；拒绝 localhost、RFC1918、链路本地、云元数据；限制大小/超时/MIME（SSRF 防护）。
+- 默认 `.md`；MDX 只允许固定组件/属性，拒绝任意 `import/export`、表达式、`<script>`、事件处理器、危险 URL。
+- `check-mdx.ts` 用 AST 检查，且在首次 MDX 编译前运行。
+- DeepSeek Harness 的提示词/来源视为不可信输入；不上传仓库、其他站点内容、配置备份、密码、私钥、PPPoE 凭据、客户网络拓扑、未脱敏日志。
+- 来源抓取：仅 HTTPS；逐跳检查重定向与解析地址；拒绝 localhost、RFC1918、链路本地、云元数据；限制大小/超时/MIME。
 - 构建产物扫描：`_worker.js`、Functions 目录、异常脚本、意外公开文件。
 - `.github/workflows/**`、`scripts/**`、`pnpm-lock.yaml`、`packages/docs-kit/**`、`fleet.config.json`、`content/policies/**` 用 CODEOWNERS 保护；生产部署只消费可信 main workflow 的 artifact。
 - 禁止带 secrets 的 `pull_request_target` 执行 PR 代码。
 
-### 3.6 页面级索引策略与 SEO/AEO
+### 3.6 页面级索引策略与 preview/production 矩阵
 
-v1 只支持 `primary`，删除站级 `mode`，改为页面级 `indexPolicy`：
+v1 只支持 `primary`：
 
 | 页面类型 | canonical | robots | sitemap |
 |---|---|---|---|
-| 原创、可索引 | 自引用 | index | 收录 |
+| 原创、可索引 | 自引用完整 URL | index | 收录 |
 | 明确不参与搜索 | 按既定策略 | noindex | 排除 |
 | 重复副本/翻译（v1.1+） | 指向 primary/同语言页 | index | 排除/含 hreflang |
 
-- canonical 与 noindex 是不同用途；不能把 noindex 当 canonical 的强化开关。
-- 校验**渲染后 HTML**：canonical 恰好一个、robots 有效、`lang` 正确；sitemap/Pagefind/llms.txt 无草稿。
-- canonical 目标必须是正确页面、200、可索引，无链、无环；不能只检查域名在注册表。
-- 查询注册表以 `语言 + 地区 + 用户任务/意图 + 查询簇` 为键，分配 primary **页面**。
-- `llms.txt`、FAQ schema 是增强项，不作为收录/AI 引用门禁；answer-first 是编辑规范，不强制所有 H2 写成问题。
+**canonical 始终是完整生产路径**，例如 `https://router.homes/guides/packages/`，不能只写域名或指向首页。
+
+| 环境 | 索引 | canonical 校验 |
+|---|---|---|
+| 本地/`wrangler pages dev` | noindex（或本地不校验） | 对照本地路由清单，目标页存在 |
+| hash preview | `X-Robots-Tag: noindex` + HTML noindex | 完整生产路径；不要求生产 URL 在线 |
+| branch alias / `project.pages.dev` | 实际验收 noindex；不能假设默认保护 | 同上 |
+| 自定义域名 `verified/live` | index | 目标 200、可索引、无跳转链；自引用一致 |
+
+- 不用 `robots.txt: Disallow: /` 替代 noindex（爬虫可能读不到指令）。
+- 预览产物不得原样上生产；生产必须重新构建并验证 noindex 已移除。
+- 验收命令：`curl -sS -D - -o /dev/null "$URL"` + HTML 解析 canonical/meta robots；错误 canonical、意外生产 noindex 均为 **0**。
 
 ### 3.7 去重与站点独立性
 
-**算法**：中文用字符 5-gram；英文用词 5-gram；正文去导航/页脚/模板；代码块与引用单独比较；记录 `algorithmVersion`。
+**算法**：中文 5-gram；英文词 5-gram；正文去导航/页脚/模板；代码块与引用单独比较；记录 `algorithmVersion`。
 
 | 情况 | 处理 |
 |---|---|
 | 规范化正文哈希完全相同 | 未登记复用 → 直接阻断 |
-| Jaccard ≥ 0.30 | 人工复核，不强制“改写” |
-| containment ≥ 0.80 | 人工复核（短文被长文整体包含） |
+| Jaccard ≥ 0.30 | 人工复核 |
+| containment ≥ 0.80 | 人工复核 |
 | 正文 < 300 字符 | 人工判断 |
-| 已批准复用（v1.1） | 按路径 + revision + 目标站 + 索引策略登记，不能整站豁免 |
 
-- 用至少 50 对已标注页面校准误报/漏报，再决定是否收紧。
-- `unique ratio = 某页独有 shingle 数 / 该页 shingle 总数`；站级统计公开聚合方式，**0.8 只作观察线**。
-- 新站启动必须有人工确认的独立用户任务、维护负责人、实际资料增量；换品牌/sidebar/措辞不算。
-- 多域名同质化属于 scaled content / doorway 高风险；低文本相似度不能排除风险。
+- 50 对样本校准，包含正常同主题、合法引用、整页复制、语义改写。
+- `unique ratio = 某页独有 shingle 数 / 该页 shingle 总数`；0.8 只作观察线。
+- 新站必须有独立用户任务、维护负责人、实际资料增量；换品牌/sidebar/措辞不算。
 
-### 3.8 首站 8–10 页内容 canary
+### 3.8 首站页面与 canary
 
-**首站建议查询簇**（可调整）：
+**最终 8–10 页**（先发 4–6 页）：
 
-1. OpenWrt 是什么、适合谁、版本选择（24.10 `opkg` vs 25.12+ `apk`）
+1. OpenWrt 是什么、适合谁、版本选择（25.12.x 主；24.10 差异段）
 2. 设备兼容性与刷机前检查（Table of Hardware、闪存/内存、恢复方式）
-3. 刷入 OpenWrt：factory/sysupgrade、镜像校验、TFTP/failsafe 恢复
-4. 首次登录与上网：LuCI/SSH、WAN/LAN、PPPoE/DHCP、DNS
-5. Wi-Fi 配置：信道/频宽/加密/漫游/802.11s
-6. 软件包管理：`apk`/`opkg`、软件源、依赖与空间
-7. 防火墙与端口转发：fw4/nftables、zone、DNAT
-8. VLAN 与访客/IoT 隔离：DSA、bridge-vlan
-9. 备份、升级与回滚：`sysupgrade -b`、keep settings、failsafe
-10. 常见故障排查：无法上网、LuCI 打不开、DNS、bootloop
+3. 刷机案例（**限一个已验证型号/修订**；E3；官方安装页；恢复另列）
+4. 首次登录与上网：LuCI/SSH、WAN/LAN、PPPoE/DHCP、DNS（WAN 不开放 LuCI/SSH；LAN 网段冲突）
+5. Wi-Fi：国家码、信道/频宽、WPA2/WPA3；漫游/802.11s 延后
+6. 包管理：`apk`/`opkg` update/add/remove、空间、签名、源版本；不做 `upgrade` 维护
+7. 防火墙：input/forward、IPv4 DNAT 与 IPv6 放行、CGNAT 前置判断
+8. VLAN/访客/IoT：DSA 端口标记/PVID/管理端口；VLAN 本身不等于隔离；IPv4+IPv6 负向测试
+9. 备份、升级与恢复路径：配置备份 vs 完整固件；不保留配置跨不兼容降级；不用 `sysupgrade -F`
+10. 故障排查：链路→地址→路由→DNS→服务；先采集再改配置
 
-建议 E3 页：第 3 页（真实设备刷机/恢复）、第 5 页（Wi-Fi 吞吐/覆盖）、第 8 页（VLAN/PPPoE 真实链路）。其余用 E1/E2；版本相关命令必须同时给出 24.10 与 25.12+ 的写法或明确适用范围。
+**E3 页**：第 3 页（刷机/恢复）、第 5 页（Wi-Fi 吞吐/覆盖）、第 8 页（VLAN/隔离真实链路）；至少 2 页。
 
 **流程**：
 
-- 首站直接写 8–10 页，不做 1→3→5 页数爬坡；先写第 1–4 页做一次评审校准，再补齐。
-- 技术 canary：本地构建 + Pages preview，验证审核、构建、链接、SEO、回滚；preview 默认 noindex，不观察收录。
-- **域名未绑定期间不做生产 canary**；Phase 5 完成 DNS/Custom Domain/TLS 后，再发布 8–10 页并观察 2–4 周。
-- 审阅批次控制在 3–5 页，避免疲劳；待审 >10 页暂停新稿。
-- 不设“4 周必须有曝光”的 KPI；GSC 只用于诊断索引/抓取原因。
+- 先写第 1、2、4、6 页 + 至少 1 页 E3（4–6 页）作为首批生产；技术/内容稳定后补到 8–10 页。
+- 技术 canary：本地 + preview，验证审核/构建/链接/SEO/回滚；不观察收录。
+- 域名未绑定时不做生产 canary；Phase 5 绑定并验收后发布首批。
+- 生产 canary 观察 2–4 周；GSC 只做诊断，不设曝光 KPI。
+- 审阅批次 3–5 页；待审 >10 页暂停新稿。
+- `minPages` 不参与首批部署授权；关于/隐私等辅助页不计入 8–10 页。
 
-**扩站条件**：
+### 3.9 发布、监控与撤稿
 
-- 技术：关键页 200、canonical 正确、无意外 noindex、sitemap 有效、无草稿泄漏、回滚演练通过。
-- 内容：100% 人工审核；事实/合规事故为 0；重复复核完成。
-- 搜索：GSC 已验证、sitemap 已提交、抓取/索引原因可查。
-
-### 3.9 发布与监控
-
-- `content promote` 写入站点内容并更新 revision；只有 `reviewed` 可 promote。
-- 构建 → 门禁 → stamp → artifact → deploy → 线上 smoke；成功后才写 `deployed`。
-- **域名未绑定期间**：只部署 preview 分支，确认 preview 为 noindex、canonical 指向 `https://router.homes`、sitemap 不提交；不创建 GSC 生产属性。
-- **绑定后**：验证 Custom Domain/TLS/apex-www、GSC、sitemap、生产 smoke；再做 2–4 周内容 canary。
-- 发布后 4 周看 GSC；无曝光只生成人工 `refresh` 任务，不自动改写/下线。
-- 每月轻审计（重复/过期/断链），每季度深审计（版本/合规/内容组合）。
+- `content promote` 写入站点；只有 `reviewed` 可 promote；批准覆盖最终构建输入。
+- 构建 → 门禁 → stamp → artifact → deploy → 线上 smoke；成功后才写 `activeDeployment` 与 `lastHealthyDeployment`。
+- 未绑定：只 preview，确认 noindex、canonical 完整路径、sitemap 不提交。
+- 绑定后：DNS/TLS/Custom Domain/apex-www、GSC、sitemap、生产 smoke；再做 2–4 周 canary。
+- 撤稿：同步清理 sidebar、sitemap、Pagefind、内链；未知路径真实 404；不把下线页全 301 到首页。
+- 无曝光分流：未发现 / 未抓取 / noindex / canonical 重复 / 已抓取未索引；不同原因不同处理，不一律改稿。
+- 月度轻审计、季度深审计。
 
 ---
 
@@ -363,21 +363,9 @@ v1 只支持 `primary`，删除站级 `mode`，改为页面级 `indexPolicy`：
 
 ### 4.1 工具链
 
-- Node 24.x（Astro 7 要求 `>=22.22`）。
-- pnpm workspace + catalog；`packageManager` 固定 pnpm 版本。
-- Astro 7.x + Starlight 0.42.x。
-- Turbo 2.x；TypeScript + zod；`@astrojs/mdx`（按需）。
-- 脚本统一用 `tsx` 运行；根 `package.json` 定义 `"fleet": "tsx scripts/fleet.ts"`，CI 用 `pnpm exec tsx ...`。不要依赖 Node 原生 TS 类型剥离处理复杂语法。
-
-```yaml
-# pnpm-workspace.yaml
-packages:
-  - 'sites/*'
-  - 'packages/*'
-catalog:
-  astro: ^7.4.1
-  '@astrojs/starlight': ^0.42.6
-```
+- Node 24.x（Astro 7 要求 `>=22.22`）；pnpm workspace + catalog；Astro 7.x + Starlight 0.42.x；Turbo 2.x；TypeScript + zod；`@astrojs/mdx`（按需）。
+- 脚本统一 `tsx`；根 `package.json` 定义 `"fleet": "tsx scripts/fleet.ts"`；CI 用 `pnpm exec tsx`，不要用 `node scripts/*.ts`。
+- 生产部署步骤只装 `wrangler`/最小依赖，不跑内容构建或安装脚本。
 
 ### 4.2 CI
 
@@ -393,13 +381,13 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - id: plan
-        run: node scripts/ci-matrix.ts --event "$GITHUB_EVENT_NAME" --base "$BASE" --head "$GITHUB_SHA"
+        run: pnpm exec tsx scripts/ci-matrix.ts --event "$GITHUB_EVENT_NAME" --base "$BASE" --head "$GITHUB_SHA"
   policy:
     needs: plan
     steps:
       - uses: actions/checkout@v4
       - run: corepack enable && pnpm install --frozen-lockfile
-      - run: node scripts/checks/global.ts   # dedup、查询归属、registry、review revision
+      - run: pnpm exec tsx scripts/checks/global.ts
   build:
     needs: [plan, policy]
     if: needs.plan.outputs.has_sites == 'true'
@@ -412,8 +400,8 @@ jobs:
       - uses: actions/checkout@v4
       - run: corepack enable && pnpm install --frozen-lockfile
       - run: pnpm exec turbo run build --filter=@fleet/site-${{ matrix.site }}
-      - run: node scripts/checks/site.ts --site ${{ matrix.site }}
-      - run: node scripts/stamp.ts --site ${{ matrix.site }}
+      - run: pnpm exec tsx scripts/checks/site.ts --site ${{ matrix.site }}
+      - run: pnpm exec tsx scripts/stamp.ts --site ${{ matrix.site }}
       - uses: actions/upload-artifact@v4
         with: { name: dist-${{ matrix.site }}, path: sites/${{ matrix.site }}/dist }
   deploy:
@@ -425,46 +413,48 @@ jobs:
         site: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
-      - run: corepack enable && pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v4
-        with: { name: dist-${{ matrix.site }} }
-      - run: pnpm fleet deploy --site ${{ matrix.site }}
+        with: { name: dist-${{ matrix.site }}, path: sites/${{ matrix.site }}/dist }
+      - run: npx wrangler pages deploy sites/${{ matrix.site }}/dist --project-name ... --branch main
 ```
 
-- `ci-matrix.ts`：PR 用 `git merge-base origin/main HEAD`；push 用 `event.before → github.sha`；无有效 base、首次运行、检测失败 → 全量。处理删除/重命名/空矩阵。
-- 影响规则：单站正文 → 构建该站 + **全库跨站检查**；docs-kit → 所有依赖站；registry/门禁脚本/共享配置/lockfile → 明确规则扩展，无法判断则全量。
-- `policy` 全局跑 dedup、查询归属、registry、review revision，不随单站 build 跳过。
-- `deploy` 用 `if: always()` + 每站 artifact 存在性检查；某站 build 失败只阻塞该站。
-- 失败站即使下次没有内容变化，也必须能补部署；`ops/deployments.json` 对账目标/已部署 revision。
-- 生产顺序：内容批准/证据/去重 → build → HTML/链接/SEO 校验 → stamp → artifact → deploy → 线上 smoke。
+**生产资格**必须同时满足：
+
+1. 全局 `policy` 成功；
+2. 该站 `checks/site` 成功；
+3. artifact 来自同一可信 run/commit；
+4. digest 匹配，stamp 的 site/commit/mode 正确；
+5. `ops/approvals.json` 有覆盖该 revision/policy 的批准；
+6. `domainStatus` 为 `verified`/`live`。
+
+- artifact 下载到明确 `sites/<id>/dist`；部署前核对路径、site、commit、mode。
+- 凭据只进部署步骤；部署步骤不跑安装/构建。
+- 每站 concurrency；拿到执行权后再次确认目标 revision，防止旧任务覆盖新发布。
+- 记录 `activeDeployment`（上传成功）与 `lastHealthyDeployment`（smoke 成功）；smoke 失败也要记录远端已变化。
+- 首次生产发布没有旧版本可回滚：预先准备 noindex 占位产物或停服处置。
+- 失败站即使下次无内容变化，也必须能补部署；`ops/deployments.json` 对账。
 
 ### 4.3 构建策略与 SLO
 
 - 3–5 站：逐站矩阵，`max-parallel: 2–3`，缓存 pnpm store。
-- 10–20 站：先维持逐站矩阵；有瓶颈再按 4–5 站分片，不直接改成一个大 build job。
-- 部署超过 5 站时，避免矩阵重复 `pnpm install`：用单个 deploy job 循环 + 每站结果记录，或只含 `wrangler` 的轻量镜像。
-- nightly 全量检查，发现变更检测遗漏。
-- Phase 0 记录冷/热构建、RSS、artifact 大小、上传耗时。
-- 初始 SLO：单站变更反馈 p95 ≤10 分钟；20 站全量 ≤30 分钟；超标再优化。
+- 10–20 站：先维持矩阵；有瓶颈再按 4–5 站分片；部署 >5 站用单 job 循环或轻量镜像，避免重复 install。
+- nightly 全量检查；Phase 0 记录冷/热构建、RSS、artifact 大小、上传耗时。
+- SLO：单站变更反馈 p95 ≤10 分钟；20 站全量 ≤30 分钟；超标再优化。
 
-### 4.4 部署与回滚
+### 4.4 部署、域名状态与回滚
 
-- Cloudflare Pages，每站一项目；direct upload。
-- `deploy.enabled=false` 可构建不部署。
-- `domainStatus=unbound` 时，`deploy.ts` 只允许 preview 分支部署；生产部署直接非零退出。绑定并验收后把 `enabled` 改为 true。
-- stamp：`site、commit、inputDigest、policyVersion、artifactDigest、runId、mode、builtAt`。
-- 部署前校验 site/commit/mode；缺 `index.html`、candidate/rehearsal、digest 不匹配 → 拒绝。
-- 记录 deployment ID；未绑定时验证 `*.pages.dev` 预览的 stamp + noindex；绑定后验证自定义域名上的 stamp。
-- **Pages 配额**：Free 每月 500 次构建、1 个同时构建；100 个项目/账号；每站 20,000 文件、单文件 25 MiB。direct upload 不消耗构建次数，但仍受文件/大小/API 限流约束。
-- 回滚：优先回滚已有成功 production deployment；不要用 `wrangler pages deployment` 当完整回滚命令。使用已核验 API：
+- `fleet deploy --target preview|production`；`domainStatus=unbound` 只允许 preview；`binding` 允许一次无内容 noindex 占位生产部署；`verified/live` 允许正式内容。
+- stamp：`site、commit、inputDigest、policyVersion、artifactDigest、runId、mode、builtAt`；digest 排除 stamp 自身。
+- 部署前校验 site/commit/mode、`index.html`、candidate/rehearsal、digest、批准、域名状态。
+- Pages 配额：Free 每月 500 次构建、1 并发；100 项目/账号；20,000 文件/站、25 MiB/文件；direct upload 不消耗构建次数，但受文件/API 限流。
+- 回滚优先用已有成功 production deployment；不要用 `wrangler pages deployment` 当完整回滚命令。API：
   ```text
   POST /accounts/{account_id}/pages/projects/{project_name}/deployments/{deployment_id}/rollback
   ```
-  或 Pages 控制台；preview 不能作为回滚目标。
+  preview 不能作为回滚目标。
 - artifact 保留最近 5 个成功生产版本或 30 天；回滚不重跑内容生成。
-- 部署前检查是否已被较新发布取代；生产部署中途不随意取消。
-- canary 失败停止扩散；非 canary 单站失败只停该站并记录补部署。
-- 纯静态 `_redirects` 不支持任意 410：无替代页返回真实 404；确需 410 再引入 Function/Worker；不要把下线页全 301 到首页。
+- 首次生产失败：停留占位/旧版；记录补部署；不把“上传成功”当“发布成功”。
+- 纯静态 `_redirects` 不支持任意 410：无替代页返回真实 404；确需 410 再引入 Function/Worker。
 
 ---
 
@@ -473,94 +463,93 @@ jobs:
 | 门禁 | 内容 | 阶段 | 处理 |
 |---|---|---|---|
 | G0a | brief schema、站点/查询登记、slug/路径 | 写作前 | 硬阻断 |
-| G0b | draft/claims/evidence schema、结构 | import 后 | 硬阻断 |
-| G1 | 来源绑定、证据类型适配、时效、`highRisk` | sourced | 硬阻断 |
-| G2 | 可信 review + `contentRevision` 匹配 | ready 前 | 硬阻断 |
+| G0b | draft/claims/evidence schema、结构、MDX 首次编译前检查 | import 后 | 硬阻断 |
+| G1 | 来源绑定、证据适配、时效、`highRisk`、许可 | sourced | 硬阻断 |
+| G2 | 第二人或受信 solo 批准；`contentRevision` + `policyVersion` 匹配 | ready 前 | 硬阻断 |
 | G3 | 精确复制阻断；近似重复人工复核 | 发布前 | 硬阻断/复核 |
 | G4 | 独立定位、查询归属人工批准；0.8 观察 | 发布前 | 人工 |
-| G5 | build、链接/资源/锚点、孤立页、sitemap、canonical、渲染 HTML | 部署前 | 硬阻断 |
+| G5 | build、链接/资源/锚点、孤立页、sitemap、canonical（完整路径）、preview/production 索引矩阵 | 部署前 | 硬阻断 |
 | G6 | 安全 headers、关键重定向；Lighthouse 后置 | 生产前/周期性 | 硬阻断/告警 |
-| G7 | 产物 stamp、digest、site/commit/mode | 部署前 | 硬阻断 |
-| G8 | 索引/曝光采集、负责人、刷新队列 | 发布后 | 运营 |
-
-**v1 保留**：C1–C10 中，C2 的“首段 2–3 句”降为编辑建议；C8 的“3–8 条内链”改建议；C9 独立为 secret/PII 扫描 + 人工权利审核；C7 的 0.8 只作观察。
+| G7 | 产物 stamp/digest、可信 run/commit、批准、域名状态 | 部署前 | 硬阻断 |
+| G8 | 索引/曝光采集、负责人、刷新/撤稿 | 发布后 | 运营 |
 
 **阈值**：
 
-- `minPages` 是上线内容计划，不是质量分；首站 8–10 页。
+- 错误 canonical、意外生产 noindex、错误站点/commit、无批准部署 = **0**。
 - 精确复制 = 0；近似重复 ≥0.30 必须复核并记录结论。
-- 死链 = 0；外链超时先重试并人工核实，不因来源站临时故障硬阻断。
-- sitemap 只含本站 URL；canonical 自引用（v1）。
-- 渲染后 HTML 检查，不只查 frontmatter。
+- 死链 = 0；外链超时先重试并人工核实。
+- 危险操作错误确认后 **24 小时内**纠正或撤稿。
+- 版本安全信息每周检查；普通版本步骤每 30 天复核；证书剩余 <14 天告警。
+- 备份初始目标：RPO ≤24 小时、RTO ≤4 小时；首发前完成一次异地恢复演练。
 
 ---
 
-## 6. 工作分解
+## 6. 工作分解与工期
 
-**工程 15–21 人日**（不含正式内容制作与评审）。
+**完整工程范围 20–30 人日**；另计 **8–15 内容/测试人日**（设备齐备时）。若坚持 15–21 工程人日，必须砍掉：第二套主题、共享组件覆盖、完整多命令 CLI；第二站只做不公开的隔离夹具。
 
 | 范围 | 人日 |
 |---|---:|
 | 两站竖切、模板、registry、docs-kit | 3–4 |
-| 内容 draft/import/check/review/promote + revision 绑定 | 3–4 |
-| CI/CD、artifact、安全与回滚 | 4–5 |
-| 内容/SEO/安全门禁及故障场景验证 | 4–6 |
-| 上线运营、监控、文档及缓冲 | 1–2 |
-| **合计** | **15–21** |
+| 内容 import/check/approve/promote + revision/证据哈希 | 4–6 |
+| CI/CD、可信 artifact、部署状态、回滚 | 5–7 |
+| SEO/索引矩阵/MDX/SSRF/去重/独立性 | 5–7 |
+| 运维、监控、文档与缓冲 | 3–6 |
+| **合计** | **20–30** |
 
-### Phase 0：竖切与决策（1–2 天）
+### Phase 0：竖切与校准（1–2 天）
 
-- 两站（`router-homes` + 一个）跑通 registry/docs-kit/构建/预览。
-- 域名未绑定：用本地 `pnpm build` + `wrangler pages dev` 或 Pages preview 验证；不配置 Custom Domain。
-- 实测冷/热构建、预览、内容隔离。
-- 确认 OpenWrt 8–10 页清单、版本口径（25.12+ 主、24.10 差异）、E3 设备型号、评审人。
-- 产出 `docs/adr/0001-architecture.md`、`0002-content-review.md`、`0003-openwrt-version-policy.md`。
+- 两站（`router-homes` + 一个不公开夹具）跑通 registry/docs-kit/构建。
+- 域名未绑定：本地 `pnpm build` + `wrangler pages dev` 或 Pages preview；不配置 Custom Domain。
+- 用两篇样稿（一篇 E1/E2、一篇 E3）校准 brief/claims/evidence/review。
+- 确认：OpenWrt 8–10 页清单、验证型号/版本、第二评审人、域名绑定时间。
+- 产出 `docs/adr/0002-content-review.md`、`0003-openwrt-version-policy.md`。
 
-**验收**：两站独立 dist；互不含对方页面；单站 dev 正常；preview 可访问且 noindex。
+**验收**：两站独立 dist；preview noindex；canonical 完整路径；样稿通过 check。
 
 ### Phase 1：骨架（3–4 天）
 
 - pnpm/Turbo/catalog、`fleet.config.json` + zod、`new-site`、`docs-kit`、`site.meta`、`templates/site`。
-- 2 套主题、共享 Header/Footer/SEOHead/Compliance（先不覆盖 Starlight 原生）。
+- 一套主题 + 原生 Starlight 外观；共享 Header/Footer/SEOHead 先不覆盖。
 - `validate`、`build`、`dev --filter`。
 
 **验收**：`new-site` 生成可运行站；重复域名/缺目录被拦截；两站构建通过；docs-kit 升级触发依赖站。
 
-### Phase 2：内容 QA 流水线（3–4 天）
+### Phase 2：内容 QA 与批准（4–6 天）
 
-- brief/claims/evidence schema；`content import/check/review/promote`。
-- `contentRevision`；受保护 PR review 绑定；solo review 模式（checklist + 时间 + revision）。
-- 首站 3–4 页走完 drafted→sourced→reviewed→ready。
+- brief/claims/evidence schema；import 剥离信任字段；`evidenceManifestHash`；MDX 编译前检查。
+- `approve-production.yml` + `ops/approvals.json`；solo/第二人模式；破坏性页面第二人或降级。
+- 首站首批 4–6 页走完 drafted→sourced→reviewed→ready。
 
-**验收**：伪造 reviewer/改 claims/改正文/改图片均不能上线；review 后改标点失效；无来源页被拒；MDX 恶意样例被拒。
+**验收**：伪造 reviewer、改 claims、改正文、改图片、只改证据定位/设备/许可 → 不能上线或批准失效；无来源页被拒。
 
-### Phase 3：CI/CD 与部署（4–5 天）
+### Phase 3：CI/CD 与部署（5–7 天）
 
-- `ci-matrix`（merge-base/事件范围/空矩阵/删除重命名）、全局 policy、按站 build/deploy、artifact、stamp、回滚。
-- `ops/deployments.json` 对账。
+- `ci-matrix`（merge-base/事件范围/空矩阵/删除重命名）、全局 policy、可信 artifact、stamp、部署状态、回滚。
+- `active/lastHealthy` 对账；preview 重部署/旧产物恢复；生产回滚演练放 Phase 5。
 
-**验收**：只改一站只构建/部署该站；改 docs-kit 触发依赖站；某站失败不阻塞其他站；错误 digest/commit 被拒；回滚演练成功。
+**验收**：只改一站只构建/部署该站；改 docs-kit 触发依赖站；某站失败不阻塞其他站；错误 digest/commit/无批准被拒；首次发布占位可用。
 
-### Phase 4：SEO/质量/安全（4–6 天）
+### Phase 4：SEO/质量/安全（5–7 天）
 
-- `indexPolicy`、canonical 渲染校验、sitemap/robots、dedup、independence、MDX/SSRF/secret 扫描、链接/孤立页。
-- 50 对样本校准 dedup；首站监控、GSC、备份。
+- `indexPolicy`、preview/production 矩阵、canonical 完整路径、sitemap/robots、dedup、independence、MDX/SSRF/secret 扫描、链接/孤立页。
+- 50 对样本校准；首站监控、GSC 准备、备份。
 
-**验收**：跨站复制被阻断/复核；canonical 链/环被发现；MDX/SSRF 样例被拒；首站 sitemap 正确。
+**验收**：跨站复制被阻断/复核；canonical 链/环/首页误指被发现；preview 泄漏被拦；MDX/SSRF 样例被拒。
 
-### Phase 5：首站 8–10 页上线（编辑 + 日历）
+### Phase 5：域名绑定与首批生产（编辑 + 日历）
 
-- 首站 8–10 页 OpenWrt 文档；先第 1–4 页校准评审，再补齐。
-- **先绑定域名**：DNS、Pages Custom Domain、TLS、apex/www、GSC 验证、sitemap 提交。
-- 生产内容 canary：正式域名发布，观察 2–4 周。
-- 技术硬条件 + 内容硬条件全过后，再开第二站（目标 3–5 站）。
+- 绑定域名：Cloudflare zone/NS、DNS/MX/TXT 备份、Custom Domain、TLS、apex/www、DNSSEC/CAA、GSC。
+- `binding`：无内容 noindex 占位部署验证路由；`verified`：首批 4–6 页（含至少 2 页 E3）。
+- smoke、sitemap、canary 2–4 周；再补到 8–10 页。
+- 生产回滚演练；危险内容事故演练。
 
-**验收**：8–10 页全部人工审核；技术/内容硬条件全过；GSC 可查；回滚可用；无 dedup 阻断。
+**验收**：域名/TLS/路由通过；首批页面 canonical/index/sitemap 正确；回滚可用；无未解决事实/合规事故。
 
 ### Phase 6：扩到 10–20 站（1–2 周工程 + 持续内容）
 
-- CI 分片（按实测）、nightly 全量、监控、审计、站点生命周期。
-- 每站 owner、复核日、下线/301 流程。
+- CI 分片、nightly 全量、监控、审计、站点生命周期。
+- 每站 owner、复核日、下线/404 流程。
 
 ---
 
@@ -568,38 +557,42 @@ jobs:
 
 | 风险 | 影响 | 缓解 |
 |---|---|---|
-| 外部 AI 幻觉/无来源断言 | 信任与 SEO 受损 | claims/evidence；人工 review；E0 拒绝 |
-| 多站同质化/doorway | 不收录、拖累主站 | 精确复制阻断；近似重复复核；一查询一 primary 页面；canary |
-| 审核被绕过/伪造 | 未审核内容上线 | contentRevision + 受保护 PR + CI 校验 + 反例测试 |
-| solo review 独立性不足 | 质量盲区 | 强制 checklist + 时间 + revision；高风险主题第二人或阻断 |
-| MDX/内容执行代码 | 供应链/服务器风险 | 默认 `.md`；MDX AST 白名单；部署权限隔离 |
-| SSRF/来源抓取 | 内网探测 | HTTPS、重定向/解析检查、私网/元数据阻断、大小/超时限制 |
-| 缓存污染/旧 stamp | 错误产物上线 | `cache:false`；stamp 绑定 inputDigest/artifactDigest；部署前校验 |
-| 旧部署覆盖新版本 | 回退 | 部署 ID/目标 revision 对账；生产部署不随意取消 |
-| 评审瓶颈 | 发布停滞 | 每批 3–5 页；待审 >10 页暂停新稿 |
-| 来源版权/引用 | 法律风险 | 权利字段；短引用；不复制全文；不上传他人内容到外部工具 |
-| Pages 配额/文件限制 | 部署失败 | 20k 文件/25 MiB 检查；接近 100 项目转 VPS/分账号 |
-| 域名/DNS/TLS | 上线延迟 | 上线验收表；负责人；证书/重定向检查 |
-| Astro/Starlight 升级 | 全站回归 | catalog 锁版本；staging canary；分批部署 |
+| 外部 AI 幻觉/无来源断言 | 信任与 SEO 受损 | claims/evidence；人工批准；E0 拒绝 |
+| solo 批准不是独立复核 | 质量盲区 | 明确边界；破坏性页面第二人或降级；高风险阻断 |
+| 刷机/恢复误导 | 设备变砖、法律/信任风险 | 单型号/修订、E3、官方安装页、三类恢复分开、禁用 `-F` |
+| 版本口径过宽 | 命令失效、误导 | 一个 25.12.x 主版本 + 24.10 差异段；`testedVersions` |
+| preview 被索引 | 重复/错误收录 | noindex 头 + HTML 双检；不提交 sitemap；生产重建 |
+| canonical 指错 | 权重损失 | 完整生产路径；本地/绑定分阶段校验；0 容忍 |
+| 首次生产无可回滚 | 事故无法恢复 | noindex 占位、停服处置、lastHealthy 记录 |
+| 审核/部署被绕过 | 未批准内容上线 | 受信 workflow、批准绑定 revision、CI 校验、CODEOWNERS |
+| MDX/内容执行代码 | 供应链风险 | 默认 `.md`；AST 白名单；编译前检查；权限隔离 |
+| SSRF/数据外泄 | 内网/隐私风险 | HTTPS、私网/元数据阻断；不上传配置/凭据 |
+| 许可/商标 | 法律风险 | license/attribution 字段；独立站声明；不复刻官方标识 |
+| Pages 配额/文件限制 | 部署失败 | 20k/25MiB 检查；接近 100 项目转 VPS/分账号 |
+| 域名/DNS/TLS | 上线延迟 | 绑定清单；DNS/MX/TXT 备份；证书告警 |
+| Astro/Starlight 升级 | 全站回归 | catalog 锁版本；夹具站 canary；分批部署 |
 
 ---
 
-## 8. 运营与上线验收
+## 8. 运营、合规与上线验收
 
 | 项目 | 验收 | 负责人 |
 |---|---|---|
-| DNS/TLS | **目前未绑定**；Phase 5 绑定：注册商/续费、apex/www、CNAME→Pages、Custom Domain、TLS、CAA、GSC 验证 | operator |
-| GSC | 绑定后每域 Domain Property、DNS 验证、sitemap 提交时间、账号恢复路径；绑定前不创建生产属性 | operator |
-| 分析 | 每站独立 ID；排除 preview/内网；事件不带 PII | operator |
-| 编辑透明度 | 关于、纠错政策、联系、隐私页；商业关系披露 | editor |
-| URL 生命周期 | 稳定 pageId；旧→新登记；无链无环；无替代内容 404 | operator |
-| 备份 | Git 外保存证据/审核记录/媒体权利/生产 artifact/域名部署映射；定期恢复演练 | operator |
-| 监控 | 每 5 分钟首页 + 1 关键页；连续 3 次失败告警；每日证书/索引指令检查 | operator |
-| 内容维护 | 每页 owner、下次复核日；按过期风险刷新 | editor |
+| 责任 | 站点 owner、编辑、部署操作者、告警接收者落实到账号；solo 可同一人 | owner |
+| 独立声明 | 首页/关于页声明独立社区文档，与 OpenWrt 项目及设备厂商无隶属/授权；商标按权利方规则 | editor |
+| 许可 | 来源记录 `licenseId/licenseUrl/attribution/modified`；OpenWrt Wiki 通常 CC BY-SA 4.0，逐项核查例外 | editor |
+| 外部 AI | 只输入经许可、脱敏的 brief/材料；禁止配置备份、密码、私钥、PPPoE 凭据、客户拓扑、未脱敏日志 | operator |
+| DNS/TLS | **未绑定**；Phase 5：Cloudflare zone/NS、DNS/MX/TXT 备份、Pages Custom Domain、TLS、apex/www、DNSSEC/CAA | operator |
+| GSC | 有 DNS 控制权可提前验证 Domain Property；sitemap 在正式验收后提交 | operator |
+| 分析/隐私 | 每站独立 ID；排除 preview/内网；隐私页先于分析脚本上线；事件不带 PII | operator |
+| URL 生命周期 | 稳定 pageId；旧→新登记；未知 404；撤稿同步 sidebar/sitemap/Pagefind/内链 | operator |
+| 备份 | Git 外保存证据/批准/许可/生产 artifact/域名部署映射；RPO≤24h、RTO≤4h；首发前异地恢复演练 | operator |
+| 监控 | 每 5 分钟首页 + 1 关键页；连续 3 次失败告警；每日证书/索引指令检查；证书 <14 天告警 | operator |
+| 内容维护 | 每页 owner、下次复核日；安全/版本信息每周、普通步骤每 30 天；危险错误 24h 纠正/撤稿 | editor |
 
 - 月度轻审计、季度深审计。
-- SLO 见 §4.3；生产部署成功率、回滚次数纳入月度复盘。
-- 内容生产成本按**编辑人时**记录，不引入模型 API 预算。
+- 生产成本按编辑/测试人时记录，不引入模型 API 预算。
+- 2–4 周 canary 是诊断窗口，不承诺收录或曝光。
 
 ---
 
@@ -607,34 +600,34 @@ jobs:
 
 ### 9.1 明确延后
 
-1. 跨站内容包 `add/sync/check/prune`（出现真实复用页后再评估 v1.1）。
-2. `mirror`/`localized`、hreflang（v1 只 primary）。
-3. 仓库内 AI 生成/provider 适配/自动批量（v1 由 DeepSeek Harness 外部生产）。
-4. embedding 去重、复杂独立性评分（v1 精确哈希 + 5-gram + containment + 人工）。
-5. 50 站编排、自动账号拆分、VPS 替代部署。
-6. 大范围 Starlight 组件覆盖、第二套主题、Lighthouse 硬阈值。
-7. 按曝光自动刷新/下线。
+1. 跨站内容包（出现真实复用页后再评估）。
+2. `mirror`/`localized`、hreflang、文档版本化、完整双版本教程。
+3. 802.11r/802.11s/多 AP 漫游、复杂 Wi-Fi 性能专题。
+4. 仓库内 AI 生成/provider/自动批量。
+5. 第二套主题、大范围 Starlight 组件覆盖、embedding 去重、Lighthouse 硬阈值。
+6. 50 站编排、自动账号拆分、VPS 替代部署。
+7. `llms.txt`/FAQ schema、自动刷新/下线。
 
-### 9.2 仍需在 Phase 0 确认
+### 9.2 Phase 0 必须确认
 
-1. OpenWrt 8–10 页最终清单（建议见 §3.8）；是否 10 页全做，还是先 8 页。
-2. 版本口径：以 25.12+（`apk`）为主、24.10（`opkg`）只做差异段，还是两者各写一套。
-3. 评审人：solo review 还是第二人；高风险主题（刷机/安全）如何处理。
-4. E3 设备：手上有哪些可刷 OpenWrt 的路由器/软路由；刷机、Wi-Fi 吞吐、VLAN/PPPoE 各由哪台设备验证。
-5. 域名：注册商/DNS 控制权是否在手；预计何时绑定；Pages 项目是否已创建。
+1. 最终 8–10 页清单；首批 4–6 页选哪几篇。
+2. 验证型号/硬件修订；哪台设备做刷机、Wi-Fi、VLAN/PPPoE 的 E3。
+3. OpenWrt 主版本（建议一个 25.12.x 稳定版）与 24.10 差异段范围。
+4. 第二评审人是否可用；不可用时，刷机页降级为来源整理。
+5. 域名注册商/DNS 控制权、绑定时间、Pages 项目是否已建。
 
 ### 9.3 下一步
 
-1. Phase 0：两站竖切 + 构建/预览实测。
-2. 确认 §9.2 四项。
-3. 进入 Phase 1；Phase 2 前写 `docs/adr/0002-content-review.md`，把 revision/review/部署状态机定死。
+1. Phase 0：两站竖切 + 两篇样稿校准。
+2. 确认 §9.2 五项。
+3. 进入 Phase 1；Phase 2 前写 `docs/adr/0002-content-review.md` 与 `0003-openwrt-version-policy.md`。
 
 ---
 
 ## 10. 评审记录
 
-- v0.2 经 Codex CLI 只读评审（`codex exec -s read-only`）；10 条 P0/P1 已纳入 v0.3。
-- v0.4 根据最新决策收敛：移除自动 AI 生成/provider/批量/内容包；首站直接 8–10 页；E3 采用推荐策略。审核绑定、MDX 安全、CI、页面级索引、dedup、部署回滚等 P0/P1 保留。
-- v0.5 首站定为 Router.Homes（router.homes）OpenWrt 中文文档；域名未绑定，Phase 0–4 只做本地/预览，Phase 5 绑定后再做生产 canary；补充 OpenWrt 25.12+ `apk` / 24.10 `opkg` 版本口径与 E3 设备建议。
-- v0.5 待 Codex 复审；复审结论与修订将写入 v0.6。
-- v0.4 未执行代码/构建验证；Phase 0 的首要任务是用两站竖切验证假设。
+- v0.2 经 Codex CLI 只读评审（`codex exec -s read-only`）；10 条 P0/P1 纳入 v0.3。
+- v0.4 收敛：移除自动 AI 生成/provider/批量/内容包；首站 8–10 页；E3 推荐策略。
+- v0.5 首站定为 Router.Homes（router.homes）OpenWrt 中文文档；域名未绑定，Phase 0–4 只做本地/预览。
+- v0.5 再经 Codex 只读复审；发现 10 条 P0/P1（solo 批准不可实现、域名状态死锁、preview canonical 冲突、CI 可信边界、刷机通用化、版本口径过宽、Wi-Fi/隔离负向测试、证据哈希、工期、合规责任）；v0.6 已纳入。
+- v0.6 未执行代码/构建验证；Phase 0 用两站竖切与两篇样稿验证假设。
