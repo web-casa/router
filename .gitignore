@@ -1,0 +1,6 @@
+node_modules/
+**/dist/
+**/.astro/
+.fleet/tmp/
+*.log
+.DS_Store
