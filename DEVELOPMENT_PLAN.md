@@ -1,8 +1,8 @@
-# 文档站群开发方案（v0.4 · 执行版）
+# 文档站群开发方案（v0.5 · OpenWrt 首站版）
 
-> 状态：方向与范围已确认；Codex review 的 P0/P1 仍保留，v0.4 按最新四点收敛范围。
+> 状态：方向与范围已确认；首站定为 **Router.Homes（https://router.homes）**，内容为 **OpenWrt 中文文档**；域名尚未绑定，Phase 0–4 先本地构建 + Pages 预览，Phase 5 绑定后再做生产验收。
 > 参考：`~/centosfan`（生产多站系统）、`starlight-multi-site`（原型，不采用）、`astro-fleet`（monorepo 工程参考，非 Starlight）。
-> 变更摘要：**AI 内容由 DeepSeek Harness 外部生产，仓库不做自动化生成；v1 不做内容包；首站直接 8–10 页做完整内容 canary；E3 采用推荐策略。**
+> 变更摘要：**DeepSeek Harness 外部写作；v1 不做内容包；首站 8–10 页 OpenWrt 文档；E3 按“规格 E1 / 步骤 E2 / 实测 E3”执行；域名未绑定，生产部署门禁到绑定后再开。**
 
 ---
 
@@ -16,9 +16,10 @@
 | ADR-004 | 部署 | Cloudflare Pages 每站一项目 + Actions 直传 |
 | ADR-005 | 规模 | 首发 3–5 站，12 个月 10–20 站 |
 | ADR-006 | 内容生产 | DeepSeek Harness 外部产出 + 人工审核 + 严格门禁，**不做自动化 AI 生成流水线** |
-| ADR-007 | 首站内容 | `router.homes` 直接 8–10 页，走完整生产内容 canary |
+| ADR-007 | 首站内容 | **Router.Homes（router.homes）OpenWrt 中文文档**，直接 8–10 页，走完整生产内容 canary |
 | ADR-008 | 证据策略 | 规格 E1；可复现步骤 E2；吞吐/覆盖/“我们实测” E3；首站至少 2–3 页有 E3 |
 | ADR-009 | 跨站分发 | v1 不做；出现真实复用页后再评估 v1.1 |
+| ADR-010 | 域名状态 | `router.homes` **尚未绑定**；Phase 0–4 只做本地构建与 Pages 预览，生产部署在绑定并验收后开启 |
 
 **Codex review 处置**：v0.2 的 10 条 P0/P1 仍保留（审核绑定、MDX/执行安全、claims/evidence、CI、隔离边界、页面级索引、dedup 校准、canary、部署回滚、门禁/工期）。v0.4 只移除“provider 适配、自动批量生成、provider 预算、内容包”相关工程，不降低审核与发布门禁。
 
@@ -32,7 +33,7 @@
 2. 单站可独立开发、构建、预览、部署；单站故障不阻塞其他站。
 3. 一条命令构建全部；一条命令构建指定站；CI 只构建受影响站点，但跨站检查全库运行。
 4. 内容由 DeepSeek Harness 在仓库外生成，进入 `content/drafts/` 后走统一的检查、评审、promote。
-5. 首站 `router.homes` 直接 8–10 页，全部人工审核后上线，观察 2–4 周再扩站。
+5. 首站 `router.homes`（Router.Homes）写 8–10 页 OpenWrt 中文文档，全部人工审核；域名暂未绑定，先预览验证，绑定后再做生产 canary 并观察 2–4 周。
 6. 每站门禁可测量：schema、claims/evidence、revision 绑定、dedup、独立性、链接、sitemap、canonical、产物。
 7. 生产可运维：部署可追溯、可回滚；每站独立 Pages 项目；密钥最小权限。
 
@@ -113,6 +114,28 @@ docs-fleet/
 | 正文、frontmatter、claims | `sites/<id>/src/content/docs/` |
 
 `site.meta.ts` 通过 `getSite(id)` 读注册表，不复制 title/domain。
+
+首站注册表示例：
+
+```json
+{
+  "id": "router-homes",
+  "domain": "router.homes",
+  "title": "Router.Homes",
+  "description": "OpenWrt 中文文档：刷机、网络、Wi-Fi、防火墙与故障排查",
+  "locale": "zh-CN",
+  "audience": "想在家用路由器上使用 OpenWrt 的用户",
+  "angle": "按真实设备与固件版本验证的 OpenWrt 操作文档",
+  "minPages": 8,
+  "deploy": {
+    "enabled": false,
+    "project": "router-homes",
+    "domainStatus": "unbound"
+  }
+}
+```
+
+`deploy.enabled=false` 直到域名绑定并验收；Phase 0–4 只允许 preview 分支部署。
 
 ### 2.4 docs-kit、schema 与构建
 
@@ -196,7 +219,9 @@ docs-fleet/
 | 版本/兼容性 | E1 | 30 天新鲜度 |
 | 稳定标准/长期政策 | E1 | 180 天新鲜度 |
 
-`router.homes` 首站建议：至少 2–3 页有 E3（例如吞吐对比、覆盖测试、Mesh 回程），其余用 E1/E2；没有实测设备的页面明确标 `tested: false`，避免“我们测试了”的表述。
+`router.homes` 首站建议：至少 2–3 页有 E3（刷机与恢复、Wi-Fi 吞吐/覆盖、VLAN/PPPoE 之一），其余用 E1/E2；没有实测设备的页面明确标 `tested: false`，避免“我们测试了”的表述。
+
+**OpenWrt 版本口径**：OpenWrt 25.12+ 使用 `apk`，24.10 使用 `opkg`；同一命令页必须标注适用版本，不能混写。E2 优先用 OpenWrt x86 VM（可重放 `apk/opkg`、LuCI、fw4 操作）；真实路由 Web UI 用截图 + 固件版本 + 日期。E3 只用于真实设备上的刷机/启动、Wi-Fi 吞吐/覆盖、VLAN/PPPoE 等结论。刷机页必须包含设备兼容性、精确镜像、校验和、恢复方式（TFTP/failsafe）与断电风险；没有真实设备就标注“未实测”，不能写“我们已刷机验证”。
 
 **规则**：
 
@@ -296,22 +321,24 @@ v1 只支持 `primary`，删除站级 `mode`，改为页面级 `indexPolicy`：
 
 **首站建议查询簇**（可调整）：
 
-1. Wi-Fi 6 与 Wi-Fi 7 家用怎么选
-2. 路由器放在哪里：覆盖与干扰
-3. 160 MHz 频宽有必要吗
-4. Mesh 与无线中继怎么选
-5. 家庭宽带与路由器选型（100M/500M/1000M）
-6. IPv6 家庭网络配置
-7. DNS 设置与测速
-8. 访客网络与 IoT 隔离
-9. 固件更新与回滚
-10. 有线回程与交换机选型
+1. OpenWrt 是什么、适合谁、版本选择（24.10 `opkg` vs 25.12+ `apk`）
+2. 设备兼容性与刷机前检查（Table of Hardware、闪存/内存、恢复方式）
+3. 刷入 OpenWrt：factory/sysupgrade、镜像校验、TFTP/failsafe 恢复
+4. 首次登录与上网：LuCI/SSH、WAN/LAN、PPPoE/DHCP、DNS
+5. Wi-Fi 配置：信道/频宽/加密/漫游/802.11s
+6. 软件包管理：`apk`/`opkg`、软件源、依赖与空间
+7. 防火墙与端口转发：fw4/nftables、zone、DNAT
+8. VLAN 与访客/IoT 隔离：DSA、bridge-vlan
+9. 备份、升级与回滚：`sysupgrade -b`、keep settings、failsafe
+10. 常见故障排查：无法上网、LuCI 打不开、DNS、bootloop
+
+建议 E3 页：第 3 页（真实设备刷机/恢复）、第 5 页（Wi-Fi 吞吐/覆盖）、第 8 页（VLAN/PPPoE 真实链路）。其余用 E1/E2；版本相关命令必须同时给出 24.10 与 25.12+ 的写法或明确适用范围。
 
 **流程**：
 
-- 首站直接写 8–10 页，不做 1→3→5 页数爬坡；先写 3–4 页做一次评审校准，再补齐。
-- 技术 canary：受保护 preview，验证审核、构建、链接、SEO、回滚；不观察收录（preview 默认 noindex）。
-- 生产内容 canary：`router.homes` 正式域名发布 8–10 页，观察 2–4 周；技术硬条件与内容硬条件全过后，再开第二站。
+- 首站直接写 8–10 页，不做 1→3→5 页数爬坡；先写第 1–4 页做一次评审校准，再补齐。
+- 技术 canary：本地构建 + Pages preview，验证审核、构建、链接、SEO、回滚；preview 默认 noindex，不观察收录。
+- **域名未绑定期间不做生产 canary**；Phase 5 完成 DNS/Custom Domain/TLS 后，再发布 8–10 页并观察 2–4 周。
 - 审阅批次控制在 3–5 页，避免疲劳；待审 >10 页暂停新稿。
 - 不设“4 周必须有曝光”的 KPI；GSC 只用于诊断索引/抓取原因。
 
@@ -325,6 +352,8 @@ v1 只支持 `primary`，删除站级 `mode`，改为页面级 `indexPolicy`：
 
 - `content promote` 写入站点内容并更新 revision；只有 `reviewed` 可 promote。
 - 构建 → 门禁 → stamp → artifact → deploy → 线上 smoke；成功后才写 `deployed`。
+- **域名未绑定期间**：只部署 preview 分支，确认 preview 为 noindex、canonical 指向 `https://router.homes`、sitemap 不提交；不创建 GSC 生产属性。
+- **绑定后**：验证 Custom Domain/TLS/apex-www、GSC、sitemap、生产 smoke；再做 2–4 周内容 canary。
 - 发布后 4 周看 GSC；无曝光只生成人工 `refresh` 任务，不自动改写/下线。
 - 每月轻审计（重复/过期/断链），每季度深审计（版本/合规/内容组合）。
 
@@ -422,9 +451,10 @@ jobs:
 
 - Cloudflare Pages，每站一项目；direct upload。
 - `deploy.enabled=false` 可构建不部署。
+- `domainStatus=unbound` 时，`deploy.ts` 只允许 preview 分支部署；生产部署直接非零退出。绑定并验收后把 `enabled` 改为 true。
 - stamp：`site、commit、inputDigest、policyVersion、artifactDigest、runId、mode、builtAt`。
 - 部署前校验 site/commit/mode；缺 `index.html`、candidate/rehearsal、digest 不匹配 → 拒绝。
-- 记录 deployment ID；部署后验证自定义域名上的 stamp。
+- 记录 deployment ID；未绑定时验证 `*.pages.dev` 预览的 stamp + noindex；绑定后验证自定义域名上的 stamp。
 - **Pages 配额**：Free 每月 500 次构建、1 个同时构建；100 个项目/账号；每站 20,000 文件、单文件 25 MiB。direct upload 不消耗构建次数，但仍受文件/大小/API 限流约束。
 - 回滚：优先回滚已有成功 production deployment；不要用 `wrangler pages deployment` 当完整回滚命令。使用已核验 API：
   ```text
@@ -481,11 +511,12 @@ jobs:
 ### Phase 0：竖切与决策（1–2 天）
 
 - 两站（`router-homes` + 一个）跑通 registry/docs-kit/构建/预览。
-- 实测冷/热构建、Pages 预览、内容隔离。
-- 确认首站 8–10 页清单、E3 设备可用性、评审人。
-- 产出 `docs/adr/0001-architecture.md`、`0002-content-review.md`。
+- 域名未绑定：用本地 `pnpm build` + `wrangler pages dev` 或 Pages preview 验证；不配置 Custom Domain。
+- 实测冷/热构建、预览、内容隔离。
+- 确认 OpenWrt 8–10 页清单、版本口径（25.12+ 主、24.10 差异）、E3 设备型号、评审人。
+- 产出 `docs/adr/0001-architecture.md`、`0002-content-review.md`、`0003-openwrt-version-policy.md`。
 
-**验收**：两站独立 dist；互不含对方页面；单站 dev 正常；preview 可访问。
+**验收**：两站独立 dist；互不含对方页面；单站 dev 正常；preview 可访问且 noindex。
 
 ### Phase 1：骨架（3–4 天）
 
@@ -519,7 +550,8 @@ jobs:
 
 ### Phase 5：首站 8–10 页上线（编辑 + 日历）
 
-- 首站直接 8–10 页；先 3–4 页校准评审，再补齐。
+- 首站 8–10 页 OpenWrt 文档；先第 1–4 页校准评审，再补齐。
+- **先绑定域名**：DNS、Pages Custom Domain、TLS、apex/www、GSC 验证、sitemap 提交。
 - 生产内容 canary：正式域名发布，观察 2–4 周。
 - 技术硬条件 + 内容硬条件全过后，再开第二站（目标 3–5 站）。
 
@@ -556,8 +588,8 @@ jobs:
 
 | 项目 | 验收 | 负责人 |
 |---|---|---|
-| DNS/TLS | 注册商/续费负责人；apex/www 主域；HTTPS/重定向；CAA/证书状态；上线前逐域验证 | operator |
-| GSC | 每域 Domain Property、DNS 验证、sitemap 提交时间、账号恢复路径 | operator |
+| DNS/TLS | **目前未绑定**；Phase 5 绑定：注册商/续费、apex/www、CNAME→Pages、Custom Domain、TLS、CAA、GSC 验证 | operator |
+| GSC | 绑定后每域 Domain Property、DNS 验证、sitemap 提交时间、账号恢复路径；绑定前不创建生产属性 | operator |
 | 分析 | 每站独立 ID；排除 preview/内网；事件不带 PII | operator |
 | 编辑透明度 | 关于、纠错政策、联系、隐私页；商业关系披露 | editor |
 | URL 生命周期 | 稳定 pageId；旧→新登记；无链无环；无替代内容 404 | operator |
@@ -585,10 +617,11 @@ jobs:
 
 ### 9.2 仍需在 Phase 0 确认
 
-1. 首站 8–10 页的最终清单（建议见 §3.8）。
-2. 评审人：solo review 还是第二人；高风险主题如何处理。
-3. E3 设备：哪些页面能做真实吞吐/覆盖测试；不能做的页面明确 `tested: false`。
-4. 域名/DNS/Pages 项目是否已就绪。
+1. OpenWrt 8–10 页最终清单（建议见 §3.8）；是否 10 页全做，还是先 8 页。
+2. 版本口径：以 25.12+（`apk`）为主、24.10（`opkg`）只做差异段，还是两者各写一套。
+3. 评审人：solo review 还是第二人；高风险主题（刷机/安全）如何处理。
+4. E3 设备：手上有哪些可刷 OpenWrt 的路由器/软路由；刷机、Wi-Fi 吞吐、VLAN/PPPoE 各由哪台设备验证。
+5. 域名：注册商/DNS 控制权是否在手；预计何时绑定；Pages 项目是否已创建。
 
 ### 9.3 下一步
 
@@ -602,4 +635,6 @@ jobs:
 
 - v0.2 经 Codex CLI 只读评审（`codex exec -s read-only`）；10 条 P0/P1 已纳入 v0.3。
 - v0.4 根据最新决策收敛：移除自动 AI 生成/provider/批量/内容包；首站直接 8–10 页；E3 采用推荐策略。审核绑定、MDX 安全、CI、页面级索引、dedup、部署回滚等 P0/P1 保留。
+- v0.5 首站定为 Router.Homes（router.homes）OpenWrt 中文文档；域名未绑定，Phase 0–4 只做本地/预览，Phase 5 绑定后再做生产 canary；补充 OpenWrt 25.12+ `apk` / 24.10 `opkg` 版本口径与 E3 设备建议。
+- v0.5 待 Codex 复审；复审结论与修订将写入 v0.6。
 - v0.4 未执行代码/构建验证；Phase 0 的首要任务是用两站竖切验证假设。
