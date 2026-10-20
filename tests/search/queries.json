@@ -1,6 +1,47 @@
-[
-  { "locale": "zh", "query": "openwrt dns 设置", "expectedUrls": ["/zh/network/dns/"], "aliasCase": true },
-  { "locale": "zh", "query": "pve 安装 openwrt", "expectedUrls": ["/zh/installation/proxmox/"], "aliasCase": false },
-  { "locale": "en", "query": "openwrt dns", "expectedUrls": ["/en/network/dns/"], "aliasCase": true },
-  { "locale": "en", "query": "openwrt proxmox", "expectedUrls": ["/en/installation/proxmox/"], "aliasCase": false }
-]
+{
+  "version": 1,
+  "topK": 5,
+  "queries": [
+    { "id": "zh-dns-01", "locale": "zh", "query": "openwrt dns 设置", "expectedUrls": ["/zh/network/dns/"], "category": "dns", "aliasCase": true },
+    { "id": "zh-dns-02", "locale": "zh", "query": "dnsmasq 上游 dns", "expectedUrls": ["/zh/network/dns/"], "category": "dns", "aliasCase": false },
+    { "id": "zh-pve-01", "locale": "zh", "query": "pve 单网口 openwrt", "expectedUrls": ["/zh/installation/proxmox/"], "category": "pve", "aliasCase": true },
+    { "id": "zh-pve-02", "locale": "zh", "query": "proxmox 安装 openwrt", "expectedUrls": ["/zh/installation/proxmox/"], "category": "pve", "aliasCase": false },
+    { "id": "zh-agh-01", "locale": "zh", "query": "adguard home openwrt", "expectedUrls": ["/zh/software/adguard-home/"], "category": "adguard-home", "aliasCase": true },
+    { "id": "zh-agh-02", "locale": "zh", "query": "adguardhome 广告拦截", "expectedUrls": ["/zh/software/adguard-home/"], "category": "adguard-home", "aliasCase": true },
+    { "id": "zh-agh-03", "locale": "zh", "query": "dnsmasq 5353", "expectedUrls": ["/zh/software/adguard-home/"], "category": "adguard-home", "aliasCase": false },
+    { "id": "zh-sqm-01", "locale": "zh", "query": "sqm cake", "expectedUrls": ["/zh/software/sqm/"], "category": "sqm", "aliasCase": false },
+    { "id": "zh-sqm-02", "locale": "zh", "query": "bufferbloat 延迟", "expectedUrls": ["/zh/software/sqm/"], "category": "sqm", "aliasCase": true },
+    { "id": "zh-sqm-03", "locale": "zh", "query": "下载时游戏卡", "expectedUrls": ["/zh/software/sqm/"], "category": "sqm", "aliasCase": true },
+    { "id": "zh-luci-01", "locale": "zh", "query": "luci 首次登录", "expectedUrls": ["/zh/getting-started/luci-first-login/"], "category": "luci", "aliasCase": false },
+    { "id": "zh-luci-02", "locale": "zh", "query": "openwrt 中文界面", "expectedUrls": ["/zh/getting-started/luci-first-login/"], "category": "luci", "aliasCase": true },
+    { "id": "zh-fw-01", "locale": "zh", "query": "immortalwrt istoreos 区别", "expectedUrls": ["/zh/getting-started/which-openwrt/"], "category": "firmware", "aliasCase": true },
+    { "id": "zh-fw-02", "locale": "zh", "query": "openwrt 固件 target", "expectedUrls": ["/zh/getting-started/which-openwrt/"], "category": "firmware", "aliasCase": false },
+    { "id": "zh-oc-01", "locale": "zh", "query": "openclash dns 冲突", "expectedUrls": ["/zh/software/openclash/"], "category": "openclash", "aliasCase": true },
+    { "id": "zh-oc-02", "locale": "zh", "query": "openclash 停用 恢复", "expectedUrls": ["/zh/software/openclash/"], "category": "openclash", "aliasCase": false },
+    { "id": "zh-pkg-01", "locale": "zh", "query": "apk opkg 区别", "expectedUrls": ["/zh/software/package-sources/"], "category": "package-sources", "aliasCase": false },
+    { "id": "zh-pkg-02", "locale": "zh", "query": "openwrt 国内镜像", "expectedUrls": ["/zh/software/package-sources/"], "category": "package-sources", "aliasCase": true },
+    { "id": "zh-rec-01", "locale": "zh", "query": "进不去后台", "expectedUrls": ["/zh/troubleshooting/no-web-ui/"], "category": "recovery", "aliasCase": true },
+    { "id": "zh-rec-02", "locale": "zh", "query": "uhttpd failsafe", "expectedUrls": ["/zh/troubleshooting/no-web-ui/"], "category": "recovery", "aliasCase": false },
+
+    { "id": "en-dns-01", "locale": "en", "query": "openwrt dns settings", "expectedUrls": ["/en/network/dns/"], "category": "dns", "aliasCase": true },
+    { "id": "en-dns-02", "locale": "en", "query": "dnsmasq upstream", "expectedUrls": ["/en/network/dns/"], "category": "dns", "aliasCase": false },
+    { "id": "en-pve-01", "locale": "en", "query": "pve single nic openwrt", "expectedUrls": ["/en/installation/proxmox/"], "category": "pve", "aliasCase": true },
+    { "id": "en-pve-02", "locale": "en", "query": "proxmox openwrt", "expectedUrls": ["/en/installation/proxmox/"], "category": "pve", "aliasCase": false },
+    { "id": "en-agh-01", "locale": "en", "query": "adguard home openwrt", "expectedUrls": ["/en/software/adguard-home/"], "category": "adguard-home", "aliasCase": true },
+    { "id": "en-agh-02", "locale": "en", "query": "adguardhome filtering", "expectedUrls": ["/en/software/adguard-home/"], "category": "adguard-home", "aliasCase": true },
+    { "id": "en-agh-03", "locale": "en", "query": "dnsmasq 5353", "expectedUrls": ["/en/software/adguard-home/"], "category": "adguard-home", "aliasCase": false },
+    { "id": "en-sqm-01", "locale": "en", "query": "sqm cake bufferbloat", "expectedUrls": ["/en/software/sqm/"], "category": "sqm", "aliasCase": false },
+    { "id": "en-sqm-02", "locale": "en", "query": "game lag while downloading", "expectedUrls": ["/en/software/sqm/"], "category": "sqm", "aliasCase": true },
+    { "id": "en-sqm-03", "locale": "en", "query": "openwrt sqm", "expectedUrls": ["/en/software/sqm/"], "category": "sqm", "aliasCase": false },
+    { "id": "en-luci-01", "locale": "en", "query": "first luci login", "expectedUrls": ["/en/getting-started/luci-first-login/"], "category": "luci", "aliasCase": false },
+    { "id": "en-luci-02", "locale": "en", "query": "luci chinese language", "expectedUrls": ["/en/getting-started/luci-first-login/"], "category": "luci", "aliasCase": true },
+    { "id": "en-fw-01", "locale": "en", "query": "immortalwrt istoreos vendor firmware", "expectedUrls": ["/en/getting-started/which-openwrt/"], "category": "firmware", "aliasCase": true },
+    { "id": "en-fw-02", "locale": "en", "query": "openwrt firmware target", "expectedUrls": ["/en/getting-started/which-openwrt/"], "category": "firmware", "aliasCase": false },
+    { "id": "en-oc-01", "locale": "en", "query": "openclash dns conflict", "expectedUrls": ["/en/software/openclash/"], "category": "openclash", "aliasCase": true },
+    { "id": "en-oc-02", "locale": "en", "query": "openclash disable", "expectedUrls": ["/en/software/openclash/"], "category": "openclash", "aliasCase": false },
+    { "id": "en-pkg-01", "locale": "en", "query": "apk opkg feeds", "expectedUrls": ["/en/software/package-sources/"], "category": "package-sources", "aliasCase": false },
+    { "id": "en-pkg-02", "locale": "en", "query": "openwrt china mirror", "expectedUrls": ["/en/software/package-sources/"], "category": "package-sources", "aliasCase": true },
+    { "id": "en-rec-01", "locale": "en", "query": "cannot reach luci", "expectedUrls": ["/en/troubleshooting/no-web-ui/"], "category": "recovery", "aliasCase": true },
+    { "id": "en-rec-02", "locale": "en", "query": "uhttpd failsafe", "expectedUrls": ["/en/troubleshooting/no-web-ui/"], "category": "recovery", "aliasCase": false }
+  ]
+}

@@ -117,7 +117,11 @@ opkg list-installed | grep <name>
 
 不要用 `apk` 命令，也不要把 25.12 的 `.apk` 塞给 opkg。
 
-## 国内镜像怎么替换
+## OpenWrt 国内镜像怎么替换
+
+如果你搜的是“OpenWrt 国内镜像”或“OpenWrt 软件源国内镜像”，先确认 release/target/架构；下面以清华 TUNA 为例。
+
+这里的“镜像”指软件源镜像站（mirror），不是固件系统镜像；国内镜像只改变下载地址，不改变包内容。
 
 以清华 TUNA 为例，镜像根是：
 

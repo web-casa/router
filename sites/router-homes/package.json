@@ -12,6 +12,7 @@
     "@astrojs/mdx": "catalog:",
     "@astrojs/starlight": "catalog:",
     "@fleet/docs-kit": "workspace:*",
+    "@pagefind/default-ui": "^1.5.2",
     "astro": "catalog:"
   },
   "devDependencies": {

@@ -12,12 +12,15 @@
     "dev": "pnpm --filter @fleet/site-router-homes dev",
     "validate": "pnpm build:kit && tsx scripts/validate.ts",
     "check": "pnpm validate && pnpm --filter @fleet/site-router-homes check && pnpm --filter @fleet/site-router-homes build && tsx scripts/checks/i18n.ts",
-    "fleet": "tsx scripts/fleet.ts"
+    "fleet": "tsx scripts/fleet.ts",
+    "test:search": "pnpm --filter @fleet/site-router-homes build && tsx scripts/checks/search.ts",
+    "test:search:only": "tsx scripts/checks/search.ts"
   },
   "devDependencies": {
     "@emnapi/core": "^1.11.3",
     "@emnapi/runtime": "^1.11.3",
     "@fleet/docs-kit": "workspace:*",
+    "playwright-core": "^1.64.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "wrangler": "^4",

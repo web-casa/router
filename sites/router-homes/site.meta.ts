@@ -7,6 +7,7 @@ if (!base) throw new Error('router-homes missing from fleet.config.json');
 const meta = {
   ...base,
   customCss: ['./src/styles/theme.css'],
+  components: { Search: './src/components/Search.astro' },
   // Starlight resolves sidebar translations by BCP-47 lang (zh-CN), not the locale key (zh).
   sidebar: [
     {
