@@ -1,0 +1,215 @@
+---
+title: 软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI
+description: 分清 OpenWrt 25.12 的 apk 与 24.10 的 opkg，核对 release/target/架构/kmods，再安全替换国内镜像。
+pageType: app
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: '待 OpenWrt 25.12/24.10 设备；软件源格式与镜像路径已核对'
+testRecipe: 'tests/recipes/package-sources.md'
+aliases: ['openwrt 软件源', 'openwrt 国内镜像', 'apk 源', 'opkg 源', 'openwrt 插件装不上']
+symptoms: ['apk update 404', 'opkg update 失败', '插件依赖不匹配', '软件源签名错误']
+sources:
+  - label: OpenWrt apk package manager
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: OpenWrt opkg package manager
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg
+  - label: OpenWrt 25.12 release notes
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: TUNA OpenWrt mirror
+    url: https://mirrors.tuna.tsinghua.edu.cn/openwrt/
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="25.12 / 24.10 设备" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="待 OpenWrt 25.12/24.10 设备；软件源格式与镜像路径已核对"
+  recipe="tests/recipes/package-sources.md"
+  result="E1：apk/opkg 区别、feed 路径、镜像替换和失败恢复已整理；未在本次环境执行"
+/>
+
+## 完成后你能确认什么
+
+- 你的固件用 `apk` 还是 `opkg`，以及对应的源文件在哪里；
+- `release`、`target`、架构、kmods 内核 hash 必须怎么匹配；
+- 国内镜像替换的是哪一段 URL，哪些路径不能改；
+- 为什么“换源后插件装不上/依赖不匹配”，以及怎么恢复；
+- 为什么 `apk upgrade`/`opkg upgrade` 不是固件升级。
+
+## 先识别包管理器和源
+
+<Step where="router-shell" title="读取版本、target 和架构" expected="你能写出完整的 release/target/arch 组合。" >
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+uname -m
+cat /etc/apk/arch 2>/dev/null
+opkg print-architecture 2>/dev/null
+```
+
+关键字段：`release.version`、`release.target`、`DISTRIB_ARCH`、`release.revision`。换源时这些必须和镜像目录一致。
+
+</Step>
+
+<Step where="router-shell" title="看当前源文件" expected="知道每个 feed 指向哪里，以及是 apk 还是 opkg。" >
+
+OpenWrt 25.12（apk）：
+
+```sh
+cat /etc/apk/repositories.d/distfeeds.list
+```
+
+OpenWrt 24.10（opkg）：
+
+```sh
+cat /etc/opkg/distfeeds.conf
+cat /etc/opkg/customfeeds.conf
+```
+
+先备份再改：
+
+```sh
+cp /etc/apk/repositories.d/distfeeds.list /etc/apk/repositories.d/distfeeds.list.bak.$(date +%F) 2>/dev/null || true
+cp /etc/opkg/distfeeds.conf /etc/opkg/distfeeds.conf.bak.$(date +%F) 2>/dev/null || true
+```
+
+</Step>
+
+## 25.12 的 apk 结构
+
+25.12 使用 `apk`，feed 索引是 `.adb`，包是 `.apk`。典型 feed 包括：
+
+- `targets/<target>/packages/packages.adb`：目标设备包；
+- `packages/<arch>/base/packages.adb`：base；
+- `packages/<arch>/luci/packages.adb`：LuCI；
+- `packages/<arch>/packages/packages.adb`：普通软件包；
+- `packages/<arch>/routing|telephony|video/packages.adb`：分类 feed；
+- `targets/<target>/kmods/<kernel-hash>/packages.adb`：内核模块，hash 必须匹配当前内核。
+
+常用命令：
+
+```sh
+apk update
+apk search <name>
+apk add <name>
+apk info -e <name>
+```
+
+不要用 `opkg` 命令，也不要把 24.10 的 `.ipk` 改名成 `.apk`。
+
+## 24.10 的 opkg 结构
+
+24.10 使用 `opkg`，索引是 `Packages.gz`，包是 `.ipk`：
+
+```sh
+opkg update
+opkg list | grep <name>
+opkg install <name>
+opkg list-installed | grep <name>
+```
+
+不要用 `apk` 命令，也不要把 25.12 的 `.apk` 塞给 opkg。
+
+## 国内镜像怎么替换
+
+以清华 TUNA 为例，镜像根是：
+
+```text
+https://mirrors.tuna.tsinghua.edu.cn/openwrt/
+```
+
+替换时只把 `https://downloads.openwrt.org` 换成上面的根，**保留后面的完整路径**：
+
+```text
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/packages/packages.adb
+→ https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.6/targets/x86/64/packages/packages.adb
+```
+
+不要只保留 `.../openwrt/` 或删掉 `releases/25.12.6/targets/x86/64/...`；路径不完整就会 404。
+
+<Step where="router-shell" title="先验证镜像路径，再改源" expected="curl 返回 200，路径与当前 release/target 一致。" >
+
+```sh
+curl -I https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.6/targets/x86/64/packages/packages.adb
+```
+
+把 URL 换成你的 release/target；如果是 kmods，还要确认内核 hash 一致。镜像站没有对应路径时，不要硬改。
+
+</Step>
+
+<Step where="router-shell" title="替换后只更新索引，不升级全系统" expected="apk/opkg update 成功，现有包不被批量升级。" >
+
+```sh
+apk update
+# 或
+opkg update
+```
+
+先 `apk search`/`opkg list` 确认能读到包，再安装你真正需要的包。**不要**把 `apk upgrade`/`opkg upgrade` 当成固件升级；固件升级用 sysupgrade/ASU/owut，见 019。
+
+</Step>
+
+## 常见失败
+
+### 404
+
+- release 版本写错（25.12.6 vs 24.10.8）；
+- target 写错（`x86/64` 不是 `x86_64` 目录）；
+- 架构写错（`x86_64`、`aarch64`）；
+- 镜像没有同步该路径；
+- 把 `packages` 和 `targets` 目录混了。
+
+### 签名/校验失败
+
+- 镜像索引损坏或不是同一 release；
+- 系统时间/证书错误；
+- 混入了别的源；
+- 不要长期用 `--allow-untrusted` 绕过；先修源和校验。
+
+### 依赖/ABI 不匹配
+
+- kmods 的内核 hash 不匹配；
+- 包是为另一个 target/架构构建的；
+- 混用了 ImmortalWrt/iStoreOS/官方源；
+- 需要同源、同版本、同架构的包，或自行编译。
+
+### 命令不存在
+
+- 25.12 没有 `opkg`，24.10 没有 `apk`；
+- 不要为了“用某个命令”去装错的包管理器；先确认固件版本和来源。
+
+### 装完 LuCI 里看不到
+
+- 只装了核心包，没装 `luci-app-*`；
+- 语言包没装；
+- 浏览器缓存/需要刷新；
+- 包版本与 LuCI 不匹配。
+
+## 恢复
+
+```sh
+# apk
+cp /etc/apk/repositories.d/distfeeds.list.bak.YYYY-MM-DD /etc/apk/repositories.d/distfeeds.list
+apk update
+
+# opkg
+cp /etc/opkg/distfeeds.conf.bak.YYYY-MM-DD /etc/opkg/distfeeds.conf
+opkg update
+```
+
+如果换源后完全无法更新，先恢复官方源，确认 DNS/时间/证书正常，再尝试镜像；不要连续换多个源。
+
+## E1 状态与来源
+
+- 本页是 E1：apk/opkg 结构、feed 路径和镜像替换按 OpenWrt 25.12 资料与实际索引整理；没有在本次环境执行换源。
+- 镜像路径会随 release 变化；发布前用 `tests/recipes/package-sources.md` 在 25.12/24.10 各跑一次 `update` 和 `search`，记录 URL/输出，再升级 E2。
+- 不要混用官方、ImmortalWrt、iStoreOS 的源；ABI/内核/签名都可能不匹配。
+
+<PageSources />

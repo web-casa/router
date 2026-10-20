@@ -71,6 +71,11 @@ const meta = {
           translations: { 'zh-CN': 'OpenClash' },
           slug: 'software/openclash',
         },
+        {
+          label: 'Package sources',
+          translations: { 'zh-CN': '软件源' },
+          slug: 'software/package-sources',
+        },
       ],
     },
   ],
