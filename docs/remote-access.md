@@ -2,6 +2,8 @@
 
 这是为 PVE 页面采集环境信息而建立的临时访问，不是长期运维账号。
 
+> 本次实验已清理：`docsread`、sudoers、sshd Match、临时 key 均已删除。以下步骤保留为可复用 runbook。
+
 ## 已创建
 
 - 用户 `docsread`（无密码，仅公钥）；

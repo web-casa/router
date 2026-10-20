@@ -34,11 +34,12 @@
 
 ## 清理
 
-当前 VM 200 已停止，`vmbr1` 仍在（无物理口）。如需清理：
+实验 VM 200 已删除；`vmbr1` **保留**，因为现有 VM 900 等仍引用它。不要直接删除：
 
 ```bash
-qm destroy 200
+# 确认没有其他 VM 使用后再删
+grep -R "vmbr1" /etc/pve/qemu-server
 ip link del vmbr1
 ```
 
-镜像和 `vmbr1` 都是临时实验资源；删除前确认没有其他 VM 使用 `vmbr1`。
+镜像已删除。删除 bridge 前必须确认没有其他 VM 使用它。

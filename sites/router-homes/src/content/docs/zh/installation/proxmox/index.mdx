@@ -229,7 +229,13 @@ cp /etc/network/interfaces.bak.YYYY-MM-DD /etc/network/interfaces
 ifreload -a
 ```
 
-如果只是临时 `vmbr1` 导致问题，删掉它：
+如果只是临时 `vmbr1` 导致问题，先确认没有别的 VM 在用它：
+
+```sh
+grep -R "vmbr1" /etc/pve/qemu-server
+```
+
+没有输出时再删除：
 
 ```sh
 ip link set vmbr1 down

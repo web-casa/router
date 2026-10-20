@@ -33,12 +33,12 @@
 
 ## 清理
 
-实验 VM 和数据盘：
+实验 VM 201 及其数据盘已删除；`vmbr2` **保留**，因为现有 VM 301/302/901 仍引用它。不要直接删除：
 
 ```bash
-qm stop 201
-qm destroy 201
+# 确认没有其他 VM 使用后再删
+grep -R "vmbr2" /etc/pve/qemu-server
 ip link del vmbr2
 ```
 
-AGH 管理密码在本地 `.fleet/agh-admin.txt`（已忽略，不提交）；实验结束删除该文件。
+AGH 管理密码文件 `.fleet/agh-admin.txt` 已删除。
