@@ -21,6 +21,8 @@ await mustNotExist(path.join(dist, 'index.html'), 'root index.html');
 await mustExist(path.join(dist, '_redirects'), '_redirects');
 await mustExist(path.join(dist, 'en/index.html'), '/en/ home');
 await mustExist(path.join(dist, 'zh/index.html'), '/zh/ home');
+await mustExist(path.join(dist, 'en/getting-started/luci-first-login/index.html'), '/en/getting-started/luci-first-login/');
+await mustExist(path.join(dist, 'zh/getting-started/luci-first-login/index.html'), '/zh/getting-started/luci-first-login/');
 await mustExist(path.join(dist, 'en/network/dns/index.html'), '/en/network/dns/');
 await mustExist(path.join(dist, 'zh/network/dns/index.html'), '/zh/network/dns/');
 await mustExist(path.join(dist, 'en/installation/proxmox/index.html'), '/en/installation/proxmox/');

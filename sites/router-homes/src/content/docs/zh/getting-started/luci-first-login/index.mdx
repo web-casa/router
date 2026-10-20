@@ -1,0 +1,182 @@
+---
+title: 首次登录 LuCI：默认地址、密码与中文界面
+description: 找到 OpenWrt 管理地址、设置 root 密码、安装中文语言包，并保留进不去后台时的恢复路径。
+pageType: overview
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: '待 OpenWrt 25.12.6 首次启动环境；厂商/改装固件默认值可能不同'
+testRecipe: 'tests/recipes/luci-first-login.md'
+aliases: ['openwrt 登录', 'luci 默认密码', '192.168.1.1', 'openwrt 中文界面']
+symptoms: ['进不去后台', '默认密码不对', 'LuCI 是英文']
+sources:
+  - label: OpenWrt LuCI documentation
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt first login
+    url: https://openwrt.org/docs/guide-quick-start/start
+  - label: LuCI Chinese language package
+    url: https://openwrt.org/packages/pkgdata/luci-i18n-base-zh-cn
+  - label: OpenWrt apk package manager
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="全新官方镜像" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="待 OpenWrt 25.12.6 首次启动环境；厂商/改装固件默认值可能不同"
+  recipe="tests/recipes/luci-first-login.md"
+  result="E1：默认地址、首次设密、中文包和恢复路径已整理；未在本次实验环境复测"
+/>
+
+## 完成后你能确认什么
+
+- 找到 OpenWrt 的 LAN 管理地址，而不是 WAN 口；
+- 首次进入 LuCI，设置一个你能管理的 root 密码；
+- 安装并切换到简体中文界面；
+- 进不去后台时，知道先用 LAN/控制台恢复，而不是盲目恢复出厂。
+
+## 适用环境与默认值
+
+- OpenWrt 25.12.6 官方镜像，`apk` 包管理器；默认 LAN 通常是 `192.168.1.1/24`。
+- 官方镜像首次启动**通常没有设置 root 密码**，LuCI 会要求你先设置；SSH 与 LuCI 共用这个 root 密码。
+- 厂商固件/改装固件（ImmortalWrt、iStoreOS、厂商定制）默认地址和密码可能完全不同；先看设备标签/说明书，不要套用本页默认值。
+- 本页是 E1：默认值、语言包名和恢复路径已按官方资料整理；具体设备仍需核对。
+
+## 连接与找管理地址
+
+<Step where="client" title="接 LAN 口，不要接 WAN" expected="客户端能拿到 192.168.1.x 地址，网关是 OpenWrt。" >
+
+把电脑接到路由器标有 **LAN** 的网口；WAN 口通常不提供管理地址。让客户端用 DHCP，然后查默认网关：
+
+Linux：
+
+```sh
+ip route
+```
+
+Windows：
+
+```powershell
+ipconfig
+```
+
+macOS：
+
+```sh
+netstat -rn
+```
+
+如果 DHCP 没拿到地址，临时给客户端配静态 `192.168.1.2/24`，网关 `192.168.1.1`，只用于登录。
+
+</Step>
+
+<Step where="client" title="打开 LuCI" expected="出现 LuCI 登录页或首次设置页。" >
+
+浏览器访问：
+
+```text
+http://192.168.1.1/
+```
+
+OpenWrt 的 LuCI 默认是 HTTP 80，不是 HTTPS；如果浏览器自动跳 HTTPS 导致打不开，手动输入 `http://`。地址以你实际网关为准，不一定是 `192.168.1.1`。
+
+</Step>
+
+## 首次设置密码
+
+<Step where="luci" title="设置 root 密码" expected="能登录 LuCI，SSH 也能用同一密码。" >
+
+官方镜像首次进入时，LuCI 通常会提示设置密码；如果没有提示，进入 **System → Administration** 设置 root 密码。也可以先 SSH：
+
+```sh
+ssh root@192.168.1.1
+passwd
+```
+
+密码要唯一、足够长；不要用 `admin`、`password`、设备型号或生日。LuCI 和 SSH 共用 root 密码，改一处即可。
+
+</Step>
+
+<Step where="client" title="验证登录" expected="退出后能用新密码重新登录。" >
+
+退出 LuCI，重新登录一次；再用 SSH 登录确认同一密码有效。把管理地址和密码保存到密码管理器，不要把密码写进文章或仓库。
+
+</Step>
+
+## 切换中文界面
+
+<Step where="luci" title="查看已安装语言" expected="语言下拉框里有简体中文，或知道需要装包。" >
+
+进入 **System → System → Language and Style**，看 Language 下拉框是否有“简体中文”。LuCI 只显示已安装的语言包；没有就需要安装。
+
+</Step>
+
+<Step where="router-shell" title="安装简体中文语言包" expected="刷新 LuCI 后能选简体中文。" >
+
+OpenWrt 25.12（apk）：
+
+```sh
+apk update
+apk add luci-i18n-base-zh-cn
+```
+
+OpenWrt 24.10（opkg）：
+
+```sh
+opkg update
+opkg install luci-i18n-base-zh-cn
+```
+
+包名是 `luci-i18n-base-zh-cn`；装完刷新浏览器，再回 **System → System → Language and Style** 选择“简体中文”，保存并应用。
+
+</Step>
+
+<Step where="client" title="验证语言持久化" expected="重新登录后仍是中文。" >
+
+退出并重新登录，确认界面仍是中文；如果又变回英文，检查语言设置是否保存成功、是否有多个浏览器标签缓存。
+
+</Step>
+
+## 进不去后台时
+
+### 打不开 192.168.1.1
+
+- 确认接的是 LAN 口，不是 WAN；
+- 确认客户端 IP 和网关在同一网段；
+- `ping 192.168.1.1` 是否通；
+- 设备默认地址可能不是 `192.168.1.1`（尤其厂商固件/改过 LAN）；
+- 浏览器是否强制跳 HTTPS；换 `http://` 或隐私窗口。
+
+### 密码不对
+
+- 官方全新镜像通常没有默认密码，而是首次设置；
+- 厂商固件可能有标签默认密码；不要反复猜；
+- 忘记密码：用 LAN + 控制台/SSH 恢复；没有控制台时，按设备文档进入 failsafe，而不是直接恢复出厂；
+- 恢复出厂会清空配置，先确认没有重要配置/备份。
+
+### 中文选项不存在
+
+- 先确认语言包是否安装：`apk info -e luci-i18n-base-zh-cn`（24.10 用 `opkg list-installed`）；
+- 语言包版本要跟 LuCI 版本匹配；
+- 安装后刷新页面，或重启 `uhttpd`/`rpcd` 相关服务，不要直接重启整个网络。
+
+### 设置密码后 SSH 仍进不去
+
+- SSH 默认端口 22，root 登录；
+- 确认没有把 LAN 地址改掉；
+- 看 LuCI 的 **System → Administration** 是否允许 SSH；
+- 用 `logread` 看 dropbear 错误，不要连续试错触发封禁。
+
+## E1 状态与来源
+
+- 本页是 E1：默认地址、首次设密、中文包名和恢复路径已按官方资料整理；没有在本次实验环境复测。
+- 不同厂商固件的默认地址/密码/语言包可能不同；发布前按具体设备核对，不能把官方默认值套到所有固件。
+- 下一步按 `tests/recipes/luci-first-login.md` 在全新 OpenWrt 25.12.6 环境走一遍，记录默认地址、首次提示、中文包安装和恢复结果，再升级 E2。
+
+<PageSources />

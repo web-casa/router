@@ -1,0 +1,182 @@
+---
+title: "First LuCI login: address, password and Chinese UI"
+description: Find the OpenWrt management address, set the root password, install the Chinese language pack, and keep a recovery path.
+pageType: overview
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Fresh OpenWrt 25.12.6 environment pending; vendor/community firmware defaults may differ'
+testRecipe: 'tests/recipes/luci-first-login.md'
+aliases: ['openwrt login', 'luci default password', '192.168.1.1', 'openwrt chinese ui']
+symptoms: ['cannot open LuCI', 'default password does not work', 'LuCI is English']
+sources:
+  - label: OpenWrt LuCI documentation
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt first login
+    url: https://openwrt.org/docs/guide-quick-start/start
+  - label: LuCI Chinese language package
+    url: https://openwrt.org/packages/pkgdata/luci-i18n-base-zh-cn
+  - label: OpenWrt apk package manager
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="fresh official image" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="Fresh OpenWrt 25.12.6 environment pending; vendor/community firmware defaults may differ"
+  recipe="tests/recipes/luci-first-login.md"
+  result="E1: default address, first password, language pack and recovery documented; not re-run in this environment"
+/>
+
+## Outcome
+
+- Find the OpenWrt LAN management address, not the WAN port.
+- Enter LuCI for the first time and set a root password you control.
+- Install and switch to the Simplified Chinese UI.
+- When LuCI is unreachable, recover through LAN/console instead of blindly resetting the device.
+
+## Applicable environment and defaults
+
+- OpenWrt 25.12.6 official image with `apk`; the default LAN is usually `192.168.1.1/24`.
+- A fresh official image **usually has no root password set**; LuCI asks you to set one. SSH and LuCI share that root password.
+- Vendor/community firmware (ImmortalWrt, iStoreOS, vendor builds) may use a completely different address and password; check the label/manual first.
+- This page is E1: defaults, package name and recovery are based on official documentation; verify your device.
+
+## Connect and find the management address
+
+<Step where="client" title="Use a LAN port, not WAN" expected="The client gets a 192.168.1.x lease and the gateway is OpenWrt.">
+
+Connect the computer to a port labeled **LAN**; the WAN port usually does not serve the management UI. Use DHCP and check the default gateway:
+
+Linux:
+
+```sh
+ip route
+```
+
+Windows:
+
+```powershell
+ipconfig
+```
+
+macOS:
+
+```sh
+netstat -rn
+```
+
+If DHCP gives no address, temporarily set a static `192.168.1.2/24` with gateway `192.168.1.1` just for login.
+
+</Step>
+
+<Step where="client" title="Open LuCI" expected="The LuCI login or first-run page appears.">
+
+Open:
+
+```text
+http://192.168.1.1/
+```
+
+LuCI defaults to HTTP port 80, not HTTPS. If the browser forces HTTPS and fails, type `http://` explicitly. Use the real gateway address; it is not always `192.168.1.1`.
+
+</Step>
+
+## Set the first password
+
+<Step where="luci" title="Set the root password" expected="You can log in to LuCI and SSH with the same password.">
+
+A fresh official image usually prompts for a password on first login. If it does not, open **System → Administration**. You can also use SSH first:
+
+```sh
+ssh root@192.168.1.1
+passwd
+```
+
+Use a unique, long password; do not use `admin`, `password`, the model name, or a birthday. LuCI and SSH share the root password.
+
+</Step>
+
+<Step where="client" title="Verify the login" expected="You can log out and log back in with the new password.">
+
+Log out of LuCI and log in again; then confirm SSH accepts the same password. Store the address and password in a password manager, not in an article or repository.
+
+</Step>
+
+## Switch to Chinese
+
+<Step where="luci" title="Check installed languages" expected="Simplified Chinese is listed, or you know it must be installed.">
+
+Open **System → System → Language and Style** and inspect the Language list. LuCI only lists installed language packs.
+
+</Step>
+
+<Step where="router-shell" title="Install the Simplified Chinese pack" expected="After refresh, Simplified Chinese is selectable.">
+
+OpenWrt 25.12 (apk):
+
+```sh
+apk update
+apk add luci-i18n-base-zh-cn
+```
+
+OpenWrt 24.10 (opkg):
+
+```sh
+opkg update
+opkg install luci-i18n-base-zh-cn
+```
+
+The package is `luci-i18n-base-zh-cn`; refresh the browser, return to **System → System → Language and Style**, select 简体中文, save and apply.
+
+</Step>
+
+<Step where="client" title="Verify persistence" expected="The UI is still Chinese after a new login.">
+
+Log out and back in. If it reverts to English, check whether the language setting was saved and whether another tab is caching the old UI.
+
+</Step>
+
+## When LuCI is unreachable
+
+### Cannot open 192.168.1.1
+
+- Confirm you are on a LAN port, not WAN.
+- Confirm the client IP and gateway are in the same subnet.
+- Check `ping 192.168.1.1`.
+- The device may use another LAN address, especially vendor firmware or a changed LAN.
+- The browser may force HTTPS; use `http://` or a private window.
+
+### Password does not work
+
+- A fresh official image usually has no default password; it asks you to set one.
+- Vendor firmware may have a label password; do not guess repeatedly.
+- If forgotten, recover through LAN plus console/SSH. Without a console, use the device's failsafe procedure; do not factory-reset first.
+- A factory reset erases configuration; confirm you have no important config/backup.
+
+### Chinese is not listed
+
+- Check the package: `apk info -e luci-i18n-base-zh-cn` (or `opkg list-installed` on 24.10).
+- The language pack must match the LuCI version.
+- Refresh the page, or restart the relevant web services; do not restart the whole network.
+
+### SSH still fails after setting the password
+
+- SSH is port 22 with root login.
+- Confirm the LAN address was not changed.
+- Check **System → Administration** for SSH access.
+- Use `logread` for dropbear errors; do not hammer the login.
+
+## E1 status and sources
+
+- This is E1: default address, first password, language package and recovery are based on official documentation; it was not re-run in this environment.
+- Vendor firmware may differ; verify the specific device before publishing.
+- Next: run `tests/recipes/luci-first-login.md` on a fresh OpenWrt 25.12.6 environment, record the default address, first-run prompt, language install and recovery, then promote to E2.
+
+<PageSources />
