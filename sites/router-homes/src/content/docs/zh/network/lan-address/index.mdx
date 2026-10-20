@@ -1,0 +1,236 @@
+---
+title: 修改 LAN 地址并重新进入后台：新旧网段、DHCP 与恢复
+description: 把 OpenWrt LAN 从 192.168.1.1 改到 192.168.10.1，验证旧地址失效、新地址可进，并保留 DHCP/控制台回滚路径。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；LAN 192.168.1.1→192.168.10.1；静态客户端/SSH；DHCP 租约未验证'
+testRecipe: 'tests/recipes/lan-address-change-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt 修改 lan 地址', 'openwrt 后台进不去', 'lan ip 修改', 'dhcp 新网段']
+symptoms: ['改 LAN 后失联', '旧地址打不开', '客户端没网']
+sources:
+  - label: OpenWrt network configuration
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP and DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt LuCI network
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt failsafe
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import lanEdit from '@assets/screenshots/luci/lan-edit-192-168-10.webp';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；LAN 192.168.1.1→192.168.10.1；静态客户端/SSH；DHCP 租约未验证"
+  recipe="tests/recipes/lan-address-change-25.12.md"
+  result="E2 partial：改到 192.168.10.1 后旧地址超时、新地址 LuCI/SSH 正常；回滚到 192.168.1.1 后旧地址恢复、新地址超时；DHCP 租约未拿到"
+  date="2026-10-20"
+/>
+
+## 完成后你能确认什么
+
+- 改 LAN 前先选一个不与 WAN/上游/VPN 冲突的网段；
+- 旧地址为什么会立刻失效，新地址怎么进；
+- 客户端/管理机要怎么切到新网段；
+- DHCP 范围、网关和 DNS 怎么一起改；
+- 改错后怎么用新地址、控制台或备份回滚。
+
+## 先选新网段
+
+- 用 RFC1918 私网：`192.168.10.0/24`、`10.10.0.0/24` 等；
+- 不要和 WAN 上游、VPN、其他 LAN/VLAN 重叠；
+- 不要用 `192.168.1.0/24` 如果上游光猫/主路由已经用它；
+- 新网关：`192.168.10.1`；DHCP 池：`192.168.10.100–199`；
+- 记录旧地址、旧网关和旧 DHCP 范围。
+
+本页示例：`192.168.1.1/24 → 192.168.10.1/24`。
+
+## 改动前
+
+<Step where="router-shell" title="记录并备份 LAN/DHCP" expected="出问题时能恢复旧地址和 DHCP 范围。" >
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+ip -4 addr show br-lan
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+确认你能进 LuCI/SSH，最好也有串口/控制台或 PVE 控制台；不要只留一个正在改的网页会话。
+
+</Step>
+
+## 修改 LAN
+
+<Step where="luci" title="在 LuCI 里改 IPv4 地址" expected="LAN 的 IPv4 地址变成新网段，DHCP 范围同步。" >
+
+进入 **Network → Interfaces → LAN → Edit**：
+
+1. Protocol 保持 `Static address`；
+2. IPv4 address 改成 `192.168.10.1/24`；
+3. IPv4 gateway 留空（LAN 不是 WAN 网关）；
+4. 到 **DHCP Server** 标签，Start `100`、Limit `100`、Lease time `12h`；
+5. Save & Apply。
+
+<Figure src={lanEdit} alt="LuCI 的 LAN 编辑窗口，IPv4 地址为 192.168.10.1/24" caption="LAN 编辑页示例。MAC/IPv6 已打码；实际地址按你的网段填写，不要照抄。" />
+
+</Step>
+
+<Step where="router-shell" title="CLI 等价修改" expected="uci 里 network.lan 和 dhcp.lan 都是新网段。" >
+
+```sh
+uci set network.lan.ipaddr='192.168.10.1/24'
+uci commit network
+
+uci set dhcp.lan.start='100'
+uci set dhcp.lan.limit='100'
+uci set dhcp.lan.leasetime='12h'
+uci commit dhcp
+
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+`network reload` 会让旧地址上的 SSH/网页会话立刻断开，这是预期行为；命令可能以超时/连接断开结束，不代表没生效。
+
+</Step>
+
+## 重新进入
+
+<Step where="client" title="切到新网段" expected="新地址能打开 LuCI/SSH，旧地址不再响应。" >
+
+- 给管理机临时静态地址 `192.168.10.2/24`，网关 `192.168.10.1`；
+- 或释放/续租 DHCP，让客户端拿到 `192.168.10.x`；
+- 访问 `http://192.168.10.1/`；
+- 旧地址 `192.168.1.1` 应该超时，而不是继续打开旧页面。
+
+```sh
+curl -I http://192.168.10.1/
+ssh root@192.168.10.1
+```
+
+如果旧地址还能打开，可能是浏览器缓存、另一个设备仍占着旧 IP，或你改的不是当前 LAN。
+
+</Step>
+
+## 验证
+
+<Step where="router-shell" title="确认接口和 DHCP 配置" expected="br-lan 是新地址，dhcp-range 也是新网段。" >
+
+```sh
+ip -4 addr show br-lan
+uci show network.lan
+uci show dhcp.lan
+ubus call network.interface.lan status | head -20
+grep -R "dhcp-range" /var/etc/dnsmasq.conf* /tmp/etc/dnsmasq.conf* 2>/dev/null
+```
+
+`dhcp-range` 应该出现 `192.168.10.100,192.168.10.199` 和 `/24`。
+
+</Step>
+
+<Step where="client" title="客户端 DHCP 验证（必须单独做）" expected="客户端拿到 192.168.10.x、网关/DNS 是 192.168.10.1。" >
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.10.1
+```
+
+客户端要释放旧租约/重新连接；如果仍拿到 `192.168.1.x`，先查 DHCP 范围、是否有第二个 DHCP、客户端是否还连在旧网段。
+
+> 本次 E2 只验证了静态客户端/SSH 和地址切换；netns DHCP 测试没有拿到租约（dnsmasq 日志提示 `no address range available`），所以 **DHCP 租约未标为已实测**。页面把 DHCP 作为必须单独验证的步骤。
+
+</Step>
+
+<Step where="router-shell" title="确认 WAN 没被改坏" expected="WAN 仍能上网，LAN 改地址不影响 WAN。" >
+
+```sh
+ip -4 addr show eth1
+ping -c 3 192.168.50.1
+nslookup openwrt.org 192.168.10.1
+```
+
+只改 LAN 时，WAN 的 DHCP/PPPoE 不应被重置；如果你同时改了 WAN，按 007 单独验证。
+
+</Step>
+
+## 回滚
+
+<Step where="router-shell" title="从新地址改回旧地址" expected="旧地址恢复，新地址超时。" >
+
+```sh
+uci set network.lan.ipaddr='192.168.1.1/24'
+uci commit network
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+管理机会再次断线；把客户端切回 `192.168.1.x` 或恢复 DHCP，确认旧地址可用。
+
+</Step>
+
+<Step where="console" title="完全进不去时" expected="不恢复出厂也能回到可用地址。" >
+
+- 用串口/HDMI/PVE 控制台登录；
+- 看 `uci show network.lan`、`ip -4 addr show br-lan`；
+- 改回旧地址或改成一个你确定能访问的网段；
+- 如果配置已经乱了，恢复 `/etc/config/network.bak.*` 和 `/etc/config/dhcp.bak.*`；
+- 最后才考虑 failsafe/恢复出厂；恢复出厂会清空配置。
+
+</Step>
+
+## 常见失败
+
+### 旧地址还能打开
+
+浏览器缓存、旧标签页、另一个设备占着旧 IP，或客户端还连在旧网段。用无痕窗口/新终端，确认 `curl` 打到的是新 IP。
+
+### 新地址打不开
+
+- 客户端不在 `192.168.10.0/24`；
+- 静态地址/网关写错；
+- 管理机还缓存旧 ARP：`ip neigh flush dev <iface>`；
+- 防火墙把 LAN 管理口挡了；
+- 你改的是 WAN 或另一个接口。
+
+### DHCP 不工作
+
+- `dhcp.lan.start/limit` 不在新网段；
+- `dnsmasq` 没重启，或 `/var/etc/dnsmasq.conf*` 还是旧 range；
+- 还有第二个 DHCP（另一个路由器/VM）；
+- 客户端没释放旧租约；
+- `logread | grep dnsmasq` 看 `no address range`/接口错误。
+
+### 新网段冲突
+
+和上游光猫、VPN、其他 LAN/VLAN 冲突会导致路由/解析异常；换一个网段，不要硬用。
+
+## E2 实测记录（2026-10-20）
+
+- 环境：PVE 9.2.2；OpenWrt 25.12.6 x86 VM 200；LAN `192.168.1.1/24` → `192.168.10.1/24`；DHCP `100–199`。
+- 改后：旧 `192.168.1.1` ping 100% loss；新 `192.168.10.1` ping/HTTP 200；LuCI/SSH 正常。
+- 回滚：改回 `192.168.1.1` 后旧地址 HTTP 200；新地址超时。
+- 未验证：客户端 DHCP 租约（netns 测试未拿到；日志 `no address range available`）、真实物理客户端、IPv6、上游冲突场景。
+- 截图：`src/assets/screenshots/luci/lan-edit-192-168-10.webp`（MAC/IPv6 已打码）。
+
+## 来源与复核
+
+- 本页是 E2 partial：地址切换/旧地址失效/回滚已实测；DHCP 租约和真实客户端未验证。
+- 复现配方：`tests/recipes/lan-address-change-25.12.md`。
+- 没有第二评审人；关键结论只限本次 VM 环境，不外推到所有固件。
+
+<PageSources />

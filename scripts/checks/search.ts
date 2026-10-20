@@ -168,11 +168,18 @@ let browser: Browser | null = null;
 const results: CaseResult[] = [];
 const negativeResults: NegativeResult[] = [];
 
+// /tmp is a small tmpfs in this environment; keep Chromium profiles/cache on disk.
+const browserTmp = path.resolve('.cache/search-tmp');
+await mkdir(browserTmp, { recursive: true });
+process.env.TMPDIR = browserTmp;
+process.env.TMP = browserTmp;
+process.env.TEMP = browserTmp;
+
 try {
   browser = await chromium.launch({
     executablePath,
     headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
+    args: ['--no-sandbox', '--disable-gpu'],
   });
 
   const pages = new Map<string, Page>();

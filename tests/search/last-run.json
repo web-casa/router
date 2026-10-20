@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-20T17:05:01.687Z",
-  "base": "http://127.0.0.1:37881",
+  "generatedAt": "2026-10-20T17:29:51.680Z",
+  "base": "http://127.0.0.1:37681",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -56,6 +56,11 @@
             "excerpt": ""
           },
           {
+            "url": "/zh/network/lan-address/",
+            "title": "修改 LAN 地址并重新进入后台：新旧网段、DHCP 与恢复",
+            "excerpt": ""
+          },
+          {
             "url": "/zh/software/openclash/",
             "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
             "excerpt": ""
@@ -86,6 +91,11 @@
           {
             "url": "/zh/software/adguard-home/",
             "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/network/lan-address/",
+            "title": "修改 LAN 地址并重新进入后台：新旧网段、DHCP 与恢复",
             "excerpt": ""
           }
         ]
@@ -536,6 +546,11 @@
             "url": "/zh/getting-started/luci-first-login/",
             "title": "首次登录 LuCI：默认地址、密码与中文界面",
             "excerpt": ""
+          },
+          {
+            "url": "/zh/network/lan-address/",
+            "title": "修改 LAN 地址并重新进入后台：新旧网段、DHCP 与恢复",
+            "excerpt": ""
           }
         ]
       },
@@ -594,8 +609,8 @@
             "excerpt": ""
           },
           {
-            "url": "/en/troubleshooting/no-web-ui/",
-            "title": "Cannot reach LuCI: IP, port, DHCP and console recovery",
+            "url": "/en/network/lan-address/",
+            "title": "Change the LAN address and get back in: old/new subnet, DHCP and recovery",
             "excerpt": ""
           }
         ]
@@ -619,6 +634,11 @@
           {
             "url": "/en/software/adguard-home/",
             "title": "AdGuard Home: from web UI to client filtering",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/network/lan-address/",
+            "title": "Change the LAN address and get back in: old/new subnet, DHCP and recovery",
             "excerpt": ""
           },
           {
@@ -1015,6 +1035,11 @@
           {
             "url": "/en/getting-started/luci-first-login/",
             "title": "First LuCI login: address, password and Chinese UI",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/network/lan-address/",
+            "title": "Change the LAN address and get back in: old/new subnet, DHCP and recovery",
             "excerpt": ""
           },
           {

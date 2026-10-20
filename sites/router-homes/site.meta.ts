@@ -45,6 +45,11 @@ const meta = {
           translations: { 'zh-CN': 'DNS 设置' },
           slug: 'network/dns',
         },
+        {
+          label: 'LAN address',
+          translations: { 'zh-CN': '修改 LAN 地址' },
+          slug: 'network/lan-address',
+        },
       ],
     },
     {
