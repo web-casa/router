@@ -1,0 +1,207 @@
+---
+title: "Before downloading firmware: model, revision, target/profile and recovery"
+description: Confirm the exact model/revision, target, profile, image type and recovery path with read-only checks before downloading or flashing firmware.
+pageType: overview
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Specific device pending; read-only checklist, no flashing'
+testRecipe: 'tests/recipes/firmware-download-check.md'
+aliases: ['openwrt firmware download', 'openwrt model', 'openwrt hardware revision', 'sysupgrade image', 'factory image']
+symptoms: ['wrong firmware', 'do not know which image', 'model mismatch', 'checksum failure']
+sources:
+  - label: OpenWrt firmware selector
+    url: https://firmware-selector.openwrt.org/
+  - label: OpenWrt sysupgrade documentation
+    url: https://openwrt.org/docs/guide-user/installation/sysupgrade
+  - label: OpenWrt 25.12 release notes
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: OpenWrt device pages
+    url: https://openwrt.org/toh/start
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="—" device="device pending" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="Specific device pending; read-only checklist, no flashing"
+  recipe="tests/recipes/firmware-download-check.md"
+  result="E1: model/revision, target/profile, image types, checksums and recovery path documented; not executed on a device"
+/>
+
+## Outcome
+
+- Know the exact model and hardware revision, not a “looks the same” model.
+- Know the OpenWrt target/subtarget/profile and which image to download.
+- Choose `sysupgrade`, `factory` or an x86 combined image correctly.
+- Verify the file source and checksum.
+- Know the recovery path before flashing, and which path to take if it fails.
+
+> This is a pre-download checklist, not a flashing guide. Bare-metal flashing, bootloader recovery and cross-major migrations are R2: use independent review and device documentation. Do not treat this page as a universal flashing tutorial.
+
+## Start with the label
+
+<Step where="client" title="Record model and hardware revision" expected="Model, revision, region and label details are written down.">
+
+Check the bottom label, box and manual; record:
+
+- vendor + full model (not just the series);
+- hardware revision (v1, v2, V2.1, etc.);
+- region/operator variant;
+- FCC ID and serial prefix if present (do not publish them);
+- recovery method (reset button, TFTP, serial, vendor tool).
+
+One model can have multiple revisions with different flash, Wi-Fi chips or partition layouts. **The same model name does not mean one universal image.**
+
+</Step>
+
+<Step where="router-shell" title="On existing OpenWrt, read the board data" expected="distribution/target/model/board_name match the device page.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+cat /tmp/sysinfo/model 2>/dev/null
+cat /tmp/sysinfo/board_name 2>/dev/null
+```
+
+Key fields: `release.distribution`, `release.version`, `release.target`, `model`, `board_name`. `model` is not the hardware revision; do not choose an image from that line alone.
+
+</Step>
+
+<Step where="router-shell" title="On x86, read DMI/BIOS" expected="You know the board/device model and are not mixing PC and VM images.">
+
+```sh
+cat /sys/class/dmi/id/sys_vendor
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/board_version
+cat /sys/class/dmi/id/bios_version
+```
+
+Also confirm BIOS/Legacy vs UEFI, disk interface and whether the image is combined/ext4. Those decide whether it boots; “x86/64” alone is not enough.
+
+</Step>
+
+## Check the firmware selector
+
+<Step where="client" title="Choose by target/profile, not filename" expected="You find the exact device page and image.">
+
+Open the [OpenWrt Firmware Selector](https://firmware-selector.openwrt.org/):
+
+1. Select the correct release (e.g. 25.12.6).
+2. Search the full model and open its device page.
+3. Verify target/subtarget, profile and hardware revision.
+4. Read the device page's “Installation” section for the first-install and upgrade image types.
+5. Download and verify SHA-256; do not just rename a file.
+
+If the selector and device page disagree, stop and verify the model/revision; do not pick the closest match.
+
+</Step>
+
+## Image types
+
+| Image/scenario | Use | Main risk |
+|---|---|---|
+| `sysupgrade` | Existing OpenWrt, upgrade with/without config | cross-version and package/kernel module incompatibility |
+| `factory` / vendor transition | First install from vendor firmware | partition/flash method mismatch can brick |
+| x86 combined/ext4 | Whole-disk x86 image/VM | BIOS/UEFI, disk layout, write method |
+| vendor firmware | Vendor web UI/recovery tool | do not mix with OpenWrt images |
+| “universal/no-disassembly” packages | Unknown source | avoid; target/profile/checksum cannot be verified |
+
+A filename containing `sysupgrade` is not proof; target, profile, revision and checksum must all match.
+
+## Download and verify
+
+<Step where="client" title="Use official/vendor sources only" expected="The file source is traceable and has a checksum.">
+
+Prefer:
+
+- OpenWrt `downloads.openwrt.org` or the Firmware Selector;
+- the device vendor's official download page;
+- a project's official release page (third-party firmware needs extra maintainer/signature checks).
+
+Do not use cloud-drive mirrors, forum attachments or “pre-modified” packages from chat. Repacks may carry scripts, old kernels or mismatched drivers.
+
+</Step>
+
+<Step where="client" title="Verify SHA-256 and file size" expected="The checksum matches the official release page.">
+
+Linux:
+
+```sh
+sha256sum openwrt-*.img.gz
+```
+
+macOS:
+
+```sh
+shasum -a 256 openwrt-*.img.gz
+```
+
+Windows:
+
+```powershell
+certutil -hashfile openwrt-*.img.gz SHA256
+```
+
+Compare with the official `sha256sums`/release page. If it differs, download again; do not “flash it and see”.
+
+</Step>
+
+## Recovery before flashing
+
+<Step where="client" title="Write down the recovery path" expected="You know how to enter failsafe/recovery if flashing fails.">
+
+Confirm at least:
+
+- how to enter failsafe (button timing/serial/IP);
+- whether TFTP/serial/vendor recovery is available;
+- management LAN address, gateway and root password;
+- config backup: `sysupgrade -b` on existing OpenWrt, or vendor export;
+- installed packages/kernel modules to rebuild after upgrade;
+- stable power; do not unplug during flashing.
+
+No recovery path, no checksum, no backup: do not start.
+
+</Step>
+
+## Common mistakes
+
+- Checking only the model, not the revision;
+- using `sysupgrade` as `factory`, or the reverse;
+- renaming another target's image and flashing it;
+- continuing after a checksum mismatch;
+- using unknown “universal/expanded” packages;
+- losing power or pulling the cable during flashing;
+- assuming success without checking DNS/firewall/packages after upgrade.
+
+## Failure branches
+
+### Wrong model downloaded
+
+Delete it and download from the device page; do not “try it”. If already flashed, use the device recovery docs (failsafe/TFTP/serial); do not keep flashing different images.
+
+### Checksum mismatch
+
+Download again; check for proxy/mirror truncation; switch to the official source. Do not disable verification.
+
+### Your revision is not listed
+
+Check the vendor page/label or the OpenWrt forum/device page. Without explicit support, do not assume compatibility.
+
+### Vendor firmware is locked
+
+Use the vendor process; do not bypass signatures/locks just to install OpenWrt. Confirm warranty/vendor-feature tradeoffs first.
+
+## E1 status and sources
+
+- This is E1: fields, image types and recovery are based on public documentation; no device download/flash was performed.
+- Model/revision come from the label and vendor page; do not generalize x86 VM experience to routers.
+- Recipe: `tests/recipes/firmware-download-check.md`; flashing steps are out of scope.
+
+<PageSources />

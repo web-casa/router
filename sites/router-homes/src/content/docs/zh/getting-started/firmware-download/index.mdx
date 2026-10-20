@@ -1,0 +1,207 @@
+---
+title: 下载固件前先核对：型号、硬件修订、target/profile 与恢复入口
+description: 用只读命令和设备标签确认型号/修订、target、profile、镜像类型和恢复方式，再下载并校验固件。
+pageType: overview
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: '待具体设备；只读核对流程，不执行刷机'
+testRecipe: 'tests/recipes/firmware-download-check.md'
+aliases: ['openwrt 固件下载', 'openwrt 型号', 'openwrt 硬件版本', 'sysupgrade 镜像', 'factory 镜像']
+symptoms: ['刷错固件', '不知道下载哪个', '型号对不上', '镜像校验失败']
+sources:
+  - label: OpenWrt firmware selector
+    url: https://firmware-selector.openwrt.org/
+  - label: OpenWrt sysupgrade documentation
+    url: https://openwrt.org/docs/guide-user/installation/sysupgrade
+  - label: OpenWrt 25.12 release notes
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: OpenWrt device pages
+    url: https://openwrt.org/toh/start
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="—" device="待核对设备" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="待具体设备；只读核对流程，不执行刷机"
+  recipe="tests/recipes/firmware-download-check.md"
+  result="E1：型号/修订、target/profile、镜像类型、校验和恢复入口已整理；未在具体设备上执行"
+/>
+
+## 完成后你能确认什么
+
+- 设备的确切型号和硬件修订，而不是“看起来一样”的型号；
+- OpenWrt 的 target/subtarget/profile，以及该下载哪一个镜像；
+- 该用 `sysupgrade`、`factory` 还是 x86 combined 镜像；
+- 下载文件是否完整、来源是否可信；
+- 刷机前恢复入口在哪里，出问题时先走哪条路。
+
+> 本页是下载前核对，不包含刷机步骤。裸机刷机、bootloader 恢复和跨大版本迁移按 R2 处理，需要独立评审/设备文档；不要拿本页当“万能刷机教程”。
+
+## 先看设备标签
+
+<Step where="client" title="记录型号和硬件修订" expected="型号、 revisions、区域版本和标签信息都记下来。" >
+
+看设备底部/包装/说明书，记录：
+
+- 厂商 + 完整型号（不要只记系列名）；
+- 硬件版本/revision（v1、v2、V2.1 等）；
+- 区域版本/运营商版本；
+- 标签上的 FCC ID、SN 前几位（不要公开发布）；
+- 恢复方式（reset 孔、TFTP、串口、厂商恢复工具）。
+
+同一个型号可能有不同 revision，内部 flash/无线芯片/分区布局不同；**型号相同不代表镜像通用**。
+
+</Step>
+
+<Step where="router-shell" title="已有 OpenWrt 时读取 board 信息" expected="distribution/target/model/board_name 能对上设备页。" >
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+cat /tmp/sysinfo/model 2>/dev/null
+cat /tmp/sysinfo/board_name 2>/dev/null
+```
+
+重点字段：`release.distribution`、`release.version`、`release.target`、`model`、`board_name`。`model` 不是硬件修订；不要只凭这一行选镜像。
+
+</Step>
+
+<Step where="router-shell" title="x86 读取 DMI/BIOS" expected="知道主板/设备型号，避免把普通 PC 镜像和虚拟机镜像混用。" >
+
+```sh
+cat /sys/class/dmi/id/sys_vendor
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/board_version
+cat /sys/class/dmi/id/bios_version
+```
+
+x86 还要确认启动方式（BIOS/Legacy 还是 UEFI）、磁盘接口和是否用 combined/ext4 镜像；这些决定镜像能否启动，不只是“x86/64”一个 target。
+
+</Step>
+
+## 在固件选择器里核对
+
+<Step where="client" title="按 target/profile 选，不按文件名猜" expected="选择器里能找到完全对应的设备页和镜像。" >
+
+打开 [OpenWrt Firmware Selector](https://firmware-selector.openwrt.org/)：
+
+1. 先选正确的 release（如 25.12.6）；
+2. 搜索完整型号，打开对应 device page；
+3. 核对 target/subtarget、profile、硬件 revision；
+4. 看设备页的“Installation”说明，确认首次安装和升级分别用哪种镜像；
+5. 下载后核对 SHA-256，不要只改文件名。
+
+设备页和选择器对不上时，停下来查型号/revision，不要选“最像”的那个。
+
+</Step>
+
+## 镜像类型怎么分
+
+| 镜像/场景 | 用途 | 主要风险 |
+|---|---|---|
+| `sysupgrade` | 已在跑 OpenWrt，保留/迁移配置升级 | 跨大版本、插件/内核模块不兼容 |
+| `factory` / 厂商过渡镜像 | 从厂商固件首次安装 | 分区/刷机方式不匹配会变砖 |
+| x86 combined/ext4 | x86 磁盘/虚拟机整体镜像 | BIOS/UEFI、磁盘布局、写入方式 |
+| vendor 固件 | 厂商 Web UI/恢复工具升级 | 不要和 OpenWrt 镜像混刷 |
+| “通用/万能/免拆”包 | 来源不明 | 不要用；无法确认 target/profile/校验 |
+
+文件名带 `sysupgrade` 不等于一定能用；还要 target、profile、revision 和校验都对。
+
+## 下载与校验
+
+<Step where="client" title="只从官方/厂商来源下载" expected="文件来源可追溯，有校验值。" >
+
+优先：
+
+- OpenWrt 官方 `downloads.openwrt.org` 或 Firmware Selector；
+- 设备厂商官方下载页（厂商固件）；
+- 项目官方发布页（第三方固件，需额外确认维护者/签名）。
+
+不要从网盘、论坛附件、聊天记录里的“改好的包”下载。第三方重打包可能带脚本、旧内核或不匹配的驱动。
+
+</Step>
+
+<Step where="client" title="核对 SHA-256 和文件大小" expected="校验值与官方发布页一致。" >
+
+Linux：
+
+```sh
+sha256sum openwrt-*.img.gz
+```
+
+macOS：
+
+```sh
+shasum -a 256 openwrt-*.img.gz
+```
+
+Windows：
+
+```powershell
+certutil -hashfile openwrt-*.img.gz SHA256
+```
+
+与官方 `sha256sums`/发布页比对；不一致就重新下载，不要“先刷了再说”。
+
+</Step>
+
+## 刷机前恢复入口
+
+<Step where="client" title="把恢复路径写在纸上/密码管理器里" expected="刷机失败时知道怎么进 failsafe/恢复模式。" >
+
+至少确认：
+
+- 设备进入 failsafe 的方式（按键时机/串口/IP）；
+- 是否有 TFTP/串口/厂商恢复工具；
+- 管理 LAN 地址、默认网关和 root 密码；
+- 配置备份：`sysupgrade -b`（已有 OpenWrt 时）或厂商导出；
+- 已安装插件/内核模块清单，升级后要重建；
+- 电源稳定，刷机过程中不要断电。
+
+没有恢复路径、没有校验、没有备份时，不要开始刷。
+
+</Step>
+
+## 常见错误
+
+- 只看“型号”不看 revision；
+- 把 `sysupgrade` 当 `factory` 用，或反过来；
+- 把别的 target 的镜像改名后刷入；
+- 校验值不匹配仍继续；
+- 用来源不明的“万能包/扩容包”；
+- 刷机时断电/拔网线；
+- 升级后不检查 DNS/防火墙/插件，直接认为成功。
+
+## 失败分支
+
+### 下载到错误型号
+
+删除文件，重新从设备页下载；不要尝试“刷一下看看”。如果已经刷入，按设备恢复文档进入 failsafe/TFTP/串口，不要连续刷不同镜像。
+
+### 校验失败
+
+重新下载；检查代理/镜像是否截断文件；仍失败就换官方源。不要关闭校验。
+
+### 设备页没有你的 revision
+
+查厂商页面/设备标签，或到 OpenWrt 论坛/设备页确认；没有明确支持时，不要假设兼容。
+
+### 厂商固件被锁/只能官方升级
+
+按厂商流程；不要为了装 OpenWrt 绕过签名/锁。需要保留保修/原厂功能时，先确认代价。
+
+## E1 状态与来源
+
+- 本页是 E1：核对字段、镜像类型和恢复入口按公开资料整理；没有在具体设备上执行下载/刷机。
+- 设备型号/revision 以标签和厂商页面为准；不能把 x86 虚拟机经验套到路由器。
+- 复现配方：`tests/recipes/firmware-download-check.md`；刷机步骤不在本页范围。
+
+<PageSources />

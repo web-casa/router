@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-20T16:46:17.677Z",
-  "base": "http://127.0.0.1:33055",
+  "generatedAt": "2026-10-20T17:05:01.687Z",
+  "base": "http://127.0.0.1:37881",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -299,11 +299,16 @@
         "expectedUrls": [
           "/zh/getting-started/which-openwrt/"
         ],
-        "rank": 2,
+        "rank": 3,
         "results": [
           {
             "url": "/zh/software/package-sources/",
             "title": "软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/getting-started/firmware-download/",
+            "title": "下载固件前先核对：型号、硬件修订、target/profile 与恢复入口",
             "excerpt": ""
           },
           {
@@ -319,11 +324,6 @@
           {
             "url": "/zh/software/openclash/",
             "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
-            "excerpt": ""
-          },
-          {
-            "url": "/zh/installation/proxmox/",
-            "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
             "excerpt": ""
           }
         ]
@@ -423,6 +423,11 @@
             "excerpt": ""
           },
           {
+            "url": "/zh/getting-started/firmware-download/",
+            "title": "下载固件前先核对：型号、硬件修订、target/profile 与恢复入口",
+            "excerpt": ""
+          },
+          {
             "url": "/zh/getting-started/which-openwrt/",
             "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
             "excerpt": ""
@@ -435,11 +440,6 @@
           {
             "url": "/zh/installation/proxmox/",
             "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
-            "excerpt": ""
-          },
-          {
-            "url": "/zh/software/adguard-home/",
-            "title": "AdGuard Home：从后台到终端过滤验证",
             "excerpt": ""
           }
         ]
@@ -458,6 +458,11 @@
           {
             "url": "/zh/getting-started/which-openwrt/",
             "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/getting-started/firmware-download/",
+            "title": "下载固件前先核对：型号、硬件修订、target/profile 与恢复入口",
             "excerpt": ""
           },
           {
@@ -495,13 +500,13 @@
             "excerpt": ""
           },
           {
-            "url": "/zh/software/adguard-home/",
-            "title": "AdGuard Home：从后台到终端过滤验证",
+            "url": "/zh/getting-started/firmware-download/",
+            "title": "下载固件前先核对：型号、硬件修订、target/profile 与恢复入口",
             "excerpt": ""
           },
           {
-            "url": "/zh/getting-started/luci-first-login/",
-            "title": "首次登录 LuCI：默认地址、密码与中文界面",
+            "url": "/zh/software/adguard-home/",
+            "title": "AdGuard Home：从后台到终端过滤验证",
             "excerpt": ""
           }
         ]
@@ -880,8 +885,13 @@
         "expectedUrls": [
           "/en/getting-started/which-openwrt/"
         ],
-        "rank": 1,
+        "rank": 2,
         "results": [
+          {
+            "url": "/en/getting-started/firmware-download/",
+            "title": "Before downloading firmware: model, revision, target/profile and recovery",
+            "excerpt": ""
+          },
           {
             "url": "/en/getting-started/which-openwrt/",
             "title": "Which OpenWrt is this: official, ImmortalWrt, iStoreOS or vendor firmware?",
@@ -900,11 +910,6 @@
           {
             "url": "/en/installation/proxmox/",
             "title": "Install OpenWrt on a single-NIC Proxmox VE host",
-            "excerpt": ""
-          },
-          {
-            "url": "/en/software/openclash/",
-            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
             "excerpt": ""
           }
         ]
@@ -1073,13 +1078,7 @@
           "/zh/troubleshooting/no-web-ui/"
         ],
         "rationale": "printer query must not route to no-LuCI recovery",
-        "results": [
-          {
-            "url": "/zh/software/sqm/",
-            "title": "下载时游戏/会议变卡：SQM 与 CAKE 怎么配、怎么测",
-            "excerpt": ""
-          }
-        ],
+        "results": [],
         "passed": true
       },
       {

@@ -29,6 +29,11 @@ const meta = {
           translations: { 'zh-CN': '固件辨识' },
           slug: 'getting-started/which-openwrt',
         },
+        {
+          label: 'Firmware download',
+          translations: { 'zh-CN': '固件下载核对' },
+          slug: 'getting-started/firmware-download',
+        },
       ],
     },
     {
