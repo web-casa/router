@@ -23,6 +23,11 @@ const meta = {
           translations: { 'zh-CN': '首次登录 LuCI' },
           slug: 'getting-started/luci-first-login',
         },
+        {
+          label: 'Which OpenWrt?',
+          translations: { 'zh-CN': '固件辨识' },
+          slug: 'getting-started/which-openwrt',
+        },
       ],
     },
     {

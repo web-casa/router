@@ -1,0 +1,175 @@
+---
+title: "Which OpenWrt is this: official, ImmortalWrt, iStoreOS or vendor firmware?"
+description: Read the distribution, version, target, package manager and hardware model with read-only commands, so you pick the right image and feeds.
+pageType: troubleshoot
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Device capture pending; commands are read-only and do not depend on the lab'
+testRecipe: 'tests/recipes/which-openwrt.md'
+aliases: ['openwrt version', 'immortalwrt vs openwrt', 'istoreos openwrt', 'openwrt firmware identify']
+symptoms: ['do not know which image to flash', 'package will not install', 'unknown firmware source']
+sources:
+  - label: OpenWrt release notes 25.12
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: OpenWrt firmware selector
+    url: https://firmware-selector.openwrt.org/
+  - label: OpenWrt package manager (apk)
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: ImmortalWrt
+    url: https://immortalwrt.org/
+  - label: iStoreOS
+    url: https://www.istoreos.com/
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="unknown" version="—" packageManager="—" device="any OpenWrt-like device" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="Device capture pending; read-only commands, no dependency on the lab"
+  recipe="tests/recipes/which-openwrt.md"
+  result="E1: fields, decision table and image-selection method documented; no device capture yet"
+/>
+
+## Outcome
+
+- Tell whether the device runs **official OpenWrt, ImmortalWrt, iStoreOS or vendor firmware**.
+- Read the distribution, version, revision, target, architecture and hardware model.
+- Know whether the package manager is `apk` or `opkg`, and which feeds belong to it.
+- Choose the right sysupgrade/vendor image instead of flashing the wrong one.
+
+## Start with three read-only commands
+
+<Step where="router-shell" title="Read the system board data" expected="You can see distribution, version, target and model.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+```
+
+The four key fields are `release.distribution`, `release.version`, `release.target` and `model`.
+
+</Step>
+
+<Step where="router-shell" title="Read the package manager and architecture" expected="You know whether it is apk or opkg, and the CPU architecture.">
+
+```sh
+command -v apk
+command -v opkg
+cat /etc/apk/arch 2>/dev/null
+opkg print-architecture 2>/dev/null
+uname -a
+```
+
+Do not guess the package manager from the version number: official 25.12 usually uses `apk`, 24.10 uses `opkg`, but forks/vendor images may differ. Trust the command that exists.
+
+</Step>
+
+<Step where="router-shell" title="Read model and hardware revision" expected="The model and board name match the device label.">
+
+x86:
+
+```sh
+cat /sys/class/dmi/id/sys_vendor
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/board_version
+cat /sys/class/dmi/id/bios_version
+```
+
+ARM/router:
+
+```sh
+cat /tmp/sysinfo/model
+cat /tmp/sysinfo/board_name
+```
+
+`model` is not the hardware revision; one model can have multiple revisions. Use the label, `board_name` and the vendor download page before flashing.
+
+</Step>
+
+## Decision table
+
+| Field/sign | Official OpenWrt | ImmortalWrt | iStoreOS | Vendor firmware |
+|---|---|---|---|---|
+| `release.distribution` | `OpenWrt` | usually `ImmortalWrt` | usually `iStoreOS`/vendor | vendor |
+| Feeds | `downloads.openwrt.org` | ImmortalWrt feeds | iStoreOS feeds | vendor store |
+| Package manager | `apk` (25.12) or `opkg` (24.10) | check the command | usually `opkg` | may be absent/restricted |
+| Web UI | LuCI | LuCI + custom | iStoreOS UI | vendor UI |
+| Upgrade image | OpenWrt sysupgrade | ImmortalWrt image | iStoreOS image | vendor firmware |
+| Support | OpenWrt community | ImmortalWrt community | iStoreOS community | vendor |
+
+**Do not mix** OpenWrt official feeds into ImmortalWrt/iStoreOS, or flash another model's sysupgrade; ABI, kernel and partition layouts may not match.
+
+## Why the “About” page is not enough
+
+- Some vendor images reskin LuCI but are not official OpenWrt underneath.
+- `DISTRIB_DESCRIPTION` can be customized and is not sufficient by itself.
+- The same version number does not imply the same target/profile.
+- The package manager and feeds are what actually matter when installing plugins.
+
+Cross-check `ubus call system board`, `/etc/openwrt_release` and the package manager.
+
+## Choose the upgrade image
+
+<Step where="router-shell" title="Record target and board_name" expected="You can find an exact match in the firmware selector/vendor page.">
+
+```sh
+ubus call system board
+```
+
+Focus on:
+
+- `release.target` (e.g. `x86/64`, `mediatek/filogic`);
+- `board_name`;
+- `model`;
+- current version/revision.
+
+For official devices, use the [OpenWrt Firmware Selector](https://firmware-selector.openwrt.org/) with the exact target/model. ImmortalWrt/iStoreOS/vendor devices use their own download pages. **Never cross-flash a sysupgrade from another model or target.**
+
+</Step>
+
+<Step where="router-shell" title="Confirm the image type" expected="You know whether this is sysupgrade or a factory/vendor image.">
+
+- Upgrading an existing OpenWrt usually uses `sysupgrade`.
+- First install from vendor firmware usually uses a `factory`/vendor transition image.
+- x86 may use combined/ext4 images written differently.
+- If unsure, read the device page; do not guess from the filename.
+
+</Step>
+
+## Failure branches and recovery
+
+### `ubus` is missing or fails
+
+It may be vendor firmware or a non-OpenWrt system. Check the web UI “About/System” and the device label; do not flash OpenWrt blindly.
+
+### Web UI only, no SSH
+
+Vendor firmware may disable SSH. Check the vendor documentation/warranty first; do not flash just to get root. If you need vendor features, use the vendor upgrade path.
+
+### Packages will not install
+
+- Package manager does not match the firmware (`apk` vs `opkg`);
+- feed architecture/version mismatch;
+- kernel module ABI mismatch;
+- feeds from another fork are mixed in.
+
+Go back to `ubus call system board` and the package manager, confirm the source, then debug.
+
+### Wrong image / bricked device
+
+Stop flashing. Use the device's failsafe, TFTP or vendor recovery procedure. If you have no recovery path, do not try “one more image”.
+
+## E1 status and sources
+
+- This is E1: fields, decision table and image-selection method are based on public documentation; no device was captured in this environment.
+- Forks/vendor outputs may differ; run `tests/recipes/which-openwrt.md` on a real device, record the fields and screenshots, then promote to E2.
+- This page only identifies firmware; it does not provide cross-model flashing or vendor-restriction bypasses.
+
+<PageSources />
