@@ -1,0 +1,21 @@
+---
+interface Row {
+  physical: string;
+  bridge: string;
+  vnic: string;
+  iface: string;
+  role: string;
+}
+interface Props { rows: Row[] }
+const { rows } = Astro.props;
+---
+<table class="topology">
+  <thead>
+    <tr><th>物理口</th><th>PVE bridge</th><th>虚拟网卡</th><th>OpenWrt 接口</th><th>职责</th></tr>
+  </thead>
+  <tbody>
+    {rows.map((row) => (
+      <tr><td>{row.physical}</td><td>{row.bridge}</td><td>{row.vnic}</td><td>{row.iface}</td><td>{row.role}</td></tr>
+    ))}
+  </tbody>
+</table>

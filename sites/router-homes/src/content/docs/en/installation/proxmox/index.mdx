@@ -1,0 +1,53 @@
+---
+title: Install OpenWrt on Proxmox
+description: Map physical NICs to bridges, virtual NICs and OpenWrt interfaces, and keep host access.
+pageType: install
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+aliases: ['openwrt proxmox', 'pve openwrt']
+symptoms: ['no internet after install', 'host unreachable']
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TopologyTable from '@components/TopologyTable.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="Proxmox VE VM" tested={false} evidence="E2" />
+
+## Outcome
+
+The OpenWrt VM routes traffic, the Proxmox host remains reachable, and you can still get to a backup when the router VM is stopped.
+
+## Topology
+
+<TopologyTable rows={[
+  { physical: 'enp1s0', bridge: 'vmbr0', vnic: 'net0', iface: 'wan', role: 'upstream / management' },
+  { physical: 'enp2s0', bridge: 'vmbr1', vnic: 'net1', iface: 'lan', role: 'LAN clients' },
+]} />
+
+## Steps
+
+<Step where="router-shell" title="Confirm interfaces" expected="wan has an address; lan is the LAN gateway.">
+
+```sh
+ip -br addr
+```
+
+</Step>
+
+<Step where="client" title="Verify host and guest access" expected="The client reaches the OpenWrt gateway and the Proxmox UI.">
+
+Test both the LAN gateway and the Proxmox host address from a client.
+
+</Step>
+
+<Step where="luci" title="Record the recovery path" expected="You know how to reach the host and restore the VM if routing fails.">
+
+Write down the physical port, bridge, VM NIC and management address before changing the WAN configuration.
+
+</Step>
+
+## Recovery
+
+If the router VM loses connectivity, use the Proxmox host console. Do not rely on a backup that is only reachable through the router VM.

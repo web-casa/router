@@ -1,0 +1,23 @@
+---
+interface Props {
+  where: 'router-shell' | 'luci' | 'client' | 'phone' | string;
+  title?: string;
+  expected?: string;
+}
+const labels: Record<string, string> = {
+  'router-shell': '路由器 Shell',
+  luci: 'LuCI',
+  client: '电脑',
+  phone: '手机',
+};
+const { where, title, expected } = Astro.props;
+const label = labels[where] ?? where;
+---
+<div class="step">
+  <div class="step-head">
+    <span class="step-badge">{label}</span>
+    {title && <strong>{title}</strong>}
+  </div>
+  <div class="step-body"><slot /></div>
+  {expected && <p class="step-expected">预期：{expected}</p>}
+</div>

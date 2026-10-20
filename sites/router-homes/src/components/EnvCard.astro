@@ -1,0 +1,28 @@
+---
+interface Props {
+  firmware?: string;
+  version?: string;
+  packageManager?: string;
+  device?: string;
+  tested?: boolean;
+  evidence?: string;
+}
+const {
+  firmware = '未注明',
+  version = '未注明',
+  packageManager = '未注明',
+  device = '未注明',
+  tested = false,
+  evidence = 'E1',
+} = Astro.props;
+---
+<aside class="env-card" aria-label="适用环境">
+  <dl>
+    <dt>固件</dt><dd>{firmware}</dd>
+    <dt>版本</dt><dd>{version}</dd>
+    <dt>包管理器</dt><dd>{packageManager}</dd>
+    <dt>设备</dt><dd>{device}</dd>
+    <dt>验证级别</dt><dd>{evidence} · {tested ? '已实测' : '未实测'}</dd>
+  </dl>
+  {!tested && <p class="warn">本页步骤尚未在本文所述设备上实测，请先备份并保留管理入口。</p>}
+</aside>

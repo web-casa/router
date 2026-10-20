@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "sites": [
+    {
+      "id": "router-homes",
+      "domain": "router.homes",
+      "title": "Router.Homes",
+      "description": "OpenWrt 中文文档：DNS、PVE、网络与故障排查",
+      "defaultLocale": "en",
+      "locales": ["en", "zh"],
+      "audience": "想在家用路由器上使用 OpenWrt 的用户",
+      "angle": "按真实设备与固件版本验证的 OpenWrt 操作文档",
+      "minPages": 4,
+      "approvalMode": "solo",
+      "theme": "router",
+      "deploy": { "enabled": false, "project": "router-homes", "domainStatus": "unbound" }
+    }
+  ]
+}

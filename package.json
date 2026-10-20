@@ -1,0 +1,24 @@
+{
+  "name": "router-homes-fleet",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "scripts": {
+    "build:kit": "pnpm --filter @fleet/docs-kit build",
+    "build": "pnpm build:kit && pnpm --filter @fleet/site-router-homes build",
+    "dev": "pnpm --filter @fleet/site-router-homes dev",
+    "validate": "pnpm build:kit && tsx scripts/validate.ts",
+    "check": "pnpm build && tsx scripts/checks/i18n.ts",
+    "fleet": "tsx scripts/fleet.ts"
+  },
+  "devDependencies": {
+    "@fleet/docs-kit": "workspace:*",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "wrangler": "^4",
+    "zod": "^3.23.8"
+  }
+}

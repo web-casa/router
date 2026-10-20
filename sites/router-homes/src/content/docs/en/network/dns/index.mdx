@@ -1,0 +1,47 @@
+---
+title: Configure DNS and verify router, client and browser
+description: Check which DNS server the router, the client and the browser actually use.
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+aliases: ['openwrt dns', 'openwrt dns settings']
+symptoms: ['pages do not load', 'some sites fail']
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86 VM" tested={false} evidence="E2" />
+
+## Outcome
+
+You can name the DNS server used by the router, by a client, and by a browser, and you can restore basic resolution after a change.
+
+## Steps
+
+<Step where="router-shell" title="Read the upstream DNS" expected="You see the DNS server handed out by WAN.">
+
+```sh
+cat /tmp/resolv.conf.d/resolv.conf.auto
+```
+
+</Step>
+
+<Step where="client" title="Check the client resolver" expected="The client points at the OpenWrt LAN address.">
+
+```sh
+nslookup example.com
+```
+
+</Step>
+
+<Step where="luci" title="Check the DHCP-advertised DNS" expected="The DHCP option matches the intended resolver.">
+
+Open **Network → DHCP and DNS** and compare the advertised DNS with the value you intended.
+
+</Step>
+
+## Recovery
+
+If name resolution breaks, restore the previous WAN DNS or disable the custom resolver, then verify with a client query before changing anything else.

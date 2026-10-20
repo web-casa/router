@@ -1,0 +1,47 @@
+---
+title: OpenWrt DNS 怎么设置：路由器、电脑和浏览器分别走哪里
+description: 分别确认路由器、终端和浏览器实际使用的 DNS，并保留恢复路径。
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+aliases: ['openwrt dns', 'openwrt dns 设置']
+symptoms: ['网页打不开', '部分网站失败']
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86 虚拟机" tested={false} evidence="E2" />
+
+## 完成后你能确认什么
+
+你能说清路由器、电脑和浏览器分别使用哪个 DNS，并在改动失败后恢复基础解析。
+
+## 操作步骤
+
+<Step where="router-shell" title="查看上游 DNS" expected="看到 WAN 下发的 DNS 地址。">
+
+```sh
+cat /tmp/resolv.conf.d/resolv.conf.auto
+```
+
+</Step>
+
+<Step where="client" title="检查终端解析器" expected="终端指向 OpenWrt 的 LAN 地址。">
+
+```sh
+nslookup example.com
+```
+
+</Step>
+
+<Step where="luci" title="检查 DHCP 通告的 DNS" expected="DHCP 选项与目标解析器一致。">
+
+打开 **网络 → DHCP/DNS**，对比通告的 DNS 是否符合预期。
+
+</Step>
+
+## 恢复
+
+如果域名解析失败，先恢复原来的 WAN DNS 或停用自定义解析器，再用终端查询确认，最后才改其他配置。

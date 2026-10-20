@@ -15,7 +15,7 @@
 3. **四组双语样板先行**：PVE、OpenClash、AdGuard Home、SQM/CAKE；它们是 16 个承诺范围内的样板，第 1–2 周完成。
 4. **P0 风险分级**：R0 只读/信息；R1 可恢复的网络变更；R2 破坏性/可能失联。无第二评审人时，R2 只做“导航 + 官方来源整理”，不写第一人称操作步骤；R1 必须 E2 + 管理恢复 + 负向测试，关键结论 E3。
 5. **域名首次部署到 Cloudflare Pages 时绑定**：六态 `unbound → placeholder-deployed → binding → verified → live → redirected-hosts`；首次生产部署只能是 noindex 占位产物（golden placeholder），绑定后再发内容。
-6. **缺译不做 fallback**：v1 不配置 `i18n.fallback`，只发布成对页面；P1 单语页留在草稿，不进入 `src/content/docs`。Phase 0 用 `/en/only-en/` 夹具断言 `/zh/only-en/` 为真实 404、无 canonical/hreflang/sitemap。
+6. **缺译不做 fallback**：v1 只发布成对页面；P1 单语页留在草稿。Phase 0 已确认 **Starlight 会为缺译条目生成 fallback**：把 `en/only-en/` 留在 `src/content/docs` 时，构建生成了 `/zh/only-en/` 并写入 canonical/hreflang/sitemap。因此单语页只放 `content/drafts/`，prebuild 强制中英配对；移除夹具后 `/zh/only-en/` 为真实 404。
 7. **ubuntu.fan 不是 Fumadocs**：它是 Next.js + Nextra + Pagefind，中文根路径、英文 `/en/`；只复用信息架构，不复用代码。
 
 ### 0.2 ADR
@@ -149,7 +149,7 @@
 - P1 26 个：独立参考/迁移、PassWall/PassWall2、DNS 组合（MosDNS+AGH+代理）、IPTV 单线复用、WireGuard PBR、旅行路由、WAN/VPN/NAS 吞吐诊断、代理前端选型等。
 - P2 4 个：设备候选专题，取得硬件修订与恢复条件后再做。
 - **四组样板**：004 PVE、043 OpenClash、026 AdGuard Home、025 SQM；第 1–2 周完成中英双语，作为后续验收标准。
-- **P1 单语不进入 v1 发布**：缺译必须真实 404；在 Phase 0 夹具通过前，单语页只留在 `content/drafts`，不进入 `src/content/docs`。
+- **P1 单语不进入 v1 发布**：Phase 0 已确认单语条目会触发 Starlight fallback；单语页只留 `content/drafts`，不进入 `src/content/docs`；`scripts/validate.ts` 强制中英配对。
 
 ---
 
@@ -175,7 +175,7 @@ starlight({
 
 - 内容目录：`src/content/docs/en/**`、`src/content/docs/zh/**`；无 root 目录。
 - Starlight 生成的 Astro i18n 默认含 `redirectToDefaultLocale: false` 与 `fallbackType: 'redirect'`；**v1 不配置任何 `i18n.fallback`**，并用夹具验证缺译为真实 404。若 Starlight 无法满足，P1 单语页只留草稿。
-- **禁止配置任何 `i18n.fallback`**；v1 只发布成对页面。缺译夹具：只放 `/en/only-en/`，断言 `GET /zh/only-en/` 为真实 **404**，无 canonical、无 hreflang、无 sitemap URL；若 Starlight 无法满足，P1 单语页只留草稿，不进入内容目录。
+- **禁止配置任何 `i18n.fallback`**；v1 只发布成对页面。Phase 0 已确认 Starlight 会为缺译条目生成 fallback 页；因此单语页不进 `src/content/docs`，构建前配对校验；移除夹具后 `/zh/only-en/` 在 Pages dev 下为 404，且无 canonical/hreflang/sitemap。
 - 根 `/` 无页面；`public/_redirects` 增加 `/ /en/ 301`。但必须请求级验收：`curl -sSI https://host/` 单跳 301、`Location: /en/`；`/en/`、`/zh/` 200；产物中不得有根 `index.html`。若引入 Pages Functions，根跳转改由 Functions 实现并删除 `_redirects` 规则，避免双重实现。
 - 页面 URL：`/en/docs/installation/proxmox/`、`/zh/docs/installation/proxmox/`。
 - 中英各自自指 canonical；双向 hreflang `en`、`zh-Hans`，可选 `x-default` 指向英文。
@@ -334,7 +334,7 @@ docs-fleet/
 
 ### 5.2 i18n、URL 与搜索验收
 
-- **缺译夹具**：只建 `/en/only-en/`，断言 `/zh/only-en/` 为真实 404，无 canonical、无 hreflang、无 sitemap URL；不得出现默认语言内容回退。
+- **缺译规则**：单语页不进 `src/content/docs`；prebuild 配对校验；Phase 0 已确认移除夹具后 `/zh/only-en/` 为真实 404，无 canonical/hreflang/sitemap，且 Pages dev 返回 404。
 - **根 301**：`curl -sSI https://host/` 必须单跳 301、`Location: /en/`；`/en/`、`/zh/` 200；产物不得有根 `index.html`；若用 Pages Functions，删除对应 `_redirects`，避免双重实现。
 - **URL 集合一致**：构建 HTML 可索引 URL = sitemap URL = manifest URL；三方不等即失败。manifest 只驱动导航/索引，不生成 canonical/hreflang/sitemap。
 - **40 查询契约**：`{ locale, query, expectedUrls, minRank, forbiddenLocales, aliasCase }`，每条只允许一个主预期 URL。阈值：40/40 非空；40/40 首屏结果语种正确；别名 100% Top 1；其余预期 URL Top 3 ≥95%；不得出现另一语言 URL。
@@ -401,7 +401,7 @@ DOCX 基线为 **10–16 开发人日**（按复用外壳估算）；本方案�
 | 第三方代理应用（OpenClash/PassWall） | 版本漂移、法律/合规风险 | 固定版本/包源；只写合法网络中的兼容性/DNS/停用恢复；不做规避/绕过教程；必要时法律复核 |
 | 关键词“全球”口径 | 决策偏差 | 保存 API 参数/地区/语言/日期/响应哈希；同时看 2026-09；不把均值当流量 |
 | 社区样本偏差 | 选题过度拟合 | 36/53 可读、17 仅索引；`index-only` 不能当证据；不推算占比/故障率 |
-| Starlight 缺译/fallback | 缺译被索引/跳转而非 404 | v1 不配置 i18n fallback；只发成对页面；Phase 0 夹具断言 404 |
+| Starlight 缺译/fallback | 缺译被索引/跳转而非 404 | Phase 0 已确认会生成 fallback；单语页只留 drafts；prebuild 配对校验；移除夹具后 `/zh/only-en/` 404 |
 | Pagefind 中文检索/别名 | 40 查询不达标 | Pagefind extended；查询扩展层；40 查询 JSON 契约；不足再评估 FlexSearch |
 | Root `/` 与 `/en` `/zh` | 重复/错误 canonical | `_redirects` 301 + 请求级验收；canonical 自指；sitemap/hreflang 校验 |
 | 生产 `pages.dev` 双主机 | 重复收录 | `live` 后 301 到正式域名；唯一 canonical 主机；HTML/sitemap 集合比对 |
@@ -454,8 +454,8 @@ DOCX 基线为 **10–16 开发人日**（按复用外壳估算）；本方案�
 
 ### 9.3 下一步
 
-1. Phase 0：2 页双语样板（DNS + PVE）+ 缺译/根 301/搜索夹具。
-2. 第 1–2 周：四组样板（PVE、OpenClash、AGH、SQM）+ 双语壳。
+1. Phase 0：**已完成**（见 `docs/phase-0-report.md`）；双语壳、4 对页面、组件、根 301、缺译 404、canonical/hreflang/sitemap 已验证。
+2. 第 1–2 周：四组样板（PVE、OpenClash、AGH、SQM）+ 双语壳；补 40 查询浏览器测试与 Pagefind 中文扩展。
 3. 第 2 周末 gate：决定 16 + 8 或只做 16；第 3–4 周基础路径；第 5–6 周分批上线；第 7–8 周条件目标。
 
 ---
@@ -468,5 +468,6 @@ DOCX 基线为 **10–16 开发人日**（按复用外壳估算）；本方案�
 - v0.6 完成 solo 批准、域名四态、preview canonical、CI 可信边界、刷机边界、证据哈希、工期与合规。
 - v0.7 纳入 DOCX/XLSX 研究：24 个 P0 主题/48 页、8 栏目、四组样板、54 主题路线图、Starlight 显式 `/en` `/zh` 方案；无第二评审人；**域名在首次 CF Pages 部署时绑定**。
 - v0.7 经 Codex 只读复审（模型 `gpt-5.6-terra`；`gpt-6.1-sol` 当前账号不支持）。9 条 P0/P1：缺译 fallback、根 301、Pagefind 别名、40 查询、P0 风险分级、16+8 范围、schema/manifest 职责、Pages 六态、研究数据边界；v0.8 已纳入。
-- v0.8 未执行代码/构建验证；Phase 0 的 2 页样板、缺译/根 301/搜索夹具与四组样板是第一批验证。
+- v0.8 未执行代码/构建验证；Phase 0 已完成竖切：`pnpm check` 通过，Wrangler Pages dev 实测 `/` 301 `/en/`、`/zh/only-en/` 404、canonical/hreflang/sitemap 正确；详见 `docs/phase-0-report.md`。
+- Phase 0 发现：Starlight 会为缺译条目生成 fallback，因此 v1 采用“单语页只留 drafts + 构建前配对校验”；Pagefind 已生成 zh-cn/en 索引，40 查询浏览器验收仍待 Phase 1。
 - ubuntu.fan 实际为 Nextra + Pagefind（非 Fumadocs）；本方案只复用信息架构，不复用其壳。

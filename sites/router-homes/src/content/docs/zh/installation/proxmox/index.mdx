@@ -1,0 +1,53 @@
+---
+title: PVE 安装 OpenWrt：网口映射、宿主机联网与恢复准备
+description: 把物理口、bridge、虚拟网卡和 OpenWrt 接口对上，并保留宿主机管理入口。
+pageType: install
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+aliases: ['openwrt proxmox', 'pve 安装 openwrt']
+symptoms: ['安装后无法上网', '宿主机失联']
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TopologyTable from '@components/TopologyTable.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="Proxmox VE 虚拟机" tested={false} evidence="E2" />
+
+## 完成后你能确认什么
+
+OpenWrt 虚拟机能转发流量，Proxmox 宿主机仍可访问，路由 VM 关闭时你仍能拿到备份。
+
+## 拓扑
+
+<TopologyTable rows={[
+  { physical: 'enp1s0', bridge: 'vmbr0', vnic: 'net0', iface: 'wan', role: '上游 / 管理' },
+  { physical: 'enp2s0', bridge: 'vmbr1', vnic: 'net1', iface: 'lan', role: 'LAN 终端' },
+]} />
+
+## 操作步骤
+
+<Step where="router-shell" title="确认接口" expected="wan 有地址，lan 是 LAN 网关。">
+
+```sh
+ip -br addr
+```
+
+</Step>
+
+<Step where="client" title="验证宿主机与虚拟机都能访问" expected="终端能到 OpenWrt 网关和 Proxmox 管理页。">
+
+从一台终端分别访问 LAN 网关和 Proxmox 宿主机地址。
+
+</Step>
+
+<Step where="luci" title="记录恢复路径" expected="你知道怎么进宿主机、怎么恢复 VM。">
+
+改 WAN 前，把物理口、bridge、VM 网卡和管理地址写下来。
+
+</Step>
+
+## 恢复
+
+路由 VM 失联时用 Proxmox 宿主机控制台。不要把备份只放在必须经过路由 VM 才能访问的位置。

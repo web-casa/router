@@ -1,0 +1,6 @@
+[
+  { "locale": "zh", "query": "openwrt dns 设置", "expectedUrls": ["/zh/network/dns/"], "aliasCase": true },
+  { "locale": "zh", "query": "pve 安装 openwrt", "expectedUrls": ["/zh/installation/proxmox/"], "aliasCase": false },
+  { "locale": "en", "query": "openwrt dns", "expectedUrls": ["/en/network/dns/"], "aliasCase": true },
+  { "locale": "en", "query": "openwrt proxmox", "expectedUrls": ["/en/installation/proxmox/"], "aliasCase": false }
+]

@@ -1,6 +1,9 @@
 node_modules/
+.pnpm-store/
 **/dist/
 **/.astro/
+.astro/
 .fleet/tmp/
 *.log
 .DS_Store
+.wrangler/
