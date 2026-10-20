@@ -1,0 +1,32 @@
+---
+interface Props {
+  status: 'planned' | 'partial' | 'verified';
+  environment?: string;
+  recipe?: string;
+  result?: string;
+  date?: string;
+}
+const locale = (Astro.locals as any).starlightRoute?.locale ?? 'en';
+const isEn = locale === 'en';
+const { status, environment = isEn ? 'Not specified' : '未注明', recipe = isEn ? 'Not registered' : '未登记', result, date } = Astro.props;
+const labels = isEn
+  ? { planned: 'Planned', partial: 'Partially verified', verified: 'Verified' }
+  : { planned: '计划中', partial: '部分验证', verified: '已验证' };
+---
+<aside class={`test-record test-record-${status}`} aria-label={isEn ? 'Test record' : '测试记录'}>
+  <strong>{isEn ? 'Test record' : '测试记录'}</strong>
+  <dl>
+    <dt>{isEn ? 'Status' : '状态'}</dt><dd>{labels[status]}</dd>
+    <dt>{isEn ? 'Environment' : '环境'}</dt><dd>{environment}</dd>
+    <dt>{isEn ? 'Recipe' : '配方'}</dt><dd><code>{recipe}</code></dd>
+    {date && <><dt>{isEn ? 'Date' : '日期'}</dt><dd>{date}</dd></>}
+    {result && <><dt>{isEn ? 'Result' : '结果'}</dt><dd>{result}</dd></>}
+  </dl>
+  {status !== 'verified' && (
+    <p class="test-warning">
+      {isEn
+        ? 'This page has not been independently tested. Promote it to E2/E3 only after running the fixed recipe.'
+        : '本页尚未完成独立实测；命令与恢复路径以固定环境复现后再标记 E2/E3。'}
+    </p>
+  )}
+</aside>

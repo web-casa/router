@@ -7,8 +7,12 @@ const extended = z.object({
   tested: z.boolean().default(false),
   testedVersions: z.array(z.string()).default([]),
   evidenceLevel: z.enum(['E1', 'E2', 'E3']).optional(),
+  testEnvironment: z.string().optional(),
+  testRecipe: z.string().optional(),
+  lastVerifiedAt: z.string().optional(),
   aliases: z.array(z.string()).default([]),
   symptoms: z.array(z.string()).default([]),
+  sources: z.array(z.object({ label: z.string(), url: z.string().url() })).default([]),
 });
 
 export const collections = {

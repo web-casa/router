@@ -1,47 +1,225 @@
 ---
 title: OpenWrt DNS 怎么设置：路由器、电脑和浏览器分别走哪里
-description: 分别确认路由器、终端和浏览器实际使用的 DNS，并保留恢复路径。
+description: 分别确认路由器、电脑和浏览器实际使用的 DNS，并保留一条可执行的回退路径。
 pageType: network
 tested: false
 testedVersions: ['25.12.6']
-evidenceLevel: E2
-aliases: ['openwrt dns', 'openwrt dns 设置']
-symptoms: ['网页打不开', '部分网站失败']
+evidenceLevel: E1
+testEnvironment: 'OpenWrt 25.12.6 x86_64 VM（2 vNIC）'
+testRecipe: 'tests/recipes/dns-25.12-x86.md'
+aliases: ['openwrt dns', 'openwrt dns 设置', 'openwrt 修改 dns']
+symptoms: ['网页打不开', '部分网站失败', 'DNS 解析失败']
+sources:
+  - label: OpenWrt DHCP and DNS configuration
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp_configuration
+  - label: OpenWrt dnsmasq
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt 25.12 release notes
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: OpenWrt apk package manager
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
 ---
 
 import EnvCard from '@components/EnvCard.astro';
 import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86 虚拟机" tested={false} evidence="E2" />
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86 虚拟机" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="OpenWrt 25.12.6 x86_64 VM，2 个 vNIC"
+  recipe="tests/recipes/dns-25.12-x86.md"
+  result="尚未执行；命令、失败分支和恢复路径待 VM 按配方复现"
+/>
 
 ## 完成后你能确认什么
 
-你能说清路由器、电脑和浏览器分别使用哪个 DNS，并在改动失败后恢复基础解析。
+你能分别回答三个问题：
 
-## 操作步骤
+- 路由器的上游 DNS 是谁；
+- 电脑/手机从 OpenWrt 拿到的 DNS 是谁；
+- 浏览器是否绕过系统 DNS（DoH）。
 
-<Step where="router-shell" title="查看上游 DNS" expected="看到 WAN 下发的 DNS 地址。">
+并且在改动失败后，能用备份或 WAN 恢复步骤回到可解析状态。
+
+## 适用环境
+
+- OpenWrt 25.12.6，默认 `dnsmasq` + `odhcpd`；25.12 使用 `apk`，24.10 使用 `opkg`。
+- 本文的检查命令不需要安装额外软件包；如果设备使用其他 DNS 组件（如 `unbound`、`https-dns-proxy`），先确认它是否接管了 53 端口。
+- 24.10 的菜单和配置键基本一致，但包管理命令不同；不要把 `apk` 命令直接套到 24.10。
+
+## DNS 路径与职责
+
+| 位置 | 默认由谁负责 | 本页怎么检查 |
+|---|---|---|
+| WAN 上游 | DHCP/PPPoE 客户端下发的 DNS | `cat /tmp/resolv.conf.d/resolv.conf.auto` |
+| 路由器本地解析 | `dnsmasq` | `nslookup openwrt.org 127.0.0.1` |
+| LAN 终端通告 | `dnsmasq` 的 DHCP option 6 / `odhcpd` 的 RDNSS | 在电脑或手机上查实际 DNS |
+| 浏览器 | 系统 DNS 或浏览器自带 DoH | 浏览器安全设置里确认 DoH 是否开启 |
+
+先判断问题在哪一层，不要一上来就换公共 DNS。
+
+## 改动前准备
+
+<Step where="router-shell" title="备份 DHCP/DNS 配置" expected="备份文件存在，且你知道怎么恢复。">
+
+```sh
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+uci export dhcp > /tmp/dhcp.before
+uci show dhcp | grep -E 'dns|resolv|server|option'
+```
+
+同时确认你能用网线通过 LAN 访问 LuCI/SSH；不要把唯一管理入口建立在正在修改的 DNS 上。
+
+</Step>
+
+## 最小步骤
+
+<Step where="router-shell" title="看当前上游 DNS 和 dnsmasq 配置" expected="你能指出 resolvfile、server、noresolv 的当前值。">
 
 ```sh
 cat /tmp/resolv.conf.d/resolv.conf.auto
+uci show dhcp.@dnsmasq[0]
+uci show network.wan | grep -E 'peerdns|dns'
 ```
+
+`/tmp/resolv.conf.d/resolv.conf.auto` 是 WAN 客户端写入的解析文件；`dhcp.@dnsmasq[0].resolvfile` 指向哪里，以实际输出为准。若 `noresolv='1'`，dnsmasq 会忽略这个文件，改用 `server` 列表。
 
 </Step>
 
-<Step where="client" title="检查终端解析器" expected="终端指向 OpenWrt 的 LAN 地址。">
+<Step where="luci" title="在 WAN 上设置自定义 DNS（推荐先改这一层）" expected="WAN 重新拨号后，上游 DNS 变成你设置的值。">
+
+打开 **网络 → 接口 → WAN → 高级设置**：
+
+1. 取消勾选“使用对端通告的 DNS 服务器”（`peerdns` 变为 0）。
+2. 在“自定义 DNS 服务器”填入你信任的 DNS，例如 `1.1.1.1` 和 `9.9.9.9`。
+3. 保存并应用；必要时重新连接 WAN。
+
+这一步会短暂中断 WAN，但不会改 LAN 的 DHCP/DNS 结构，失败时更容易回退。
+
+</Step>
+
+<Step where="router-shell" title="确认 dnsmasq 正在监听并已加载新上游" expected="53 端口在监听，日志没有配置错误。">
 
 ```sh
-nslookup example.com
+netstat -lnp | grep ':53'
+/etc/init.d/dnsmasq restart
+logread -e dnsmasq | tail -20
+```
+
+如果 `dnsmasq` 启动失败，先不要继续改 DHCP option；用 `logread` 的错误原文定位配置语法或端口冲突。
+
+</Step>
+
+<Step where="luci" title="检查 DHCP 通告给终端的 DNS" expected="终端拿到的是 OpenWrt 的 LAN 地址，或你明确设置的 option 6。">
+
+打开 **网络 → DHCP/DNS → DHCP 服务器 → 高级设置**，检查“DHCP 选项”是否包含 `6,<DNS>`。没有 option 6 时，客户端通常使用路由器 LAN 地址作为 DNS；有 option 6 时，客户端会直接拿到该地址。
+
+不要同时把客户端 DNS 指向一个未监听 53 的地址。
+
+</Step>
+
+## 终端验证
+
+<Step where="router-shell" title="从路由器本机验证 A 与 AAAA" expected="两条查询都返回结果，且没有超时。">
+
+```sh
+nslookup openwrt.org 127.0.0.1
+nslookup -type=AAAA openwrt.org 127.0.0.1
 ```
 
 </Step>
 
-<Step where="luci" title="检查 DHCP 通告的 DNS" expected="DHCP 选项与目标解析器一致。">
+<Step where="client" title="从电脑验证实际收到的 DNS" expected="客户端 DNS 与 DHCP/静态配置一致，查询能返回结果。">
 
-打开 **网络 → DHCP/DNS**，对比通告的 DNS 是否符合预期。
+Linux：
+
+```sh
+resolvectl status
+cat /etc/resolv.conf
+nslookup openwrt.org
+```
+
+Windows：
+
+```powershell
+ipconfig /all
+nslookup openwrt.org
+```
+
+macOS：
+
+```sh
+scutil --dns
+nslookup openwrt.org
+```
 
 </Step>
 
-## 恢复
+<Step where="client" title="在浏览器里确认是否绕过路由器 DNS" expected="做 DNS 验证时 DoH 已关闭，或你明确知道它指向哪里。">
 
-如果域名解析失败，先恢复原来的 WAN DNS 或停用自定义解析器，再用终端查询确认，最后才改其他配置。
+Chrome/Edge：`chrome://settings/security` 或“隐私和安全 → 安全 → 使用安全 DNS”。Firefox：设置 → 隐私与安全 → DNS over HTTPS。浏览器开启 DoH 时，系统 DNS 可能完全不被使用；这会让“改了路由器 DNS 但浏览器不生效”看起来像故障。
+
+</Step>
+
+<Step where="client" title="检查 IPv6 解析与 RA/RDNSS" expected="有 IPv6 上游时 AAAA 可解析；没有时明确记录条件不足。">
+
+```sh
+nslookup -type=AAAA openwrt.org
+ip -6 route
+```
+
+如果上游没有 IPv6 前缀，不要用 IPv4 的结果推断 IPv6 DNS 正常。
+
+</Step>
+
+## 失败分支与恢复
+
+### 网页打不开，但能 ping 通 IP
+
+优先怀疑 DNS，而不是 WAN 断线：
+
+1. 在客户端查实际 DNS：`resolvectl status` / `ipconfig /all` / `scutil --dns`。
+2. 在路由器查 53 端口和 dnsmasq 日志：`netstat -lnp | grep ':53'`、`logread -e dnsmasq`。
+3. 确认浏览器 DoH 是否开启；临时关闭后重试。
+4. 确认 DHCP option 6 没有把客户端指向错误地址。
+
+### LuCI/SSH 进不去
+
+不要继续改 DNS。用网线接 LAN，给客户端配一个同网段静态 IP，确认默认网关是 OpenWrt LAN 地址；再从本地控制台或 SSH 恢复：
+
+```sh
+cp /etc/config/dhcp.bak.YYYY-MM-DD /etc/config/dhcp
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+```
+
+如果你刚刚改了 WAN 的自定义 DNS，也可以把 `peerdns` 改回 1，让上游 DNS 自动下发：
+
+```sh
+uci set network.wan.peerdns='1'
+uci -q delete network.wan.dns
+uci commit network
+ifup wan
+```
+
+### dnsmasq 起不来
+
+先看错误原文，不要反复重启：
+
+```sh
+logread -e dnsmasq | tail -50
+dnsmasq --test
+```
+
+常见原因是端口被其他 DNS 组件占用、配置语法错误、上游地址不可达。恢复备份后再逐项恢复自定义配置。
+
+## 来源与复核
+
+- 本文是 E1 草稿，命令与恢复路径尚未在固定 VM 上执行；`TestRecord` 状态为 planned。
+- 下一步按 `tests/recipes/dns-25.12-x86.md` 在 OpenWrt 25.12.6 x86 VM 上复现，记录命令输出、失败分支和恢复结果，再升级为 E2。
+- 版本/菜单变化时更新 `testedVersions` 与 `lastVerifiedAt`；不要把 24.10 的 `opkg` 命令写进 25.12 的步骤。
+
+<PageSources />

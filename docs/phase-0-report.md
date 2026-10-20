@@ -35,7 +35,7 @@
 
 ## 尚未完成
 
-- 四组样板的完整内容：PVE 与 DNS 目前是 `tested: false` 的脚手架，OpenClash 与 AdGuard Home 尚未创建。
+- DNS 已补成完整 E1 草稿（八段、`TestRecord`、来源、配方法）；PVE 仍是脚手架；OpenClash、AdGuard Home、SQM 尚未创建。
 - 40 条搜索查询的浏览器测试与阈值（40/40 非空、语种、别名 Top 1、预期 Top 3 ≥95%）。
 - Pagefind extended 中文分词配置与查询扩展层。
 - 域名绑定、golden placeholder、Pages 生产部署与回滚。
@@ -56,4 +56,5 @@ XDG_CONFIG_HOME=$PWD/.wrangler/config WRANGLER_HOME=$PWD/.wrangler \
 ## 已知警告
 
 - Starlight 构建提示 `i18n` collection 为空、`docs → 404` entry 未找到；`404.html` 仍正常生成，Phase 1 清理。
-- 尚未运行 `astro check`；Phase 1 加入 `@astrojs/check` 与类型检查。
+- `astro check` 已通过：0 errors / 0 warnings / 19 个 `z` 弃用 hints。pnpm isolated 下需在根 devDependencies 保留 `@emnapi/core`、`@emnapi/runtime`，否则 `@astrojs/check` 启动时会报缺包。
+- 当前 Phase 1 的 DNS 页是 E1 草稿（`tested: false`），不是 E2/E3 结论；下一步按 `tests/recipes/dns-25.12-x86.md` 复现。

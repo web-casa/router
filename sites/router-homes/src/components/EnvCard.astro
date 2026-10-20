@@ -7,22 +7,27 @@ interface Props {
   tested?: boolean;
   evidence?: string;
 }
+const locale = (Astro.locals as any).starlightRoute?.locale ?? 'en';
+const isEn = locale === 'en';
 const {
-  firmware = '未注明',
-  version = '未注明',
-  packageManager = '未注明',
-  device = '未注明',
+  firmware = isEn ? 'Not specified' : '未注明',
+  version = isEn ? 'Not specified' : '未注明',
+  packageManager = isEn ? 'Not specified' : '未注明',
+  device = isEn ? 'Not specified' : '未注明',
   tested = false,
   evidence = 'E1',
 } = Astro.props;
+const labels = isEn
+  ? { firmware: 'Firmware', version: 'Version', pm: 'Package manager', device: 'Device', evidence: 'Evidence', tested: 'tested', untested: 'not tested', warning: 'These steps have not been tested on the device described above. Back up first and keep a management path open.' }
+  : { firmware: '固件', version: '版本', pm: '包管理器', device: '设备', evidence: '验证级别', tested: '已实测', untested: '未实测', warning: '本页步骤尚未在本文所述设备上实测，请先备份并保留管理入口。' };
 ---
-<aside class="env-card" aria-label="适用环境">
+<aside class="env-card" aria-label={isEn ? 'Applicable environment' : '适用环境'}>
   <dl>
-    <dt>固件</dt><dd>{firmware}</dd>
-    <dt>版本</dt><dd>{version}</dd>
-    <dt>包管理器</dt><dd>{packageManager}</dd>
-    <dt>设备</dt><dd>{device}</dd>
-    <dt>验证级别</dt><dd>{evidence} · {tested ? '已实测' : '未实测'}</dd>
+    <dt>{labels.firmware}</dt><dd>{firmware}</dd>
+    <dt>{labels.version}</dt><dd>{version}</dd>
+    <dt>{labels.pm}</dt><dd>{packageManager}</dd>
+    <dt>{labels.device}</dt><dd>{device}</dd>
+    <dt>{labels.evidence}</dt><dd>{evidence} · {tested ? labels.tested : labels.untested}</dd>
   </dl>
-  {!tested && <p class="warn">本页步骤尚未在本文所述设备上实测，请先备份并保留管理入口。</p>}
+  {!tested && <p class="warn">{labels.warning}</p>}
 </aside>
