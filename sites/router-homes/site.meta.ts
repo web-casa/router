@@ -50,6 +50,11 @@ const meta = {
           translations: { 'zh-CN': '修改 LAN 地址' },
           slug: 'network/lan-address',
         },
+        {
+          label: 'WAN connectivity',
+          translations: { 'zh-CN': '主路由联网' },
+          slug: 'network/wan-connectivity',
+        },
       ],
     },
     {

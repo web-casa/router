@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-20T17:39:32.010Z",
-  "base": "http://127.0.0.1:35877",
+  "generatedAt": "2026-10-20T17:53:12.365Z",
+  "base": "http://127.0.0.1:35173",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -96,6 +96,11 @@
           {
             "url": "/zh/network/lan-address/",
             "title": "修改 LAN 地址并重新进入后台：新旧网段、DHCP 与恢复",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/network/wan-connectivity/",
+            "title": "主路由联网：WAN DHCP 与 PPPoE 分别怎么验证",
             "excerpt": ""
           }
         ]
@@ -599,18 +604,18 @@
             "excerpt": ""
           },
           {
-            "url": "/en/installation/proxmox/",
-            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
-            "excerpt": ""
-          },
-          {
             "url": "/en/software/adguard-home/",
             "title": "AdGuard Home: from web UI to client filtering",
             "excerpt": ""
           },
           {
-            "url": "/en/network/lan-address/",
-            "title": "Change the LAN address and get back in: old/new subnet, DHCP and recovery",
+            "url": "/en/installation/proxmox/",
+            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/network/wan-connectivity/",
+            "title": "Main-router connectivity: verify WAN DHCP and PPPoE separately",
             "excerpt": ""
           }
         ]

@@ -31,6 +31,8 @@ await mustExist(path.join(dist, 'en/network/dns/index.html'), '/en/network/dns/'
 await mustExist(path.join(dist, 'zh/network/dns/index.html'), '/zh/network/dns/');
 await mustExist(path.join(dist, 'en/network/lan-address/index.html'), '/en/network/lan-address/');
 await mustExist(path.join(dist, 'zh/network/lan-address/index.html'), '/zh/network/lan-address/');
+await mustExist(path.join(dist, 'en/network/wan-connectivity/index.html'), '/en/network/wan-connectivity/');
+await mustExist(path.join(dist, 'zh/network/wan-connectivity/index.html'), '/zh/network/wan-connectivity/');
 await mustExist(path.join(dist, 'en/installation/proxmox/index.html'), '/en/installation/proxmox/');
 await mustExist(path.join(dist, 'zh/installation/proxmox/index.html'), '/zh/installation/proxmox/');
 await mustExist(path.join(dist, 'en/software/adguard-home/index.html'), '/en/software/adguard-home/');
