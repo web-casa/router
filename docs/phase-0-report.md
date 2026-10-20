@@ -52,3 +52,8 @@ pnpm check
 XDG_CONFIG_HOME=$PWD/.wrangler/config WRANGLER_HOME=$PWD/.wrangler \
   pnpm exec wrangler pages dev sites/router-homes/dist --port 8788
 ```
+
+## 已知警告
+
+- Starlight 构建提示 `i18n` collection 为空、`docs → 404` entry 未找到；`404.html` 仍正常生成，Phase 1 清理。
+- 尚未运行 `astro check`；Phase 1 加入 `@astrojs/check` 与类型检查。

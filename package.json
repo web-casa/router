@@ -11,7 +11,7 @@
     "build": "pnpm build:kit && pnpm --filter @fleet/site-router-homes build",
     "dev": "pnpm --filter @fleet/site-router-homes dev",
     "validate": "pnpm build:kit && tsx scripts/validate.ts",
-    "check": "pnpm build && tsx scripts/checks/i18n.ts",
+    "check": "pnpm validate && pnpm --filter @fleet/site-router-homes build && tsx scripts/checks/i18n.ts",
     "fleet": "tsx scripts/fleet.ts"
   },
   "devDependencies": {
