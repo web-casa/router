@@ -5,7 +5,7 @@ pageType: network
 tested: true
 testedVersions: ['25.12.6']
 evidenceLevel: E2
-testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; LAN 192.168.1.1→192.168.10.1; static client/SSH; DHCP lease not verified'
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; LAN 192.168.1.1→192.168.10.1; DHCP lease verified after reboot'
 testRecipe: 'tests/recipes/lan-address-change-25.12.md'
 lastVerifiedAt: '2026-10-20'
 aliases: ['openwrt change lan ip', 'openwrt cannot reach luci after lan change', 'lan ip change', 'dhcp new subnet']
@@ -31,10 +31,10 @@ import PageSources from '@components/PageSources.astro';
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
 <TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200; LAN 192.168.1.1→192.168.10.1; static client/SSH; DHCP lease not verified"
+  status="verified"
+  environment="OpenWrt 25.12.6 x86 VM 200; LAN 192.168.1.1→192.168.10.1; DHCP lease verified after reboot"
   recipe="tests/recipes/lan-address-change-25.12.md"
-  result="E2 partial: old address timed out and new LuCI/SSH worked; rollback restored the old address and new timed out; DHCP lease was not obtained"
+  result="E2: old address timed out and new LuCI/SSH worked; reload alone did not lease DHCP, but after reboot the netns client got 192.168.10.191/24; rollback restored old and new timed out"
   date="2026-10-20"
 />
 
@@ -105,6 +105,8 @@ uci commit dhcp
 
 `network reload` immediately drops the old SSH/web session; that is expected. The command may end with a timeout/disconnect, which does not mean it failed.
 
+On the first run, `network reload` + `dnsmasq restart` alone did not give the DHCP client a lease; **after rebooting OpenWrt** the same client got `192.168.10.191/24`. If DHCP does not lease, schedule a reboot instead of only restarting dnsmasq repeatedly.
+
 </Step>
 
 ## Get back in
@@ -152,7 +154,7 @@ ping 192.168.10.1
 
 Release the old lease/reconnect. If the client still gets `192.168.1.x`, check the DHCP range, a second DHCP server, and whether the client is still on the old segment.
 
-> This E2 run verified the static client/SSH and address switch; the netns DHCP test did not obtain a lease (dnsmasq logged `no address range available`). **DHCP lease is therefore not marked as verified** and remains a required separate check.
+> This E2 run tested DHCP in two stages: with only `network reload` + `dnsmasq restart`, the netns client got no lease; after `reboot`, the same netns client got `192.168.10.191/24` and gateway `192.168.10.1`. The page therefore treats “reboot, then retest DHCP” as a required step rather than assuming reload is enough.
 
 </Step>
 
@@ -211,6 +213,7 @@ Browser cache, a stale tab, another device holding the old IP, or the client is 
 
 - `dhcp.lan.start/limit` is outside the new subnet;
 - `dnsmasq` was not restarted, or `/var/etc/dnsmasq.conf*` still has the old range;
+- reload alone still gives no lease: reboot OpenWrt and retest (it worked in this lab);
 - a second DHCP server (another router/VM) exists;
 - the client did not release the old lease;
 - check `logread | grep dnsmasq` for `no address range`/interface errors.
@@ -224,12 +227,13 @@ Overlap with the upstream ONT, VPN, or another LAN/VLAN causes routing/resolutio
 - Environment: PVE 9.2.2; OpenWrt 25.12.6 x86 VM 200; LAN `192.168.1.1/24` → `192.168.10.1/24`; DHCP `100–199`.
 - After change: old `192.168.1.1` 100% loss; new `192.168.10.1` ping/HTTP 200; LuCI/SSH worked.
 - Rollback: old address HTTP 200; new address timed out.
-- Not verified: client DHCP lease (netns test did not obtain one; log said `no address range available`), physical clients, IPv6, upstream-conflict scenarios.
+- DHCP: reload alone gave no lease; after reboot the netns client obtained `192.168.10.191/24` and gateway `192.168.10.1`.
+- Not verified: physical clients, IPv6, upstream-conflict scenarios.
 - Screenshot: `src/assets/screenshots/luci/lan-edit-192-168-10.webp` (MAC/IPv6 redacted).
 
 ## Sources and review
 
-- This is E2 partial: address switch/old-address failure/rollback were tested; DHCP lease and physical clients were not.
+- This is E2: address switch, old-address failure, DHCP lease after reboot and rollback were tested; physical clients, IPv6 and upstream conflicts were not.
 - Recipe: `tests/recipes/lan-address-change-25.12.md`.
 - No independent reviewer; conclusions are limited to this VM environment.
 

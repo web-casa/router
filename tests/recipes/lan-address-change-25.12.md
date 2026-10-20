@@ -2,7 +2,7 @@
 
 ## Status
 
-E2 partial, run 2026-10-20. Address switch, old-address failure and rollback verified; DHCP lease and physical clients were not.
+E2, run 2026-10-20. Address switch, old-address failure, DHCP lease after reboot and rollback verified; physical clients/IPv6 were not.
 
 ## Environment
 
@@ -47,7 +47,7 @@ E2 partial, run 2026-10-20. Address switch, old-address failure and rollback ver
    ubus call network.interface.lan status
    grep -R "dhcp-range" /var/etc/dnsmasq.conf* /tmp/etc/dnsmasq.conf* 2>/dev/null
    ```
-5. Optionally test DHCP from a client; release/renew and verify `192.168.10.x`.
+5. Test DHCP from a client; release/renew and verify `192.168.10.x`. If there is no lease after reload, reboot OpenWrt and retest.
 6. Roll back:
    ```sh
    uci set network.lan.ipaddr='192.168.1.1/24'
@@ -72,9 +72,9 @@ E2 partial, run 2026-10-20. Address switch, old-address failure and rollback ver
 - New `192.168.10.1`: ping OK, HTTP 200, LuCI/SSH OK.
 - `dhcp-range=set:lan,192.168.10.100,192.168.10.199,255.255.255.0,12h`.
 - Rollback: old HTTP 200; new timed out.
-- DHCP netns attempt: no lease; dnsmasq logged `no address range available` (not marked verified).
+- DHCP: reload alone gave no netns lease (dnsmasq `no address range available`); after `reboot`, the same netns client got `192.168.10.191/24`, gateway `192.168.10.1`, lease 43200s.
 - Screenshot: `src/assets/screenshots/luci/lan-edit-192-168-10.webp`.
 
 ## Not tested
 
-- Real DHCP client lease/renewal, physical LAN, IPv6, upstream/VPN overlap.
+- Physical clients, IPv6, upstream/VPN overlap.

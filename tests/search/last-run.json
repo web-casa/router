@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-20T17:29:51.680Z",
-  "base": "http://127.0.0.1:37681",
+  "generatedAt": "2026-10-20T17:39:32.010Z",
+  "base": "http://127.0.0.1:35877",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -599,13 +599,13 @@
             "excerpt": ""
           },
           {
-            "url": "/en/software/adguard-home/",
-            "title": "AdGuard Home: from web UI to client filtering",
+            "url": "/en/installation/proxmox/",
+            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
             "excerpt": ""
           },
           {
-            "url": "/en/installation/proxmox/",
-            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
             "excerpt": ""
           },
           {
