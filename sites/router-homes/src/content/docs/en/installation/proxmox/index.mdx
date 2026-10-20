@@ -1,53 +1,260 @@
 ---
-title: Install OpenWrt on Proxmox
-description: Map physical NICs to bridges, virtual NICs and OpenWrt interfaces, and keep host access.
+title: Install OpenWrt on a single-NIC Proxmox VE host
+description: Use a bypass resolver or an internal bridge to run OpenWrt on a PVE host with only one physical NIC, while keeping host access.
 pageType: install
 tested: false
 testedVersions: ['25.12.6']
-evidenceLevel: E2
-aliases: ['openwrt proxmox', 'pve openwrt']
-symptoms: ['no internet after install', 'host unreachable']
+evidenceLevel: E1
+testEnvironment: 'Proxmox VE 9.2.2, single Realtek RTL8111 NIC, vmbr0 192.168.50.2/24'
+testRecipe: 'tests/recipes/pve-single-nic-25.12.md'
+aliases: ['openwrt proxmox', 'pve openwrt', 'proxmox single nic openwrt']
+symptoms: ['no internet after install', 'host unreachable', 'PVE has only one NIC']
+sources:
+  - label: Proxmox VE network configuration
+    url: https://pve.proxmox.com/wiki/Network_Configuration
+  - label: Proxmox VE qm command
+    url: https://pve.proxmox.com/pve-docs/qm.1.html
+  - label: OpenWrt x86 installation
+    url: https://openwrt.org/docs/guide-user/installation/openwrt_x86
+  - label: OpenWrt 25.12 release notes
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
 ---
 
 import EnvCard from '@components/EnvCard.astro';
 import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
 import TopologyTable from '@components/TopologyTable.astro';
+import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="Proxmox VE VM" tested={false} evidence="E2" />
+<EnvCard firmware="Proxmox VE" version="9.2.2" packageManager="—" device="single-NIC x86 host" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="Proxmox VE 9.2.2, single Realtek RTL8111, vmbr0 192.168.50.2/24"
+  recipe="tests/recipes/pve-single-nic-25.12.md"
+  result="Not executed yet; VM 200, vmbr1 and OpenWrt 25.12.6 still need a run"
+/>
 
 ## Outcome
 
-The OpenWrt VM routes traffic, the Proxmox host remains reachable, and you can still get to a backup when the router VM is stopped.
+You can choose the right topology on a PVE host with **one physical NIC**:
 
-## Topology
+- without changing the PVE management address;
+- without accidentally serving DHCP on `vmbr0`;
+- with a bypass resolver or an internal LAN lab;
+- and with host access that survives the router VM being stopped.
+
+## Applicable environment
+
+- Proxmox VE 8.x/9.x with one physical NIC; `vmbr0` carries both the PVE management address and the upstream gateway.
+- This page is written for PVE 9.2.2, one Realtek RTL8111 NIC, `vmbr0 192.168.50.2/24`, gateway `192.168.50.1`.
+- **One NIC cannot physically separate WAN and LAN.** Do not copy the `enp1s0/enp2s0` layout from dual-NIC guides. Use a bypass service or an internal PVE bridge.
+- A second NIC or a VLAN-capable switch is easier; that topology is out of scope here.
+
+## Two topologies
+
+### A. Bypass DNS/gateway (smallest change)
+
+OpenWrt has one vNIC on `vmbr0` with LAN address `192.168.50.3/24`, and **DHCP is disabled**. Clients use it as DNS (or gateway) manually; it reaches the internet through `192.168.50.1`.
 
 <TopologyTable rows={[
-  { physical: 'enp1s0', bridge: 'vmbr0', vnic: 'net0', iface: 'wan', role: 'upstream / management' },
-  { physical: 'enp2s0', bridge: 'vmbr1', vnic: 'net1', iface: 'lan', role: 'LAN clients' },
+  { physical: 'nic0', bridge: 'vmbr0', vnic: 'net0', iface: 'lan 192.168.50.3', role: 'bypass DNS/gateway' },
 ]} />
 
-## Steps
+Good for validating DNS, AdGuard Home, or OpenClash DNS/rules without touching the main router's DHCP.
 
-<Step where="router-shell" title="Confirm interfaces" expected="wan has an address; lan is the LAN gateway.">
+### B. Internal PVE LAN lab (recommended for routing tests)
+
+OpenWrt has two vNICs: `net0` on `vmbr0` as WAN (DHCP), `net1` on `vmbr1` as LAN (`192.168.1.1/24`). `vmbr1` has **no physical ports** and is only used by a test client VM.
+
+<TopologyTable rows={[
+  { physical: 'nic0', bridge: 'vmbr0', vnic: 'net0', iface: 'wan DHCP', role: 'upstream 192.168.50.1' },
+  { physical: '—', bridge: 'vmbr1', vnic: 'net1', iface: 'lan 192.168.1.1', role: 'internal test client' },
+]} />
+
+This validates routing, NAT, DHCP, DNS, and “host still reachable after the router VM stops” without touching the physical LAN.
+
+## Before you change anything
+
+<Step where="router-shell" title="Record host networking and VM state" expected="You can restore vmbr0 from notes if something breaks.">
 
 ```sh
+ip -br link
 ip -br addr
+cat /etc/network/interfaces
+bridge link
+qm list
+pvesm status
 ```
 
-</Step>
-
-<Step where="client" title="Verify host and guest access" expected="The client reaches the OpenWrt gateway and the Proxmox UI.">
-
-Test both the LAN gateway and the Proxmox host address from a client.
+Write down the `vmbr0` address, gateway, physical port, and VM list. On a single-NIC host, `vmbr0` is your only management path; a mistake can lock you out.
 
 </Step>
 
-<Step where="luci" title="Record the recovery path" expected="You know how to reach the host and restore the VM if routing fails.">
+<Step where="router-shell" title="Prepare console access and the image" expected="You can still reach PVE if SSH dies.">
 
-Write down the physical port, bridge, VM NIC and management address before changing the WAN configuration.
+Use a monitor/keyboard, IPMI, or cloud VNC; do not rely on SSH alone. Then download the OpenWrt x86_64 image on the PVE host:
+
+```sh
+cd /var/lib/vz/template/iso
+wget https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+wget https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/sha256sums
+sha256sum -c sha256sums --ignore-missing
+gzip -d openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+```
+
+Do not continue if the checksum fails. Use the current filename/version from downloads.openwrt.org.
 
 </Step>
 
-## Recovery
+## Minimal steps
 
-If the router VM loses connectivity, use the Proxmox host console. Do not rely on a backup that is only reachable through the router VM.
+<Step where="router-shell" title="Create the internal vmbr1 bridge (lab B only)" expected="vmbr1 exists and is up; vmbr0 addresses are unchanged.">
+
+Start with a temporary bridge; persist it only after it works:
+
+```sh
+ip link add name vmbr1 type bridge
+ip link set vmbr1 up
+ip -br link show vmbr1
+ip -br addr show vmbr0
+```
+
+`vmbr1` has no physical port, so it cannot leak DHCP to the home LAN. Do not run a DHCP server on `vmbr0`.
+
+</Step>
+
+<Step where="router-shell" title="Create OpenWrt VM 200" expected="VM 200 has a scsi0 boot disk and net0/net1.">
+
+```sh
+qm create 200 --name openwrt-lab --memory 512 --cores 2 --ostype l26 \
+  --scsihw virtio-scsi-pci \
+  --net0 virtio,bridge=vmbr0 \
+  --net1 virtio,bridge=vmbr1 \
+  --serial0 socket
+qm importdisk 200 /var/lib/vz/template/iso/openwrt-25.12.6-x86-64-generic-ext4-combined.img local-lvm
+qm set 200 --scsi0 local-lvm:vm-200-disk-0
+qm set 200 --boot order=scsi0
+qm start 200
+```
+
+Use `pvesm status` for the real storage ID. After `qm importdisk`, confirm the disk name from the command output; it may be `vm-200-disk-0`.
+
+</Step>
+
+<Step where="router-shell" title="Open the OpenWrt console and identify NIC order" expected="You know which interface is WAN and which is LAN.">
+
+```sh
+qm terminal 200
+```
+
+If serial has no output, use the PVE VNC console. Inside OpenWrt:
+
+```sh
+ip -br link
+ip -br addr
+uci show network
+```
+
+The `eth0/eth1` order is not guaranteed to match `net0/net1`; verify by MAC/link and `uci show network`. Do not assume `eth0` is WAN.
+
+</Step>
+
+<Step where="router-shell" title="Configure WAN/LAN and disable DHCP on WAN" expected="WAN gets an address from 192.168.50.1; LAN is 192.168.1.1; no DHCP on vmbr0.">
+
+In the OpenWrt console, replace `eth0/eth1` with the interfaces you verified:
+
+```sh
+uci set network.wan=interface
+uci set network.wan.proto='dhcp'
+uci set network.wan.device='eth0'
+uci set network.lan=interface
+uci set network.lan.proto='static'
+uci set network.lan.device='eth1'
+uci set network.lan.ipaddr='192.168.1.1'
+uci set network.lan.netmask='255.255.255.0'
+uci set dhcp.wan=dhcp
+uci set dhcp.wan.interface='wan'
+uci set dhcp.wan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+```
+
+Confirm `dhcp.wan.ignore='1'`; otherwise OpenWrt may serve DHCP on the upstream `vmbr0` and disturb the home network.
+
+</Step>
+
+<Step where="client" title="Verify routing from a test client" expected="The client reaches 192.168.1.1, the upstream gateway, and DNS.">
+
+Create a test VM on `vmbr1` (or attach its NIC there) and let it get a lease from OpenWrt LAN. Then:
+
+```sh
+ip route
+ping 192.168.1.1
+ping 192.168.50.1
+nslookup openwrt.org
+```
+
+If the client gets no lease, inspect OpenWrt `dhcp.lan` and `dnsmasq` before changing `vmbr0`.
+
+</Step>
+
+## Verification
+
+- `qm status 200` is running; `qm config 200` shows `net0` on `vmbr0`, `net1` on `vmbr1`.
+- Inside OpenWrt, `ip -br addr` shows WAN `192.168.50.x` and LAN `192.168.1.1/24`.
+- Test client: default gateway is `192.168.1.1`, can ping `192.168.50.1`, and resolves `openwrt.org`.
+- Host: `ssh root@192.168.50.2` and the PVE web UI still work.
+- Stop the router VM (`qm stop 200`); host management still works; `qm start 200` restores it.
+
+## Failure branches and recovery
+
+### Host SSH is unreachable
+
+Stop changing the network. Use the monitor/keyboard, IPMI, or cloud console and check:
+
+```sh
+ip -br addr show vmbr0
+cat /etc/network/interfaces
+bridge link
+```
+
+If you just edited `/etc/network/interfaces`, restore the backup and reload:
+
+```sh
+cp /etc/network/interfaces.bak.YYYY-MM-DD /etc/network/interfaces
+ifreload -a
+```
+
+If only the temporary `vmbr1` caused the problem:
+
+```sh
+ip link set vmbr1 down
+ip link del vmbr1
+```
+
+### OpenWrt has no WAN address
+
+```sh
+qm config 200
+qm terminal 200
+```
+
+Inside OpenWrt, check `ip -br link`, `uci show network`, and `logread`. Confirm `net0` is on `vmbr0` and `nic0` is up; do not add a second DHCP server on `vmbr0`.
+
+### Test client gets no 192.168.1.x lease
+
+Check OpenWrt `dhcp.lan` and whether `dnsmasq` is running; confirm the test VM is actually attached to `vmbr1`. Do not change `vmbr0` addresses or gateway to “fix” the lab.
+
+### Can you still reach the host after stopping the router VM?
+
+That is the recovery gate: after `qm stop 200`, open `https://192.168.50.2:8006` and SSH from another machine. If not, your management path depends on OpenWrt; fix that before continuing.
+
+## Sources and review
+
+- This is an E1 draft: PVE version and single-NIC layout come from the actual host; VM creation and routing steps have not been executed here.
+- Next: run `tests/recipes/pve-single-nic-25.12.md` on VM 200, record `qm config`, OpenWrt `ip -br addr`, client routes, and the stopped-VM recovery, then promote to E2.
+- Single NIC is not dual NIC: do not turn this into a “physically separate WAN/LAN” guide without a second NIC or VLAN switch.
+
+<PageSources />

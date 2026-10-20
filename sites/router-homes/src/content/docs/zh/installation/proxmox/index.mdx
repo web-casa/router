@@ -1,53 +1,260 @@
 ---
-title: PVE 安装 OpenWrt：网口映射、宿主机联网与恢复准备
-description: 把物理口、bridge、虚拟网卡和 OpenWrt 接口对上，并保留宿主机管理入口。
+title: PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验
+description: 只有一块物理网卡的 PVE 上，用旁路网关或内部 bridge 跑 OpenWrt，并保留宿主机管理入口。
 pageType: install
 tested: false
 testedVersions: ['25.12.6']
-evidenceLevel: E2
-aliases: ['openwrt proxmox', 'pve 安装 openwrt']
-symptoms: ['安装后无法上网', '宿主机失联']
+evidenceLevel: E1
+testEnvironment: 'Proxmox VE 9.2.2，单 Realtek RTL8111 网口，vmbr0 192.168.50.2/24'
+testRecipe: 'tests/recipes/pve-single-nic-25.12.md'
+aliases: ['openwrt proxmox', 'pve 安装 openwrt', 'pve 单网口 openwrt']
+symptoms: ['安装后无法上网', '宿主机失联', 'PVE 只有一个网口']
+sources:
+  - label: Proxmox VE network configuration
+    url: https://pve.proxmox.com/wiki/Network_Configuration
+  - label: Proxmox VE qm command
+    url: https://pve.proxmox.com/pve-docs/qm.1.html
+  - label: OpenWrt x86 installation
+    url: https://openwrt.org/docs/guide-user/installation/openwrt_x86
+  - label: OpenWrt 25.12 release notes
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
 ---
 
 import EnvCard from '@components/EnvCard.astro';
 import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
 import TopologyTable from '@components/TopologyTable.astro';
+import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="Proxmox VE 虚拟机" tested={false} evidence="E2" />
+<EnvCard firmware="Proxmox VE" version="9.2.2" packageManager="—" device="单网口 x86 主机" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="Proxmox VE 9.2.2，单 Realtek RTL8111，vmbr0 192.168.50.2/24"
+  recipe="tests/recipes/pve-single-nic-25.12.md"
+  result="尚未执行；VM 200、vmbr1 和 OpenWrt 25.12.6 的步骤待按配方复现"
+/>
 
 ## 完成后你能确认什么
 
-OpenWrt 虚拟机能转发流量，Proxmox 宿主机仍可访问，路由 VM 关闭时你仍能拿到备份。
+你能在**只有一块物理网卡**的 PVE 上选对拓扑：
 
-## 拓扑
+- 不把 PVE 宿主机管理地址改掉；
+- 不把 DHCP 服务器误开到 `vmbr0`；
+- 用旁路 DNS/网关或 PVE 内部 LAN 实验跑起 OpenWrt；
+- 路由 VM 关掉后，仍能通过宿主机控制台恢复。
+
+## 适用环境
+
+- Proxmox VE 8.x/9.x，单物理网口，`vmbr0` 承载宿主机管理地址和上游网关。
+- 本页按 PVE 9.2.2、单 Realtek RTL8111、`vmbr0 192.168.50.2/24`、网关 `192.168.50.1` 编写。
+- **单网口不能同时物理分离 WAN/LAN**。不要照搬双网口教程里的 `enp1s0/enp2s0`；要么做旁路，要么用 PVE 内部 bridge 做实验。
+- 如果你有第二块网卡或可 VLAN 的交换机，双网口拓扑更简单；本页不覆盖那种情况。
+
+## 两种拓扑
+
+### A. 旁路 DNS/网关（改动最小）
+
+OpenWrt 只用一个 vNIC 接 `vmbr0`，LAN 地址设为 `192.168.50.3/24`，**关闭 DHCP**。客户端把 DNS（或网关）手动指向它；它再经 `192.168.50.1` 出网。
 
 <TopologyTable rows={[
-  { physical: 'enp1s0', bridge: 'vmbr0', vnic: 'net0', iface: 'wan', role: '上游 / 管理' },
-  { physical: 'enp2s0', bridge: 'vmbr1', vnic: 'net1', iface: 'lan', role: 'LAN 终端' },
+  { physical: 'nic0', bridge: 'vmbr0', vnic: 'net0', iface: 'lan 192.168.50.3', role: '旁路 DNS/网关' },
 ]} />
 
-## 操作步骤
+适合先验证 DNS、AdGuard Home、OpenClash 的 DNS/规则；不改变主路由 DHCP。
 
-<Step where="router-shell" title="确认接口" expected="wan 有地址，lan 是 LAN 网关。">
+### B. PVE 内部 LAN 实验（推荐做路由验证）
+
+OpenWrt 用两个 vNIC：`net0` 接 `vmbr0` 做 WAN（DHCP），`net1` 接 `vmbr1` 做 LAN（`192.168.1.1/24`）。`vmbr1` **不接任何物理口**，只给测试客户端 VM 用。
+
+<TopologyTable rows={[
+  { physical: 'nic0', bridge: 'vmbr0', vnic: 'net0', iface: 'wan DHCP', role: '上游 192.168.50.1' },
+  { physical: '—', bridge: 'vmbr1', vnic: 'net1', iface: 'lan 192.168.1.1', role: '内部测试客户端' },
+]} />
+
+这条路径能验证路由、NAT、DHCP、DNS 和“关掉路由 VM 后宿主机仍可管理”，又不会影响家里的物理 LAN。
+
+## 改动前准备
+
+<Step where="router-shell" title="记录宿主机网络和 VM 配置" expected="出问题时你能凭记录恢复 vmbr0。" >
 
 ```sh
+ip -br link
 ip -br addr
+cat /etc/network/interfaces
+bridge link
+qm list
+pvesm status
 ```
 
-</Step>
-
-<Step where="client" title="验证宿主机与虚拟机都能访问" expected="终端能到 OpenWrt 网关和 Proxmox 管理页。">
-
-从一台终端分别访问 LAN 网关和 Proxmox 宿主机地址。
+把 `vmbr0` 的地址、网关、物理口和当前 VM 列表记下来。单网口机器上，`vmbr0` 就是你唯一的管理入口，改错会直接失联。
 
 </Step>
 
-<Step where="luci" title="记录恢复路径" expected="你知道怎么进宿主机、怎么恢复 VM。">
+<Step where="router-shell" title="准备控制台和镜像" expected="即使 SSH 断了，你还能进 PVE 控制台。" >
 
-改 WAN 前，把物理口、bridge、VM 网卡和管理地址写下来。
+优先用显示器/键盘、IPMI 或云厂商 VNC，不要只依赖 SSH。然后把 OpenWrt x86_64 镜像下载到 PVE：
+
+```sh
+cd /var/lib/vz/template/iso
+wget https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+wget https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/sha256sums
+sha256sum -c sha256sums --ignore-missing
+gzip -d openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+```
+
+校验失败就不要继续。镜像名/版本以 downloads.openwrt.org 当前页面为准。
 
 </Step>
 
-## 恢复
+## 最小步骤
 
-路由 VM 失联时用 Proxmox 宿主机控制台。不要把备份只放在必须经过路由 VM 才能访问的位置。
+<Step where="router-shell" title="创建内部 bridge vmbr1（仅实验 B）" expected="vmbr1 存在且 UP，vmbr0 的地址没有变化。" >
+
+先做临时 bridge，验证可行后再写入 `/etc/network/interfaces`：
+
+```sh
+ip link add name vmbr1 type bridge
+ip link set vmbr1 up
+ip -br link show vmbr1
+ip -br addr show vmbr0
+```
+
+`vmbr1` 不接物理口，所以不会把 DHCP 泄漏到家里 LAN。不要在 `vmbr0` 上开 DHCP。
+
+</Step>
+
+<Step where="router-shell" title="创建 OpenWrt VM 200" expected="VM 200 有 scsi0 启动盘、net0/net1 两个网卡。" >
+
+```sh
+qm create 200 --name openwrt-lab --memory 512 --cores 2 --ostype l26 \
+  --scsihw virtio-scsi-pci \
+  --net0 virtio,bridge=vmbr0 \
+  --net1 virtio,bridge=vmbr1 \
+  --serial0 socket
+qm importdisk 200 /var/lib/vz/template/iso/openwrt-25.12.6-x86-64-generic-ext4-combined.img local-lvm
+qm set 200 --scsi0 local-lvm:vm-200-disk-0
+qm set 200 --boot order=scsi0
+qm start 200
+```
+
+`local-lvm` 以 `pvesm status` 为准；如果存储名不同，替换成你的存储。`qm importdisk` 后磁盘名可能是 `vm-200-disk-0`，以命令输出为准。
+
+</Step>
+
+<Step where="router-shell" title="进 OpenWrt 控制台确认网卡顺序" expected="你能分清哪个是 WAN、哪个是 LAN，不靠猜。" >
+
+```sh
+qm terminal 200
+```
+
+如果串口没有输出，用 PVE 的 VNC 控制台。进去后：
+
+```sh
+ip -br link
+ip -br addr
+uci show network
+```
+
+OpenWrt x86 镜像的 `eth0/eth1` 顺序不一定等于 `net0/net1`；以 MAC/链路和 `uci show network` 为准。不要直接把 `eth0` 当 WAN。
+
+</Step>
+
+<Step where="router-shell" title="配置 WAN/LAN，关闭 WAN 上的 DHCP" expected="WAN 从 192.168.50.1 拿到地址；LAN 是 192.168.1.1；vmbr0 上没有 DHCP。" >
+
+在 OpenWrt 控制台里按实际接口名配置。示例（把 `eth0/eth1` 换成你确认过的名字）：
+
+```sh
+uci set network.wan=interface
+uci set network.wan.proto='dhcp'
+uci set network.wan.device='eth0'
+uci set network.lan=interface
+uci set network.lan.proto='static'
+uci set network.lan.device='eth1'
+uci set network.lan.ipaddr='192.168.1.1'
+uci set network.lan.netmask='255.255.255.0'
+uci set dhcp.wan=dhcp
+uci set dhcp.wan.interface='wan'
+uci set dhcp.wan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+```
+
+确认 `dhcp.wan.ignore='1'`，否则 OpenWrt 可能在上游 `vmbr0` 上开 DHCP，影响家里网络。
+
+</Step>
+
+<Step where="client" title="用测试客户端验证路由" expected="客户端能到 192.168.1.1、能出网、能解析域名。" >
+
+在 `vmbr1` 上建一台测试 VM（或把测试 VM 的网卡接到 `vmbr1`），让它从 OpenWrt 的 LAN DHCP 拿地址。然后：
+
+```sh
+ip route
+ping 192.168.1.1
+ping 192.168.50.1
+nslookup openwrt.org
+```
+
+如果客户端拿不到地址，先查 OpenWrt 的 `dhcp.lan` 和 `dnsmasq`，不要先去改 PVE 的 `vmbr0`。
+
+</Step>
+
+## 终端验证
+
+- `qm status 200` 为 running；`qm config 200` 里 `net0` 在 `vmbr0`、`net1` 在 `vmbr1`。
+- OpenWrt 里 `ip -br addr`：WAN 有 `192.168.50.x`，LAN 是 `192.168.1.1/24`。
+- 测试客户端：默认网关是 `192.168.1.1`，能 `ping 192.168.50.1`，能解析 `openwrt.org`。
+- 宿主机：`ssh root@192.168.50.2` 仍然可用；PVE Web UI 仍然可开。
+- 关掉路由 VM：`qm stop 200`，宿主机管理入口仍在；再 `qm start 200` 恢复。
+
+## 失败分支与恢复
+
+### 宿主机 SSH 失联
+
+不要继续改网络。用显示器/键盘、IPMI 或云控制台进 PVE，检查：
+
+```sh
+ip -br addr show vmbr0
+cat /etc/network/interfaces
+bridge link
+```
+
+如果刚改过 `/etc/network/interfaces`，恢复备份并重载：
+
+```sh
+cp /etc/network/interfaces.bak.YYYY-MM-DD /etc/network/interfaces
+ifreload -a
+```
+
+如果只是临时 `vmbr1` 导致问题，删掉它：
+
+```sh
+ip link set vmbr1 down
+ip link del vmbr1
+```
+
+### OpenWrt 没有 WAN 地址
+
+```sh
+qm config 200
+qm terminal 200
+```
+
+在 OpenWrt 里查 `ip -br link`、`uci show network`、`logread`。确认 `net0` 在 `vmbr0`，且 `vmbr0` 的物理口 `nic0` 是 UP；不要在 `vmbr0` 上再建一个 DHCP 服务器。
+
+### 客户端拿不到 192.168.1.x
+
+先看 OpenWrt 的 `dhcp.lan` 是否启用、`dnsmasq` 是否运行；再看测试 VM 是否真的接在 `vmbr1`。不要为了“让客户端上网”去改 `vmbr0` 的地址或网关。
+
+### 路由 VM 关掉后宿主机还能进吗
+
+这是本页的恢复验收项：在 `qm stop 200` 后，从另一台机器访问 `https://192.168.50.2:8006` 和 SSH。若不能，说明你把宿主机管理路径建在了依赖 OpenWrt 的链路上，先修管理路径，再继续。
+
+## 来源与复核
+
+- 本页是 E1 草稿：PVE 版本与单网口布局来自实际环境采集；OpenWrt VM 创建/路由步骤尚未在本机执行。
+- 下一步按 `tests/recipes/pve-single-nic-25.12.md` 在 VM 200 上复现，记录 `qm config`、OpenWrt `ip -br addr`、客户端路由和关 VM 恢复结果，再升级为 E2。
+- 单网口不等于双网口：不要在本页基础上直接写“WAN/LAN 物理分离”；需要第二块网卡或 VLAN 交换机时另写一篇。
+
+<PageSources />
