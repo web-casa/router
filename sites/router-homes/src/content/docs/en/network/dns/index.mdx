@@ -2,10 +2,11 @@
 title: Configure DNS and verify router, client and browser
 description: Find out which DNS server the router, the client and the browser actually use, and keep a recovery path.
 pageType: network
-tested: false
+tested: true
 testedVersions: ['25.12.6']
-evidenceLevel: E1
-testEnvironment: 'OpenWrt 25.12.6 x86_64 VM (2 vNICs)'
+evidenceLevel: E2
+testEnvironment: 'PVE 9.2.2 single NIC; OpenWrt 25.12.6 VM 200; netns DHCP client'
+lastVerifiedAt: '2026-10-20'
 testRecipe: 'tests/recipes/dns-25.12-x86.md'
 aliases: ['openwrt dns', 'openwrt dns settings', 'openwrt change dns']
 symptoms: ['pages do not load', 'some sites fail', 'DNS resolution failed']
@@ -25,13 +26,14 @@ import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86 VM" tested={false} evidence="E1" />
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86 VM" tested={true} evidence="E2" />
 
 <TestRecord
-  status="planned"
-  environment="OpenWrt 25.12.6 x86_64 VM, 2 vNICs"
+  status="partial"
+  environment="PVE 9.2.2 single NIC; OpenWrt 25.12.6 VM 200; netns DHCP client"
   recipe="tests/recipes/dns-25.12-x86.md"
-  result="Not executed yet; commands, failure branches and recovery still need a VM run"
+  result="WAN DNS 192.168.50.1 → 1.1.1.1 applied; bad upstream timed out; recovery worked; client DHCP DNS 192.168.1.1, resolution OK"
+  date="2026-10-20"
 />
 
 ## Outcome
@@ -121,6 +123,21 @@ Do not point clients at an address that is not listening on port 53.
 
 </Step>
 
+<Step where="router-shell" title="CLI equivalent (optional)" expected="resolv.auto shows 1.1.1.1 and queries succeed.">
+
+```sh
+uci set network.wan.peerdns='0'
+uci -q delete network.wan.dns
+uci add_list network.wan.dns='1.1.1.1'
+uci commit network
+ifup wan
+cat /tmp/resolv.conf.d/resolv.conf.auto
+```
+
+After the change, use `logread -e dnsmasq` to confirm the new upstream. If clients still receive the old DNS, restart dnsmasq or inspect DHCP option 6.
+
+</Step>
+
 ## Verify from clients
 
 <Step where="router-shell" title="Check A and AAAA on the router" expected="Both queries return an answer without timing out.">
@@ -205,6 +222,18 @@ uci commit network
 ifup wan
 ```
 
+### WAN DNS changed but clients still use the old resolver
+
+Check whether `resolv.auto` changed, then whether dnsmasq loaded the new upstream:
+
+```sh
+cat /tmp/resolv.conf.d/resolv.conf.auto
+logread -e dnsmasq | tail -20
+/etc/init.d/dnsmasq restart
+```
+
+If `resolv.auto` did not change, inspect `network.wan.dns` and `peerdns`. If clients still receive the old DNS, inspect DHCP option 6 and browser DoH.
+
 ### dnsmasq does not start
 
 Read the error instead of restarting repeatedly:
@@ -216,10 +245,19 @@ dnsmasq --test
 
 Common causes are another resolver holding port 53, a syntax error, or an unreachable upstream. Restore the backup first, then reintroduce custom settings one at a time.
 
+## E2 lab run (2026-10-20)
+
+- Environment: PVE 9.2.2 single NIC; OpenWrt 25.12.6 VM 200; WAN `192.168.50.77/24`, LAN `192.168.1.1/24`.
+- Baseline: `resolv.auto` was `nameserver 192.168.50.1`; `nslookup openwrt.org 127.0.0.1` returned A/AAAA.
+- Custom: `peerdns=0` + `network.wan.dns=1.1.1.1`; `resolv.auto` changed to `nameserver 1.1.1.1`; queries still worked.
+- Failure: dnsmasq upstream set to unreachable `192.0.2.1`; a random `.example.com` query returned `connection timed out; no servers could be reached`; deleting `noresolv`/`server` and restoring `peerdns=1` recovered resolution.
+- Client: netns DHCP received `192.168.1.116/24`, DNS `192.168.1.1`; `dig @192.168.1.1 openwrt.org` worked; `ping 192.168.50.1` worked.
+- Not tested: browser DoH, IPv6 upstream/RA/RDNSS, physical LAN clients, long-run stability.
+
 ## Sources and review
 
-- This is an E1 draft; commands and recovery have not been executed on a fixed VM. `TestRecord` is `planned`.
-- Next step: run `tests/recipes/dns-25.12-x86.md` on the OpenWrt 25.12.6 x86 VM, record outputs, failure branches and recovery, then promote to E2.
+- This page has an E2 lab reproduction; browser DoH and IPv6 upstream are still untested and must not be described as verified.
+- Evidence: `docs/dns-e2-run.md` and `tests/recipes/dns-25.12-x86.md`.
 - Update `testedVersions` and `lastVerifiedAt` when the menu or version changes; do not put 24.10 `opkg` commands into a 25.12 procedure.
 
 <PageSources />

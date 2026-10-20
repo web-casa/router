@@ -2,10 +2,11 @@
 title: OpenWrt DNS 怎么设置：路由器、电脑和浏览器分别走哪里
 description: 分别确认路由器、电脑和浏览器实际使用的 DNS，并保留一条可执行的回退路径。
 pageType: network
-tested: false
+tested: true
 testedVersions: ['25.12.6']
-evidenceLevel: E1
-testEnvironment: 'OpenWrt 25.12.6 x86_64 VM（2 vNIC）'
+evidenceLevel: E2
+testEnvironment: 'PVE 9.2.2 单网口；OpenWrt 25.12.6 VM 200；netns DHCP 客户端'
+lastVerifiedAt: '2026-10-20'
 testRecipe: 'tests/recipes/dns-25.12-x86.md'
 aliases: ['openwrt dns', 'openwrt dns 设置', 'openwrt 修改 dns']
 symptoms: ['网页打不开', '部分网站失败', 'DNS 解析失败']
@@ -25,13 +26,14 @@ import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86 虚拟机" tested={false} evidence="E1" />
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86 虚拟机" tested={true} evidence="E2" />
 
 <TestRecord
-  status="planned"
-  environment="OpenWrt 25.12.6 x86_64 VM，2 个 vNIC"
+  status="partial"
+  environment="PVE 9.2.2 单网口；OpenWrt 25.12.6 VM 200；netns DHCP 客户端"
   recipe="tests/recipes/dns-25.12-x86.md"
-  result="尚未执行；命令、失败分支和恢复路径待 VM 按配方复现"
+  result="WAN DNS 192.168.50.1 → 1.1.1.1 生效；坏上游查询超时；恢复后正常；客户端 DHCP DNS 192.168.1.1，解析成功"
+  date="2026-10-20"
 />
 
 ## 完成后你能确认什么
@@ -121,6 +123,21 @@ logread -e dnsmasq | tail -20
 
 </Step>
 
+<Step where="router-shell" title="CLI 等价改法（可选）" expected="resolv.auto 显示 1.1.1.1，查询成功。">
+
+```sh
+uci set network.wan.peerdns='0'
+uci -q delete network.wan.dns
+uci add_list network.wan.dns='1.1.1.1'
+uci commit network
+ifup wan
+cat /tmp/resolv.conf.d/resolv.conf.auto
+```
+
+改完用 `logread -e dnsmasq` 确认它加载了新上游；如果客户端仍拿到旧 DNS，重启 dnsmasq 或检查 DHCP option 6。
+
+</Step>
+
 ## 终端验证
 
 <Step where="router-shell" title="从路由器本机验证 A 与 AAAA" expected="两条查询都返回结果，且没有超时。">
@@ -205,6 +222,18 @@ uci commit network
 ifup wan
 ```
 
+### 改完 WAN DNS 但客户端仍走旧解析
+
+先确认 `resolv.auto` 是否真的变了，再看 dnsmasq 是否加载了新上游：
+
+```sh
+cat /tmp/resolv.conf.d/resolv.conf.auto
+logread -e dnsmasq | tail -20
+/etc/init.d/dnsmasq restart
+```
+
+如果 `resolv.auto` 没变，检查 `network.wan.dns` 和 `peerdns`；如果客户端仍拿到旧 DNS，检查 DHCP option 6 和浏览器 DoH。
+
 ### dnsmasq 起不来
 
 先看错误原文，不要反复重启：
@@ -216,10 +245,19 @@ dnsmasq --test
 
 常见原因是端口被其他 DNS 组件占用、配置语法错误、上游地址不可达。恢复备份后再逐项恢复自定义配置。
 
+## E2 实测记录（2026-10-20）
+
+- 环境：PVE 9.2.2 单网口；OpenWrt 25.12.6 VM 200；WAN `192.168.50.77/24`，LAN `192.168.1.1/24`。
+- 基线：`resolv.auto` 为 `nameserver 192.168.50.1`；`nslookup openwrt.org 127.0.0.1` 返回 A/AAAA。
+- 自定义：`peerdns=0` + `network.wan.dns=1.1.1.1`；`resolv.auto` 变为 `nameserver 1.1.1.1`，查询仍成功。
+- 故障：dnsmasq 上游改为不可达 `192.0.2.1`，随机 `.example.com` 查询返回 `connection timed out; no servers could be reached`；删除 `noresolv`/`server` 并恢复 `peerdns=1` 后解析恢复。
+- 客户端：netns DHCP 获得 `192.168.1.116/24`，DNS `192.168.1.1`，`dig @192.168.1.1 openwrt.org` 成功，`ping 192.168.50.1` 通。
+- 未测：浏览器 DoH、IPv6 上游/RA/RDNSS、物理 LAN 客户端、长期稳定性。
+
 ## 来源与复核
 
-- 本文是 E1 草稿，命令与恢复路径尚未在固定 VM 上执行；`TestRecord` 状态为 planned。
-- 下一步按 `tests/recipes/dns-25.12-x86.md` 在 OpenWrt 25.12.6 x86 VM 上复现，记录命令输出、失败分支和恢复结果，再升级为 E2。
+- 本页已在固定实验环境完成 E2 复现；浏览器 DoH 与 IPv6 上游仍未测，不能写成已验证。
+- 复现记录见 `docs/dns-e2-run.md` 与 `tests/recipes/dns-25.12-x86.md`。
 - 版本/菜单变化时更新 `testedVersions` 与 `lastVerifiedAt`；不要把 24.10 的 `opkg` 命令写进 25.12 的步骤。
 
 <PageSources />
