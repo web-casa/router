@@ -25,6 +25,8 @@ await mustExist(path.join(dist, 'en/network/dns/index.html'), '/en/network/dns/'
 await mustExist(path.join(dist, 'zh/network/dns/index.html'), '/zh/network/dns/');
 await mustExist(path.join(dist, 'en/installation/proxmox/index.html'), '/en/installation/proxmox/');
 await mustExist(path.join(dist, 'zh/installation/proxmox/index.html'), '/zh/installation/proxmox/');
+await mustExist(path.join(dist, 'en/software/adguard-home/index.html'), '/en/software/adguard-home/');
+await mustExist(path.join(dist, 'zh/software/adguard-home/index.html'), '/zh/software/adguard-home/');
 await mustNotExist(path.join(dist, 'en/only-en/index.html'), '/en/only-en/ unpaired fixture');
 await mustNotExist(path.join(dist, 'zh/only-en/index.html'), '/zh/only-en/ fallback');
 await mustExist(path.join(dist, '404.html'), '404 page');

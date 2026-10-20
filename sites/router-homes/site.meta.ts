@@ -41,6 +41,17 @@ const meta = {
         },
       ],
     },
+    {
+      label: 'Software',
+      translations: { zh: '软件' },
+      items: [
+        {
+          label: 'AdGuard Home',
+          translations: { zh: 'AdGuard Home' },
+          slug: 'software/adguard-home',
+        },
+      ],
+    },
   ],
 } as SiteMeta;
 

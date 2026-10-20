@@ -1,0 +1,295 @@
+---
+title: AdGuard Home：从后台到终端过滤验证
+description: 在 OpenWrt 上让 AdGuard Home 接管 53、dnsmasq 退到 5353，并验证 DHCP 客户端拦截与重启恢复。
+pageType: app
+tested: true
+testedVersions: ['25.12.6', '0.107.79']
+evidenceLevel: E2
+testEnvironment: 'PVE 9.2.2 单网口；OpenWrt 25.12.6 VM 201；AGH 0.107.79；vmbr2 192.168.2.0/24'
+testRecipe: 'tests/recipes/agh-25.12-vm201.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['adguard home openwrt', 'openwrt adguardhome', 'adguardhome 安装']
+symptoms: ['广告拦截不生效', 'DNS 端口冲突', '改了 DNS 客户端不生效']
+sources:
+  - label: OpenWrt adguardhome package
+    url: https://openwrt.org/packages/pkgdata/adguardhome
+  - label: AdGuard Home documentation
+    url: https://adguard.com/kb/adguard-home/overview/
+  - label: OpenWrt dnsmasq and DHCP
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt fstab / block-mount
+    url: https://openwrt.org/docs/guide-user/storage/fstab
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import TopologyTable from '@components/TopologyTable.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 201 / 1GB" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="PVE 9.2.2 单网口；OpenWrt 25.12.6 VM 201；AGH 0.107.79；vmbr2 192.168.2.0/24"
+  recipe="tests/recipes/agh-25.12-vm201.md"
+  result="AGH 53 + Web 3000；dnsmasq 5353；DHCP option 6 → 192.168.2.1；客户端 blocked.example=0.0.0.0，openwrt.org 正常；重启后 fstab/规则/服务保留"
+  date="2026-10-20"
+/>
+
+## 完成后你能确认什么
+
+- AdGuard Home 接管 OpenWrt 的 `53`，Web 后台在 `3000`；
+- `dnsmasq` 退到 `5353`，仍负责 DHCP；
+- DHCP 客户端拿到 `192.168.2.1` 作为 DNS；
+- 自定义过滤规则生效，正常域名仍能解析；
+- 重启后数据盘、AGH 配置和过滤规则仍然存在。
+
+## 适用环境与拓扑
+
+- PVE 9.2.2 单网口；OpenWrt 25.12.6 x86_64 VM 201（1GB RAM，2GB 数据盘）。
+- WAN `net0` 接 `vmbr0`（DHCP）；LAN `net1` 接独立 `vmbr2`（`192.168.2.0/24`）。
+- AGH 版本 0.107.79；`apk` 源里有 `adguardhome` 包。
+- **不要让两个 OpenWrt VM 的 DHCP 共享同一个 bridge**：本实验 VM 200 在 `vmbr1`（192.168.1.0/24），VM 201 必须在 `vmbr2`（192.168.2.0/24），否则客户端可能拿到另一个网段的租约。
+
+<TopologyTable rows={[
+  { physical: 'nic0', bridge: 'vmbr0', vnic: 'net0', iface: 'wan DHCP', role: '上游 192.168.50.1' },
+  { physical: '—', bridge: 'vmbr2', vnic: 'net1', iface: 'lan 192.168.2.1', role: 'AGH + DHCP 客户端' },
+]} />
+
+## 端口与职责
+
+| 端口 | 组件 | 作用 |
+|---|---|---|
+| 53 | AdGuard Home | 客户端 DNS、过滤、上游转发 |
+| 3000 | AdGuard Home | Web 管理后台 |
+| 5353 | dnsmasq | DHCP 与本地 DNS（不再对客户端提供 53） |
+
+不要把 AGH 和 dnsmasq 同时绑在 53；也不要把 DHCP option 6 指向一个没有监听 53 的地址。
+
+## 改动前准备
+
+<Step where="router-shell" title="备份配置并准备数据盘" expected="出问题时能恢复 dnsmasq/AGH 配置。" >
+
+```sh
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+cp /etc/config/adguardhome /etc/config/adguardhome.bak.$(date +%F) 2>/dev/null || true
+cat /etc/config/dhcp
+```
+
+确认你能进 PVE 控制台或 OpenWrt LAN；不要把唯一管理入口建立在正在改的 DNS 上。
+
+</Step>
+
+## 最小步骤
+
+<Step where="router-shell" title="安装 AGH、数据盘工具和 fstab 支持" expected="adguardhome、block-mount、e2fsprogs 已安装。" >
+
+```sh
+apk update
+apk add adguardhome block-mount e2fsprogs
+```
+
+`e2fsprogs` 提供 `mkfs.ext4`；`block-mount` 提供 `fstab` 服务。国内网络慢时可换 OpenWrt 镜像源，但包必须通过签名校验。
+
+</Step>
+
+<Step where="router-shell" title="格式化并持久挂载数据盘" expected="/opt/agh 挂在独立磁盘上，重启后仍在。" >
+
+只对**确认无数据**的实验室数据盘操作：
+
+```sh
+mkfs.ext4 -F /dev/sdb
+mkdir -p /opt/agh
+mount /dev/sdb /opt/agh
+block info /dev/sdb
+```
+
+用 `block info` 输出的 UUID，在 LuCI 的“挂载点”里把该磁盘目标设为 `/opt/agh` 并启用；或用 CLI 找到对应的 `@mount[n]`：
+
+```sh
+uci show fstab
+# 找到 uuid 为 <你的-UUID> 的 @mount[n]
+uci set fstab.@mount[n].target='/opt/agh'
+uci set fstab.@mount[n].enabled='1'
+uci commit fstab
+/etc/init.d/fstab enable
+block mount
+mount | grep /opt/agh
+```
+
+本实验用的是已自动检测出的 `fstab.@mount[2]`（UUID 指向 2GB 数据盘），把 target 改为 `/opt/agh`、enabled 设为 1 后成功。不要照抄 `[2]`，按你的 UUID 找对应 section。
+
+</Step>
+
+<Step where="router-shell" title="把 dnsmasq 退到 5353" expected="53 端口空出来，DHCP 仍然正常。" >
+
+```sh
+uci set dhcp.@dnsmasq[0].port='5353'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+netstat -lnp | grep -E ':53|:5353'
+```
+
+此时客户端暂时无法用 53 解析；下一步启动 AGH。
+
+</Step>
+
+<Step where="router-shell" title="启动 AGH 首次配置" expected="Web 后台在 3000 可访问。" >
+
+```sh
+uci set adguardhome.config.work_dir='/opt/agh/work'
+uci commit adguardhome
+mkdir -p /opt/agh/work
+chown -R adguardhome:adguardhome /opt/agh /etc/adguardhome
+/etc/init.d/adguardhome enable
+/etc/init.d/adguardhome start
+sleep 3
+netstat -lnp | grep -E ':3000|:53'
+```
+
+浏览器打开 `http://192.168.2.1:3000/`，设置：
+
+- Web 端口 `3000`；
+- DNS 端口 `53`；
+- 管理员账号/密码；
+- Upstream DNS 填 `192.168.50.1`（本实验环境）；
+- 如果上游不做 DNSSEC 验证，先关闭 DNSSEC，避免解析失败。
+
+没有浏览器时可用 AGH 的 setup API；密码不要写进脚本或仓库。
+
+</Step>
+
+<Step where="router-shell" title="让 DHCP 通告 AGH 地址" expected="客户端 DNS 是 192.168.2.1。" >
+
+```sh
+uci add_list dhcp.lan.dhcp_option='6,192.168.2.1'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+uci show dhcp.lan | grep dhcp_option
+```
+
+只改 `dnsmasq` 端口而不加 option 6 时，部分客户端可能拿不到 DNS；本实验必须显式加。
+
+</Step>
+
+<Step where="luci" title="添加一个确定性过滤规则" expected="blocked.example 返回 0.0.0.0，正常域名不受影响。" >
+
+在 AGH 后台 **Filters → Custom filtering rules** 添加：
+
+```text
+||blocked.example^
+```
+
+这是测试用保留域名；真实使用再订阅维护中的过滤列表。不要用“拦截后网页打不开”来判断规则生效，先用 `nslookup` 看返回。
+
+</Step>
+
+## 验证
+
+<Step where="router-shell" title="检查端口和本机解析" expected="AGH 监听 53/3000，dnsmasq 监听 5353。" >
+
+```sh
+netstat -lnp | grep -E ':53|:3000|:5353'
+nslookup blocked.example 192.168.2.1
+nslookup openwrt.org 192.168.2.1
+```
+
+预期：`blocked.example` 返回 `0.0.0.0`（IPv6 可能同时显示 `::`）；`openwrt.org` 返回真实地址。
+
+</Step>
+
+<Step where="client" title="从 DHCP 客户端验证" expected="客户端拿到 192.168.2.x 和 DNS 192.168.2.1，拦截/正常解析都正确。" >
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+nslookup blocked.example
+nslookup openwrt.org
+```
+
+如果客户端 DNS 不是 `192.168.2.1`，回到 DHCP option 6 和 dnsmasq 端口检查。
+
+</Step>
+
+<Step where="router-shell" title="重启后复验" expected="数据盘自动挂载，AGH 和过滤规则恢复。" >
+
+```sh
+reboot
+```
+
+重启后：
+
+```sh
+mount | grep /opt/agh
+netstat -lnp | grep -E ':53|:3000'
+nslookup blocked.example 192.168.2.1
+nslookup openwrt.org 192.168.2.1
+```
+
+</Step>
+
+## 失败分支与恢复
+
+### AGH 起不来 / 53 被占用
+
+```sh
+logread | grep -i adguard | tail -50
+netstat -lnp | grep ':53'
+/usr/bin/AdGuardHome --check-config -c /etc/adguardhome/adguardhome.yaml
+```
+
+如果 dnsmasq 还在 53，先确认 `dhcp.@dnsmasq[0].port='5353'`；如果是配置错误，恢复备份：
+
+```sh
+cp /etc/adguardhome/adguardhome.bak.YYYY-MM-DD /etc/adguardhome/adguardhome.yaml
+/etc/init.d/adguardhome restart
+```
+
+### 客户端完全无法解析
+
+临时把 DNS 还给 dnsmasq：
+
+```sh
+uci set dhcp.@dnsmasq[0].port='53'
+uci -q delete dhcp.lan.dhcp_option
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+/etc/init.d/adguardhome stop
+```
+
+先恢复基础解析，再逐项排查 AGH。
+
+### 数据盘没挂上
+
+```sh
+mount | grep /opt/agh
+block info /dev/sdb
+logread | grep -i fstab
+```
+
+检查 fstab 的 UUID、target、enabled；必要时手动 `mount /dev/sdb /opt/agh` 后重启 AGH。
+
+### 过滤不生效
+
+- 确认 AGH 是客户端实际使用的 DNS；
+- 确认规则在 **Custom filtering rules**，不是订阅列表；
+- 用 `nslookup blocked.example 192.168.2.1` 直接问 AGH；
+- 浏览器/系统 DoH 可能绕过 AGH。
+
+## E2 实测记录（2026-10-20）
+
+- 环境：PVE 9.2.2 单网口；OpenWrt 25.12.6 VM 201（1GB/2GB 数据盘）；AGH 0.107.79。
+- 端口：AGH `53` + Web `3000`；dnsmasq `5353`；DHCP option 6 `192.168.2.1`。
+- 客户端：DHCP `192.168.2.166/24`，DNS `192.168.2.1`；`blocked.example` → `0.0.0.0`，`openwrt.org` → `64.226.122.113`。
+- 重启：`/opt/agh` 通过 fstab 自动挂载；AGH、dnsmasq、过滤规则恢复；Web 返回 302。
+- 未测：真实浏览器 UI 操作、外部订阅列表、物理 LAN 客户端、IPv6、长期稳定性。
+
+## 来源与复核
+
+- 本页是 E2 实验记录；未做独立复核，也未在真实物理 LAN 上验证。
+- 复现配方：`tests/recipes/agh-25.12-vm201.md`；环境记录：`docs/agh-e2-run.md`。
+- AGH 版本/包名变化时更新 `testedVersions`；不要直接套用其他固件版本的 init 脚本。
+
+<PageSources />

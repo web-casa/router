@@ -35,7 +35,7 @@
 
 ## 尚未完成
 
-- DNS 与 PVE 均已完成 E2 实验（见 `docs/dns-e2-run.md`、`docs/pve-e2-run.md`）；OpenClash、AdGuard Home、SQM 尚未创建。
+- DNS、PVE、AGH 均已完成 E2 实验（见 `docs/dns-e2-run.md`、`docs/pve-e2-run.md`、`docs/agh-e2-run.md`）；OpenClash、SQM 尚未创建。
 - 40 条搜索查询的浏览器测试与阈值（40/40 非空、语种、别名 Top 1、预期 Top 3 ≥95%）。
 - Pagefind extended 中文分词配置与查询扩展层。
 - 域名绑定、golden placeholder、Pages 生产部署与回滚。
