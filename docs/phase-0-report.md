@@ -35,7 +35,7 @@
 
 ## 尚未完成
 
-- DNS、PVE、AGH 均已完成 E2 实验（见 `docs/dns-e2-run.md`、`docs/pve-e2-run.md`、`docs/agh-e2-run.md`）；SQM、005 LuCI 首次登录、041 固件辨识已补 E1 页；OpenClash 尚未创建。
+- DNS、PVE、AGH 均已完成 E2 实验（见 `docs/dns-e2-run.md`、`docs/pve-e2-run.md`、`docs/agh-e2-run.md`）；SQM、005 LuCI 首次登录、041 固件辨识、043 OpenClash 已补 E1 页；OpenClash 严格限定兼容性/DNS/停用恢复，不含代理订阅或绕过内容。
 - 40 条搜索查询的浏览器测试与阈值（40/40 非空、语种、别名 Top 1、预期 Top 3 ≥95%）。
 - Pagefind extended 中文分词配置与查询扩展层。
 - 域名绑定、golden placeholder、Pages 生产部署与回滚。

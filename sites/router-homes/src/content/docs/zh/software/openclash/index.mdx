@@ -1,0 +1,189 @@
+---
+title: OpenClash 入门：兼容性、DNS 冲突与停用恢复
+description: 在合法网络环境中检查 OpenClash 的固件/架构/包格式兼容性，处理 DNS 冲突，并保证停用后基础联网可恢复。
+pageType: app
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: '待合法测试环境；不提供代理端点/订阅'
+testRecipe: 'tests/recipes/openclash-25.12.md'
+aliases: ['openclash 安装', 'openclash 兼容性', 'openclash dns']
+symptoms: ['OpenClash 装不上', '开了 OpenClash 后没网', 'DNS 冲突']
+sources:
+  - label: OpenClash project
+    url: https://github.com/vernesong/OpenClash
+  - label: OpenWrt package format
+    url: https://openwrt.org/docs/guide-user/additional-software/package-format
+  - label: OpenWrt DHCP and DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: Mihomo core
+    url: https://github.com/MetaCubeX/mihomo
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86/ARM 待确认" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="待合法测试环境；不提供代理端点/订阅"
+  recipe="tests/recipes/openclash-25.12.md"
+  result="E1：兼容性检查、DNS 冲突、停用恢复已整理；未在本次环境安装/运行"
+/>
+
+> **范围**：本页只讨论合法网络环境中的兼容性、DNS 冲突、启停与恢复，不提供代理服务器、订阅链接、规则集，也不提供绕过网络封锁或规避服务地域/访问控制的步骤。使用前请确认当地法律、网络服务商条款和你要访问的服务条款。
+
+## 完成后你能确认什么
+
+- 你的固件/架构/包格式是否匹配 OpenClash 发布包；
+- 它和 dnsmasq、AdGuard Home 的 53 端口是否会冲突；
+- 启动后如何确认进程/日志/端口，而不是只看 LuCI 页面；
+- 停用后如何把 DNS 和基础联网恢复回来；
+- 哪些内容本页不会提供，以及为什么。
+
+## 适用环境与前提
+
+- OpenWrt 25.12.6（`apk`）或 24.10（`opkg`）；x86 或 ARM 需与发布包架构一致。
+- OpenClash 是第三方 LuCI 应用，通常还需要匹配的 Mihomo/Meta 内核；前端、内核、固件版本三者要配套。
+- 25.12 的 `apk` 与 24.10 的 `ipk` 不是同一种包格式；不要把 `.ipk` 改名成 `.apk`，也不要把别的架构的包硬装进来。
+- 如果设备是厂商固件/ImmortalWrt/iStoreOS，先按 041 页确认来源和包管理器，再谈安装。
+
+## 安装前检查
+
+<Step where="router-shell" title="确认固件、架构和空间" expected="你知道包格式、CPU 架构，以及是否有足够空间。" >
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+uname -m
+command -v apk
+command -v opkg
+df -h /
+free -h
+```
+
+记录 `release.target`、`DISTRIB_ARCH`、包管理器和可用空间。OpenClash + 内核 + 规则数据可能占用几十 MB，空间不足不要硬装。
+
+</Step>
+
+<Step where="router-shell" title="看发布页是否有匹配包" expected="能找到对应固件版本/架构的 apk 或 ipk。" >
+
+只从 OpenClash 官方发布页获取安装包，核对：
+
+- 固件大版本（25.12 / 24.10）；
+- 包格式（apk / ipk）；
+- CPU 架构（x86_64、aarch64 等）；
+- 依赖（内核模块、bash/curl 等，以发布说明为准）；
+- SHA-256/发布页校验值。
+
+没有匹配包就停在这里；不要用“通用包”或别人的包硬装。
+
+</Step>
+
+<Step where="router-shell" title="记录 DNS/端口基线" expected="你知道 53 现在归谁，停用后要恢复成什么。" >
+
+```sh
+netstat -lnp | grep -E ':53|:5353|:7874|:9090'
+cat /tmp/resolv.conf.d/resolv.conf.auto
+nslookup openwrt.org 127.0.0.1
+```
+
+如果 AdGuard Home 已占 53、dnsmasq 在 5353，OpenClash 不能再抢 53；先决定谁负责 DNS，再启动。
+
+</Step>
+
+## 最小配置（不提供代理端点）
+
+<Step where="luci" title="先只启用前端和内核，不接管 DNS" expected="服务能启动，LuCI 能看到状态。" >
+
+在 **Services → OpenClash**：
+
+1. 选择与架构匹配的内核；
+2. 先关闭“接管 DNS/DNS 劫持”之类选项；
+3. 保存并启动；
+4. 打开日志页，确认没有“内核不匹配/端口占用/依赖缺失”。
+
+本页不提供代理服务器、订阅或规则内容；如果你没有合法可用的配置，到这里就停止，不要为了“先跑起来”去填未知来源的订阅。
+
+</Step>
+
+<Step where="router-shell" title="确认进程、端口和日志" expected="OpenClash/内核在跑，且没有和 53 冲突。" >
+
+```sh
+ps w | grep -Ei 'openclash|mihomo|clash' | grep -v grep
+netstat -lnp | grep -E ':7874|:9090|:53'
+logread | grep -i openclash | tail -30
+```
+
+端口以你的配置为准；关键是：**不要有两个进程同时监听 53**。如果 OpenClash 日志报 DNS 绑定失败，先停用它，不要反复重启。
+
+</Step>
+
+## 停用与恢复
+
+<Step where="router-shell" title="停用并确认基础联网恢复" expected="不依赖 OpenClash 也能解析和上网。" >
+
+```sh
+/etc/init.d/openclash stop
+/etc/init.d/openclash disable
+uci show openclash
+/etc/init.d/dnsmasq restart
+nslookup openwrt.org 127.0.0.1
+```
+
+如果之前改过 dnsmasq 端口或 DHCP option 6，按 026/011 页恢复；确认客户端 DNS 不再指向已停止的 OpenClash。
+
+</Step>
+
+## 失败分支与恢复
+
+### 开了 OpenClash 后完全没网
+
+1. 用 LAN/控制台进系统；
+2. 停用 OpenClash；
+3. 恢复 dnsmasq 的 53 端口和 DHCP DNS；
+4. 检查防火墙/DNS 劫持规则是否还在；
+5. 必要时重启，确认基础联网后再排查。
+
+### LuCI 进不去
+
+不要继续点“重启”。用 SSH/控制台停服务：
+
+```sh
+/etc/init.d/openclash stop
+/etc/init.d/openclash disable
+logread | tail -50
+```
+
+如果是防火墙把管理入口挡了，先用控制台恢复，不要盲目恢复出厂。
+
+### 包格式/架构不匹配
+
+- 25.12 用 apk，24.10 用 ipk；不能互换；
+- x86_64 与 aarch64 包不能混用；
+- 内核与前端版本不匹配时，先回退到发布页标注的组合；
+- 不要为了装上而关闭所有校验。
+
+### DNS 冲突/解析环路
+
+- 53 只能有一个主要 DNS 入口；
+- AdGuard Home、dnsmasq、OpenClash 的 DNS 不要互相指成环；
+- 先停 OpenClash，恢复 dnsmasq/AGH，再逐项加回；
+- 用 `nslookup` 分别测 `127.0.0.1`、LAN 地址和上游。
+
+## 合规与版本边界
+
+- 只在允许的网络和服务条款下使用；不提供绕过网络封锁、规避服务地域/访问控制、共享账号/订阅的内容。
+- OpenClash/Mihomo 是第三方项目，版本和依赖变化快；升级前看发布说明，保留回退包。
+- 本页不构成法律意见；有合规疑问时先咨询，不要先部署。
+
+## E1 状态与来源
+
+- 本页是 E1：兼容性检查、DNS 冲突和停用恢复按公开资料整理；没有在本次环境安装/运行 OpenClash。
+- 下一步按 `tests/recipes/openclash-25.12.md` 在合法测试环境记录固件/包格式/端口/停用恢复，再升级 E2；没有匹配包或没有合法配置就保持 E1。
+- 不要把本页扩展成代理订阅/绕过教程；那超出站点范围。
+
+<PageSources />

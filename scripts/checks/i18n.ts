@@ -33,6 +33,8 @@ await mustExist(path.join(dist, 'en/software/adguard-home/index.html'), '/en/sof
 await mustExist(path.join(dist, 'zh/software/adguard-home/index.html'), '/zh/software/adguard-home/');
 await mustExist(path.join(dist, 'en/software/sqm/index.html'), '/en/software/sqm/');
 await mustExist(path.join(dist, 'zh/software/sqm/index.html'), '/zh/software/sqm/');
+await mustExist(path.join(dist, 'en/software/openclash/index.html'), '/en/software/openclash/');
+await mustExist(path.join(dist, 'zh/software/openclash/index.html'), '/zh/software/openclash/');
 await mustNotExist(path.join(dist, 'en/only-en/index.html'), '/en/only-en/ unpaired fixture');
 await mustNotExist(path.join(dist, 'zh/only-en/index.html'), '/zh/only-en/ fallback');
 await mustExist(path.join(dist, '404.html'), '404 page');

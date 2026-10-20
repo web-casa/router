@@ -66,6 +66,11 @@ const meta = {
           translations: { 'zh-CN': 'SQM / CAKE' },
           slug: 'software/sqm',
         },
+        {
+          label: 'OpenClash',
+          translations: { 'zh-CN': 'OpenClash' },
+          slug: 'software/openclash',
+        },
       ],
     },
   ],

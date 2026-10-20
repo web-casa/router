@@ -1,0 +1,189 @@
+---
+title: "OpenClash basics: compatibility, DNS conflicts and clean disable"
+description: Check OpenClash firmware/architecture/package compatibility in a lawful environment, resolve DNS conflicts, and keep basic connectivity recoverable after disable.
+pageType: app
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Lawful test environment pending; no proxy endpoints/subscriptions provided'
+testRecipe: 'tests/recipes/openclash-25.12.md'
+aliases: ['openclash install', 'openclash compatibility', 'openclash dns']
+symptoms: ['OpenClash will not install', 'no internet after enabling OpenClash', 'DNS conflict']
+sources:
+  - label: OpenClash project
+    url: https://github.com/vernesong/OpenClash
+  - label: OpenWrt package format
+    url: https://openwrt.org/docs/guide-user/additional-software/package-format
+  - label: OpenWrt DHCP and DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: Mihomo core
+    url: https://github.com/MetaCubeX/mihomo
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86/ARM pending" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="Lawful test environment pending; no proxy endpoints/subscriptions provided"
+  recipe="tests/recipes/openclash-25.12.md"
+  result="E1: compatibility checks, DNS conflicts and disable recovery documented; not installed/run in this environment"
+/>
+
+> **Scope**: this page covers compatibility, DNS conflicts, start/stop and recovery in a lawful environment. It does not provide proxy servers, subscription links, rule sets, or steps to bypass network controls or service/region restrictions. Check local law, ISP terms and the terms of the service you access before use.
+
+## Outcome
+
+- Decide whether your firmware/architecture/package format matches an OpenClash release.
+- Check whether it will conflict with dnsmasq or AdGuard Home on port 53.
+- Verify process/log/port state instead of trusting the LuCI page alone.
+- Restore DNS and basic connectivity after disabling it.
+- Know what this page intentionally does not cover.
+
+## Applicable environment and assumptions
+
+- OpenWrt 25.12.6 (`apk`) or 24.10 (`opkg`); x86/ARM must match the release package.
+- OpenClash is a third-party LuCI app and usually needs a matching Mihomo/Meta core; frontend, core and firmware must be compatible.
+- `apk` on 25.12 and `ipk` on 24.10 are different formats. Do not rename an `.ipk` to `.apk`, and do not force another architecture's package.
+- On vendor firmware/ImmortalWrt/iStoreOS, identify the source and package manager first (see the firmware identification page).
+
+## Pre-install checks
+
+<Step where="router-shell" title="Check firmware, architecture and free space" expected="You know the package format, CPU architecture and available space.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+uname -m
+command -v apk
+command -v opkg
+df -h /
+free -h
+```
+
+Record `release.target`, `DISTRIB_ARCH`, the package manager and free space. OpenClash plus core and rule data can take tens of MB; do not force it on a full rootfs.
+
+</Step>
+
+<Step where="router-shell" title="Find a matching release package" expected="You can find an apk/ipk for the exact firmware and architecture.">
+
+Use only the official OpenClash release page and verify:
+
+- firmware major version (25.12 / 24.10);
+- package format (apk / ipk);
+- CPU architecture (x86_64, aarch64, etc.);
+- dependencies (kernel modules, bash/curl, per release notes);
+- SHA-256/checksum from the release page.
+
+If there is no matching package, stop. Do not force a “universal” package or someone else's build.
+
+</Step>
+
+<Step where="router-shell" title="Record the DNS/port baseline" expected="You know who owns 53 and what restore means.">
+
+```sh
+netstat -lnp | grep -E ':53|:5353|:7874|:9090'
+cat /tmp/resolv.conf.d/resolv.conf.auto
+nslookup openwrt.org 127.0.0.1
+```
+
+If AdGuard Home owns 53 and dnsmasq is on 5353, OpenClash must not also take 53. Decide who owns DNS before starting it.
+
+</Step>
+
+## Minimal setup (no proxy endpoints)
+
+<Step where="luci" title="Start the frontend and core first, without DNS takeover" expected="The service starts and LuCI shows status.">
+
+In **Services → OpenClash**:
+
+1. Select a core matching the architecture.
+2. Leave DNS takeover/hijack disabled for now.
+3. Save and start.
+4. Open the log page and confirm there is no “core mismatch / port in use / missing dependency”.
+
+This page does not provide proxy servers, subscriptions or rules. If you do not have a lawful configuration, stop here; do not paste an unknown subscription just to “make it run”.
+
+</Step>
+
+<Step where="router-shell" title="Confirm process, ports and logs" expected="OpenClash/core is running without a port-53 conflict.">
+
+```sh
+ps w | grep -Ei 'openclash|mihomo|clash' | grep -v grep
+netstat -lnp | grep -E ':7874|:9090|:53'
+logread | grep -i openclash | tail -30
+```
+
+Ports depend on your configuration; the key rule is: **never let two processes bind 53**. If the log reports a DNS bind failure, disable OpenClash instead of restarting it repeatedly.
+
+</Step>
+
+## Disable and recover
+
+<Step where="router-shell" title="Disable and confirm basic connectivity" expected="Resolution and internet work without OpenClash.">
+
+```sh
+/etc/init.d/openclash stop
+/etc/init.d/openclash disable
+uci show openclash
+/etc/init.d/dnsmasq restart
+nslookup openwrt.org 127.0.0.1
+```
+
+If you changed the dnsmasq port or DHCP option 6 earlier, restore it per the DNS/AGH pages; make sure clients no longer point at a stopped OpenClash DNS.
+
+</Step>
+
+## Failure branches and recovery
+
+### No internet after enabling OpenClash
+
+1. Reach the device over LAN/console.
+2. Stop OpenClash.
+3. Restore dnsmasq port 53 and DHCP DNS.
+4. Check whether firewall/DNS hijack rules remain.
+5. Reboot if needed; restore basic connectivity before debugging further.
+
+### LuCI is unreachable
+
+Do not keep clicking “restart”. Use SSH/console to stop the service:
+
+```sh
+/etc/init.d/openclash stop
+/etc/init.d/openclash disable
+logread | tail -50
+```
+
+If a firewall rule blocks management, recover from the console; do not factory-reset blindly.
+
+### Package format/architecture mismatch
+
+- 25.12 uses apk; 24.10 uses ipk; they are not interchangeable.
+- x86_64 and aarch64 packages are not interchangeable.
+- If frontend and core versions do not match, return to the combination listed on the release page.
+- Do not disable all signature/verification checks just to install it.
+
+### DNS conflict/loop
+
+- Only one main DNS entry point should own 53.
+- AdGuard Home, dnsmasq and OpenClash DNS must not point at each other in a loop.
+- Stop OpenClash, restore dnsmasq/AGH, then add components back one at a time.
+- Test `127.0.0.1`, the LAN address and the upstream separately with `nslookup`.
+
+## Compliance and version boundaries
+
+- Use only on networks and under service terms that permit it. This page does not provide circumvention, region/access-control evasion, or shared account/subscription content.
+- OpenClash/Mihomo are third-party projects with fast-moving versions/dependencies; read release notes and keep a rollback package.
+- This is not legal advice; resolve compliance questions before deployment.
+
+## E1 status and sources
+
+- This is E1: compatibility, DNS conflicts and disable recovery are based on public documentation; OpenClash was not installed/run in this environment.
+- Next: use `tests/recipes/openclash-25.12.md` in a lawful test environment, record firmware/package format/ports/disable recovery, then promote to E2. If there is no matching package or lawful configuration, keep it at E1.
+- Do not expand this page into a proxy subscription/bypass tutorial; that is out of scope.
+
+<PageSources />
