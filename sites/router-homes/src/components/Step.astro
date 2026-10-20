@@ -7,8 +7,8 @@ interface Props {
 const locale = (Astro.locals as any).starlightRoute?.locale ?? 'en';
 const isEn = locale === 'en';
 const labels: Record<string, string> = isEn
-  ? { 'router-shell': 'Router shell', luci: 'LuCI', client: 'Computer', phone: 'Phone' }
-  : { 'router-shell': '路由器 Shell', luci: 'LuCI', client: '电脑', phone: '手机' };
+  ? { 'router-shell': 'Router shell', luci: 'LuCI', client: 'Computer', phone: 'Phone', console: 'Console' }
+  : { 'router-shell': '路由器 Shell', luci: 'LuCI', client: '电脑', phone: '手机', console: '本地控制台' };
 const { where, title, expected } = Astro.props;
 const label = labels[where] ?? where;
 ---

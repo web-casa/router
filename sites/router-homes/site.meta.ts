@@ -78,6 +78,17 @@ const meta = {
         },
       ],
     },
+    {
+      label: 'Troubleshooting',
+      translations: { 'zh-CN': '故障排查' },
+      items: [
+        {
+          label: "Can't reach LuCI",
+          translations: { 'zh-CN': '进不去后台' },
+          slug: 'troubleshooting/no-web-ui',
+        },
+      ],
+    },
   ],
 } as SiteMeta;
 

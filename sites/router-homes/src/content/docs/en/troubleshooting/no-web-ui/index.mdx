@@ -1,0 +1,234 @@
+---
+title: "Cannot reach LuCI: IP, port, DHCP and console recovery"
+description: Work from LAN port and client address to the real management IP, uhttpd/SSH/firewall, and keep console/failsafe recovery without a blind factory reset.
+pageType: troubleshoot
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'OpenWrt 25.12.6 device reproduction pending; read-only/low-risk commands'
+testRecipe: 'tests/recipes/troubleshooting-no-web-ui.md'
+aliases: ['openwrt cannot open luci', 'luci not loading', '192.168.1.1 not working', 'openwrt unreachable']
+symptoms: ['cannot open 192.168.1.1', 'login page times out', 'lost access after LAN change', 'no DHCP address']
+sources:
+  - label: OpenWrt failsafe and factory reset
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+  - label: OpenWrt LuCI essentials
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt network configuration
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP and DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="device reproduction pending" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="OpenWrt 25.12.6 device reproduction pending; read-only/low-risk commands"
+  recipe="tests/recipes/troubleshooting-no-web-ui.md"
+  result="E1: layered triage and console/failsafe boundaries documented; not reproduced in this environment"
+/>
+
+## Outcome
+
+- Tell whether the problem is the physical link, client address, management IP, HTTP service, or SSH/firewall.
+- Decide whether LuCI is actually listening without changing configuration.
+- Recover with a static client address, console, or failsafe instead of a blind factory reset.
+- Know when to stop, back up, or read the device documentation.
+
+## Triage table
+
+| Symptom | Check first | Do not do first |
+|---|---|---|
+| No link LED | cable, LAN port, power | reflash firmware |
+| Client has 169.254.x.x | DHCP/cable/LAN port | change router LAN |
+| Ping works, web fails | 80/443, uhttpd, firewall, HTTPS | factory reset |
+| Ping fails | client subnet, management IP, VLAN/port | keep changing IPs |
+| SSH works, LuCI fails | uhttpd/LuCI package/port | change network config |
+| No console output | serial settings, video output, power | short pins/reflash blindly |
+
+## Layer 1: physical port and link
+
+<Step where="client" title="Use a LAN port, not WAN" expected="The LAN LED is on and the client sees a link.">
+
+Connect to a port labeled **LAN**; the WAN port usually does not provide management access. Try another cable and another LAN port; check the LEDs and the client NIC state.
+
+If the LED never lights: check power, cable and port before touching firmware.
+
+</Step>
+
+## Layer 2: client address and gateway
+
+<Step where="client" title="Confirm the client is in the LAN subnet" expected="The client has 192.168.1.x or another known LAN address.">
+
+Linux:
+
+```sh
+ip addr show
+ip route
+```
+
+Windows:
+
+```powershell
+ipconfig /all
+```
+
+macOS:
+
+```sh
+ifconfig
+netstat -rn
+```
+
+A `169.254.x.x` address means DHCP failed. Confirm cable/LAN first, then set a temporary static address:
+
+- IP: `192.168.1.2`
+- Mask: `255.255.255.0`
+- Gateway: `192.168.1.1`
+
+Use it only for login; do not collide with the router LAN address.
+
+</Step>
+
+<Step where="client" title="Ping the gateway" expected="It replies, or you know the management IP is not 192.168.1.1.">
+
+```sh
+ping 192.168.1.1
+```
+
+- Replies: go to layer 3.
+- No reply: check the client subnet, LAN port, and whether the default address was changed.
+- Do not declare the device dead from a failed ping alone.
+
+</Step>
+
+## Layer 3: was the management IP changed?
+
+<Step where="client" title="Find the real LAN address" expected="You have at least two candidate addresses and test them.">
+
+Common sources:
+
+- device label/manual;
+- a saved config/screenshot;
+- the upstream router's DHCP lease table, if reachable;
+- `uci show network` on the console;
+- a LAN address you changed yourself.
+
+On **your own subnet**, inspect the ARP cache:
+
+```sh
+ip neigh
+```
+
+Do not scan an unknown network broadly, and do not guess a device from scan results.
+
+</Step>
+
+## Layer 4: HTTP/HTTPS and SSH
+
+<Step where="client" title="Separate “ping works but web fails” from link failure" expected="You know whether it is a port/service/protocol issue.">
+
+```sh
+curl -v http://192.168.1.1/
+curl -k -v https://192.168.1.1/
+ssh root@192.168.1.1
+```
+
+- HTTP and HTTPS both time out: uhttpd/LuCI is not listening, or the firewall blocks it.
+- HTTP 404/redirect: port/path/HTTPS configuration.
+- SSH works: debug services over SSH; do not change the LAN.
+
+</Step>
+
+<Step where="router-shell" title="If SSH works, inspect uhttpd and ports" expected="You know whether LuCI runs and 80/443 listen.">
+
+```sh
+netstat -lnp | grep -E ':80|:443|:22'
+ps w | grep -E 'uhttpd|rpcd' | grep -v grep
+logread -e uhttpd | tail -30
+uci show uhttpd
+```
+
+If uhttpd is not running, try:
+
+```sh
+/etc/init.d/uhttpd restart
+```
+
+If it still fails, read the logs and firewall; do not restart the whole network repeatedly.
+
+</Step>
+
+<Step where="router-shell" title="Check whether the firewall blocks management" expected="LAN to router 80/443/22 is not accidentally blocked.">
+
+```sh
+uci show firewall
+logread | grep -i firewall | tail -20
+```
+
+If you just changed a firewall zone, restore the backup or fix it from the console; do not keep changing it without console access.
+
+</Step>
+
+## Layer 5: local console / failsafe
+
+<Step where="console" title="Confirm the system is alive from the console" expected="You see a login prompt or kernel log.">
+
+Use serial/HDMI/keyboard, IPMI, or a cloud console. Serial is often `115200 8N1`, but check the device. If there is no output, verify the cable/baud/power first.
+
+Once in:
+
+```sh
+ip addr show
+ip route
+uci show network
+uci show dhcp
+logread | tail -50
+```
+
+</Step>
+
+<Step where="console" title="Use failsafe only when needed" expected="You can restore LAN/DHCP without a factory reset.">
+
+Failsafe button timing is device-specific; follow the OpenWrt device page/vendor manual. Once in, inspect first:
+
+```sh
+uci show network
+uci show dhcp
+```
+
+If only the LAN address is wrong, change it back and reboot after verifying. If unsure, record/back up the config first; do not run `firstboot`. A factory reset erases configuration.
+
+</Step>
+
+## Recovery order
+
+1. **Change nothing**: cable/LAN port/static client address.
+2. **Ping works, web fails**: uhttpd/firewall/HTTPS.
+3. **SSH works**: debug services over SSH; do not change LAN.
+4. **No SSH**: console/failsafe.
+5. **Factory reset last**: confirm no important config/backup, and know you must reconfigure WAN/LAN/Wi-Fi.
+
+## Common misdiagnoses
+
+- Using the WAN port as management.
+- The client still has an old subnet/static IP.
+- The browser forces HTTPS while LuCI is HTTP.
+- Assuming LuCI is healthy because ping works.
+- Changing the LAN address without updating DHCP/gateway.
+- A firewall rule blocks LAN management.
+- uhttpd is missing/removed, but the network is restarted repeatedly.
+
+## E1 status and sources
+
+- This is E1: layered triage and console/failsafe boundaries are based on public documentation; it was not reproduced in this environment.
+- Next: use `tests/recipes/troubleshooting-no-web-ui.md` on a real device to simulate a wrong LAN, a stopped uhttpd, and a static client; record recovery, then promote to E2.
+- Do not turn this into a “universal recovery command”; console/failsafe procedures differ by device/firmware. Read the device docs first.
+
+<PageSources />

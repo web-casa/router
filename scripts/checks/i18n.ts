@@ -37,6 +37,8 @@ await mustExist(path.join(dist, 'en/software/openclash/index.html'), '/en/softwa
 await mustExist(path.join(dist, 'zh/software/openclash/index.html'), '/zh/software/openclash/');
 await mustExist(path.join(dist, 'en/software/package-sources/index.html'), '/en/software/package-sources/');
 await mustExist(path.join(dist, 'zh/software/package-sources/index.html'), '/zh/software/package-sources/');
+await mustExist(path.join(dist, 'en/troubleshooting/no-web-ui/index.html'), '/en/troubleshooting/no-web-ui/');
+await mustExist(path.join(dist, 'zh/troubleshooting/no-web-ui/index.html'), '/zh/troubleshooting/no-web-ui/');
 await mustNotExist(path.join(dist, 'en/only-en/index.html'), '/en/only-en/ unpaired fixture');
 await mustNotExist(path.join(dist, 'zh/only-en/index.html'), '/zh/only-en/ fallback');
 await mustExist(path.join(dist, '404.html'), '404 page');

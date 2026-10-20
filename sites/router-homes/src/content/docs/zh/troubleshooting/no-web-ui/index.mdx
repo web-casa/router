@@ -1,0 +1,234 @@
+---
+title: 进不去后台：IP、网口、DHCP 与本地控制台恢复
+description: 从 LAN 口、客户端地址、真实管理 IP 到 uhttpd/SSH/防火墙逐层排查，保留控制台和 failsafe 恢复路径。
+pageType: troubleshoot
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: '待 OpenWrt 25.12.6 设备复现；命令为只读/低风险'
+testRecipe: 'tests/recipes/troubleshooting-no-web-ui.md'
+aliases: ['openwrt 进不去后台', 'luci 打不开', '192.168.1.1 进不去', 'openwrt 失联']
+symptoms: ['打不开 192.168.1.1', '登录页超时', '改 LAN 后失联', 'DHCP 没地址']
+sources:
+  - label: OpenWrt failsafe and factory reset
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+  - label: OpenWrt LuCI essentials
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt network configuration
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP and DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="待复现设备" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="待 OpenWrt 25.12.6 设备复现；命令为只读/低风险"
+  recipe="tests/recipes/troubleshooting-no-web-ui.md"
+  result="E1：分层排查、控制台/failsafe 恢复边界已整理；未在本次环境复现"
+/>
+
+## 完成后你能确认什么
+
+- 先分清是**物理链路、客户端地址、管理 IP、HTTP 服务、SSH/防火墙**哪一层；
+- 不改配置也能判断 LuCI 是否真的在监听；
+- 能用静态 IP/控制台/failsafe 恢复，而不是直接恢复出厂；
+- 知道什么时候必须停手、先备份或找设备文档。
+
+## 先做一张分诊表
+
+| 现象 | 先查什么 | 先不要做什么 |
+|---|---|---|
+| 网口灯不亮 | 网线、LAN 口、供电 | 反复刷固件 |
+| 客户端 169.254.x.x | DHCP/网线/LAN 口 | 直接改路由器 LAN |
+| ping 得通但网页打不开 | 80/443、uhttpd、防火墙、HTTPS | 恢复出厂 |
+| ping 不通 | 客户端网段、管理 IP、VLAN/网口 | 连续换 IP |
+| SSH 能进但 LuCI 不行 | uhttpd/LuCI 包/端口 | 改网络配置 |
+| 控制台也没有输出 | 串口参数、显示输出、供电 | 盲目短接/刷机 |
+
+## 第 1 层：物理口和链路
+
+<Step where="client" title="接 LAN，不接 WAN" expected="LAN 口灯亮，客户端能识别链路。" >
+
+把电脑接到标有 **LAN** 的网口；WAN 口通常不提供管理地址。换一根网线、换一个 LAN 口，确认网口灯和电脑网卡状态。
+
+如果网口灯完全不亮：先查供电、网线、口是否损坏；不要从刷机开始。
+
+</Step>
+
+## 第 2 层：客户端地址和网关
+
+<Step where="client" title="确认客户端有没有拿到同网段地址" expected="客户端是 192.168.1.x 或你已知的 LAN 网段。" >
+
+Linux：
+
+```sh
+ip addr show
+ip route
+```
+
+Windows：
+
+```powershell
+ipconfig /all
+```
+
+macOS：
+
+```sh
+ifconfig
+netstat -rn
+```
+
+如果地址是 `169.254.x.x`，说明 DHCP 没拿到。先确认网线/LAN 口，再给客户端临时静态地址：
+
+- IP：`192.168.1.2`
+- 掩码：`255.255.255.0`
+- 网关：`192.168.1.1`
+
+只用于登录；不要和路由器 LAN 地址冲突。
+
+</Step>
+
+<Step where="client" title="ping 网关" expected="能 ping 通，或明确知道管理 IP 不是 192.168.1.1。" >
+
+```sh
+ping 192.168.1.1
+```
+
+- 通：进入第 3 层；
+- 不通：确认客户端网段、LAN 口、设备默认地址是否被改过；
+- 不要用 `ping` 不通就直接判断设备坏了。
+
+</Step>
+
+## 第 3 层：管理 IP 是否被改过
+
+<Step where="client" title="找真实 LAN 地址" expected="你能列出至少两个可能的地址并逐个验证。" >
+
+常见来源：
+
+- 设备标签/说明书；
+- 之前保存的配置/截图；
+- 同一网段的 DHCP 租约表（如果你还能进上游路由器）；
+- 控制台里 `uci show network`；
+- 你自己改过的 LAN 地址。
+
+在**你自己的网段**内可以查看 ARP 缓存：
+
+```sh
+ip neigh
+```
+
+不要在未知网络里大范围扫描；不要用扫描结果直接猜设备。
+
+</Step>
+
+## 第 4 层：HTTP/HTTPS 和 SSH
+
+<Step where="client" title="区分“能 ping 但网页打不开”" expected="知道是端口/服务/协议问题，不是链路问题。" >
+
+```sh
+curl -v http://192.168.1.1/
+curl -k -v https://192.168.1.1/
+ssh root@192.168.1.1
+```
+
+- HTTP 超时、HTTPS 也超时：uhttpd/LuCI 没监听，或防火墙挡了；
+- HTTP 404/重定向：可能端口/路径/HTTPS 配置问题；
+- SSH 能进：优先用 SSH 查服务，不要改 LAN。
+
+</Step>
+
+<Step where="router-shell" title="SSH 能进时检查 uhttpd 和端口" expected="知道 LuCI 服务是否在跑、80/443 是否监听。" >
+
+```sh
+netstat -lnp | grep -E ':80|:443|:22'
+ps w | grep -E 'uhttpd|rpcd' | grep -v grep
+logread -e uhttpd | tail -30
+uci show uhttpd
+```
+
+如果 uhttpd 没跑，可以尝试：
+
+```sh
+/etc/init.d/uhttpd restart
+```
+
+如果重启后仍不行，先看日志和防火墙，不要连续重启整个网络。
+
+</Step>
+
+<Step where="router-shell" title="检查防火墙是否挡了管理入口" expected="LAN 到路由器的 80/443/22 没有被误挡。" >
+
+```sh
+uci show firewall
+logread | grep -i firewall | tail -20
+```
+
+如果你刚改过 firewall/zone，先恢复备份或从控制台修；不要在没有控制台的情况下继续改。
+
+</Step>
+
+## 第 5 层：本地控制台 / failsafe
+
+<Step where="console" title="用控制台确认系统还活着" expected="能看到登录提示或内核日志。" >
+
+按设备文档接串口/HDMI/键盘，或使用 IPMI/云控制台。串口常见 `115200 8N1`，但以设备为准；没有输出时先查线序、波特率、供电。
+
+能进控制台后：
+
+```sh
+ip addr show
+ip route
+uci show network
+uci show dhcp
+logread | tail -50
+```
+
+</Step>
+
+<Step where="console" title="需要时进入 failsafe" expected="能在不恢复出厂的情况下改回 LAN/DHCP。" >
+
+failsafe 的按键时机因设备而异，按 OpenWrt 设备页/厂商文档操作。进入后通常可以先看配置：
+
+```sh
+uci show network
+uci show dhcp
+```
+
+如果只是 LAN 地址改错，可在确认后改回并重启；如果不确定，先备份/记录当前配置，不要执行 `firstboot`。恢复出厂会清空配置。
+
+</Step>
+
+## 恢复顺序
+
+1. **不动配置**：换线/换 LAN 口/静态客户端地址；
+2. **能 ping 不能开网页**：查 uhttpd/防火墙/HTTPS；
+3. **能 SSH**：用 SSH 查服务，不改 LAN；
+4. **不能 SSH**：控制台/failsafe；
+5. **最后才恢复出厂**：确认没有重要配置/备份，并知道恢复后要重新配 WAN/LAN/Wi-Fi。
+
+## 常见误判
+
+- 把 WAN 口当管理口；
+- 客户端还在旧网段/旧静态 IP；
+- 浏览器强制 HTTPS，实际 LuCI 是 HTTP；
+- 只 ping 通就以为 LuCI 正常；
+- 改了 LAN 地址但没改 DHCP/网关，客户端拿不到新地址；
+- 防火墙把 LAN 管理口挡了；
+- uhttpd 没装/被卸载，却一直重启网络。
+
+## E1 状态与来源
+
+- 本页是 E1：分层排查和控制台/failsafe 边界按公开资料整理；没有在本次环境复现。
+- 下一步按 `tests/recipes/troubleshooting-no-web-ui.md` 在真实设备上模拟“改错 LAN/停 uhttpd/静态客户端”三种情况，记录恢复步骤，再升级 E2。
+- 不要把本页写成“万能恢复命令”；不同设备/固件的控制台和 failsafe 操作不同，先查设备文档。
+
+<PageSources />
