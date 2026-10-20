@@ -50,6 +50,11 @@ const meta = {
           translations: { zh: 'AdGuard Home' },
           slug: 'software/adguard-home',
         },
+        {
+          label: 'SQM / CAKE',
+          translations: { zh: 'SQM / CAKE' },
+          slug: 'software/sqm',
+        },
       ],
     },
   ],

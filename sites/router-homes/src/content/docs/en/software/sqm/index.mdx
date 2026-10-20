@@ -1,0 +1,236 @@
+---
+title: "SQM and CAKE: stop lag under download and upload"
+description: Check whether lag is bufferbloat, shape WAN traffic with SQM/CAKE, and verify with before/after latency data. Virtual NICs cannot represent a real line.
+pageType: app
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Real WAN/router pending; PVE virtual NIC can only validate configuration, not throughput/latency'
+testRecipe: 'tests/recipes/sqm-25.12.md'
+aliases: ['openwrt sqm', 'openwrt cake', 'sqm setup', 'bufferbloat']
+symptoms: ['game lag while downloading', 'video call stutter', 'latency spikes', 'slow browsing while uploading']
+sources:
+  - label: OpenWrt SQM documentation
+    url: https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm
+  - label: OpenWrt SQM scripts package
+    url: https://openwrt.org/packages/pkgdata/sqm-scripts
+  - label: CAKE qdisc documentation
+    url: https://www.bufferbloat.net/projects/codel/wiki/Cake/
+  - label: Bufferbloat project
+    url: https://www.bufferbloat.net/projects/bloat/wiki/Introduction/
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="real WAN router (pending)" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="Real WAN router pending; a PVE virtual NIC can only validate configuration, not throughput/latency"
+  recipe="tests/recipes/sqm-25.12.md"
+  result="E1: package names, options and measurement method documented; no real-line before/after run yet"
+/>
+
+## Outcome
+
+- Decide whether “lag while downloading/uploading” is bufferbloat, rather than Wi-Fi, ONT, or ISP congestion.
+- Install and configure `sqm-scripts` and CAKE on OpenWrt 25.12.
+- Record idle vs loaded latency, loss and throughput instead of claiming “it feels faster”.
+- Know when SQM is the wrong tool, and how to turn it off quickly.
+
+## Applicable environment
+
+- OpenWrt 25.12.6 with `apk`; `sqm-scripts 1.7.2`; optional `luci-app-sqm`.
+- The router is the **main NAT gateway** and WAN traffic passes through it. On an AP/bypass router, SQM may not see the main traffic.
+- CAKE costs CPU; on gigabit lines check single-core usage before adding shaping.
+- This page is E1: commands and parameters must be checked against your line/firmware before it becomes E2. Throughput/latency claims need a real WAN and are E3.
+
+## Is it bufferbloat?
+
+Typical signs:
+
+- Idle ping is fine, but latency spikes as soon as a download/upload starts; games jump, calls stutter.
+- Capping download/upload makes latency fall again.
+- The same happens on wired and Wi-Fi clients, pointing to the WAN queue.
+
+Not bufferbloat:
+
+- Only one room/client on Wi-Fi is bad: check signal, interference, roaming.
+- High latency/loss even when idle: check ONT, ISP, line.
+- Router CPU is already saturated; SQM may make it worse.
+
+## Key parameters
+
+| Parameter | Meaning | Common mistake |
+|---|---|---|
+| `interface` | interface to shape, usually `wan` | using `eth0`/`br-lan` so traffic bypasses it |
+| `download`/`upload` | shaped rate (kbit/s) | using the advertised plan rate, keeping the queue full |
+| `qdisc` | `cake` or `fq_codel` | enabling SQM but leaving the default qdisc |
+| `script` | `piece_of_cake.qos` / `simplest.qos` | wrong script, options do not apply |
+| `linklayer`/`overhead` | link-layer overhead | copying Ethernet values on PPPoE/VLAN |
+| CPU | CAKE compute cost | gigabit CAKE on a CPU that cannot keep up |
+
+Start at **85%–95%** of measured throughput, then tune from loaded latency. Do not put “100M plan = 100000”.
+
+## Before you change anything
+
+<Step where="router-shell" title="Record WAN, CPU and current qdisc" expected="You know which interface you are changing and whether SQM is already active.">
+
+```sh
+ip -br link
+ip -br addr
+uci show network | grep -E "wan|device"
+uci show sqm 2>/dev/null || echo "sqm not installed"
+top -bn1 | head -15
+```
+
+Write down the WAN logical interface, physical device, plan/measured rate and CPU model. Keep LuCI/SSH access.
+
+</Step>
+
+<Step where="router-shell" title="Take an idle baseline" expected="Idle latency/loss is recorded for comparison.">
+
+```sh
+ping -c 20 1.1.1.1
+ping -c 20 192.168.50.1
+```
+
+Use `irtt`/`flent` if available; otherwise record min/avg/max/mdev and loss.
+
+</Step>
+
+## Minimal steps
+
+<Step where="router-shell" title="Install SQM" expected="sqm-scripts and the LuCI app are installed.">
+
+```sh
+apk update
+apk add sqm-scripts luci-app-sqm
+```
+
+`luci-app-sqm` alone does not install the scripts; verify with `apk info -e sqm-scripts`.
+
+</Step>
+
+<Step where="luci" title="Configure SQM in LuCI" expected="WAN has cake/piece_of_cake and can be enabled/disabled.">
+
+Open **Network → SQM QoS**:
+
+1. Enable it.
+2. Select `wan` (not `br-lan`).
+3. Set download/upload to 85%–95% of measured throughput.
+4. Choose `cake` and `piece_of_cake.qos`.
+5. Select the real link layer (do not copy Ethernet values on PPPoE/VLAN).
+6. Save and apply.
+
+Start conservatively; raise the rate only after latency improves.
+
+</Step>
+
+<Step where="router-shell" title="CLI equivalent (inspect the section name first)" expected="uci show sqm shows the queue you changed.">
+
+```sh
+uci show sqm
+```
+
+The section may not be `@queue[0]`; use the real name. Example:
+
+```sh
+uci set sqm.@queue[0].enabled='1'
+uci set sqm.@queue[0].interface='wan'
+uci set sqm.@queue[0].download='90000'
+uci set sqm.@queue[0].upload='18000'
+uci set sqm.@queue[0].qdisc='cake'
+uci set sqm.@queue[0].script='piece_of_cake.qos'
+uci set sqm.@queue[0].linklayer='ethernet'
+uci set sqm.@queue[0].overhead='0'
+uci commit sqm
+/etc/init.d/sqm restart
+```
+
+These numbers are examples, not your line parameters; verify `linklayer`/`overhead`.
+
+</Step>
+
+<Step where="router-shell" title="Confirm the qdisc is attached" expected="cake/fq_codel appears on wan and the log is clean.">
+
+```sh
+tc -s qdisc show dev wan
+tc -s qdisc show | grep -E "cake|fq_codel|ifb"
+logread -e sqm | tail -30
+```
+
+If you only see `noqueue`/`pfifo_fast`, SQM is not active; check the interface and `/etc/init.d/sqm` logs.
+
+</Step>
+
+## Loaded verification
+
+<Step where="client" title="Measure latency under download/upload" expected="You have before/after data, not a feeling.">
+
+Keep a ping running while another terminal saturates the line:
+
+```sh
+# terminal A
+ping -i 0.2 1.1.1.1
+
+# terminal B: use a trusted speed/download tool to saturate the line
+```
+
+Record:
+
+- idle vs loaded min/avg/max/mdev;
+- loss;
+- whether throughput dropped significantly;
+- whether one router CPU core is saturated.
+
+Without this data, do not write “SQM reduced latency”.
+
+</Step>
+
+## Failure branches and recovery
+
+### SQM does not start / no qdisc
+
+```sh
+logread -e sqm | tail -50
+tc -s qdisc show dev wan
+uci show sqm
+```
+
+Common causes: wrong interface, missing `sqm-scripts`, unsupported qdisc/script combination, `tc` errors. Disable SQM and restore the previous state before debugging.
+
+### Throughput collapses / CPU saturates
+
+- Rate set too low: raise it in steps from the measured value.
+- CAKE too costly on a weak CPU: use `fq_codel` or a lower rate.
+- Wrong link overhead: correct it for PPPoE/VLAN.
+- Disable SQM and confirm throughput returns.
+
+### No effect
+
+- Traffic bypasses the router (AP/bypass/switch).
+- The bottleneck is Wi-Fi or ISP congestion.
+- Only download is shaped; upload is still congested.
+- You measured idle latency, not loaded latency.
+
+### Quick disable
+
+```sh
+uci set sqm.@queue[0].enabled='0'
+uci commit sqm
+/etc/init.d/sqm restart
+```
+
+Or restore the previous `/etc/config/sqm` backup.
+
+## E1 status and sources
+
+- This is E1: package names, options and verification steps are based on OpenWrt 25.12 documentation; no real-WAN run and no throughput/latency numbers.
+- Next: run `tests/recipes/sqm-25.12.md` on a real main router, record line/CPU/qdisc and before/after data, then promote to E2. Only real-line data can support E3.
+- CAKE inside a VM only proves that commands/qdisc attach; it cannot represent a home broadband line. Do not use VM numbers to claim “it works”.
+
+<PageSources />

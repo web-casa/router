@@ -1,0 +1,236 @@
+---
+title: 下载时游戏/会议变卡：SQM 与 CAKE 怎么配、怎么测
+description: 先判断是不是 bufferbloat，再用 SQM/CAKE 限速整形，并用前后数据验证；虚拟网卡不能代表真实线路。
+pageType: app
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: '待真实 WAN/路由器；PVE 虚拟网卡仅用于配置检查，不能代表吞吐/延迟'
+testRecipe: 'tests/recipes/sqm-25.12.md'
+aliases: ['openwrt sqm', 'openwrt cake', 'sqm 设置', 'bufferbloat']
+symptoms: ['下载时游戏卡', '视频会议卡', '延迟飙升', '上传时网页变慢']
+sources:
+  - label: OpenWrt SQM documentation
+    url: https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm
+  - label: OpenWrt SQM scripts package
+    url: https://openwrt.org/packages/pkgdata/sqm-scripts
+  - label: CAKE qdisc documentation
+    url: https://www.bufferbloat.net/projects/codel/wiki/Cake/
+  - label: Bufferbloat project
+    url: https://www.bufferbloat.net/projects/bloat/wiki/Introduction/
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="真实 WAN 路由器（待测）" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="待真实 WAN 路由器；PVE 虚拟网卡只能验证配置，不能代表吞吐/延迟"
+  recipe="tests/recipes/sqm-25.12.md"
+  result="E1：包名、配置项和测量方法已整理；尚未在真实线路做前后对比"
+/>
+
+## 完成后你能确认什么
+
+- 你的“下载/上传时变卡”是不是 bufferbloat，而不是 Wi-Fi、光猫或运营商拥塞；
+- `sqm-scripts` 和 CAKE 在 OpenWrt 25.12 上的安装/配置路径；
+- 如何记录**空载/负载**下的延迟、丢包和吞吐，而不是凭感觉说“变快了”；
+- 什么时候不该开 SQM，以及怎么快速关掉恢复。
+
+## 适用环境
+
+- OpenWrt 25.12.6，`apk` 包管理器；`sqm-scripts 1.7.2`，LuCI 可选 `luci-app-sqm`。
+- 路由器是**主路由/NAT 网关**，WAN 流量经过它；如果是 AP/旁路只转发部分流量，SQM 可能看不到主要流量。
+- CAKE 需要 CPU；千兆以上线路先看 CPU 单核占用，别把“降延迟”变成“降吞吐”。
+- 本页是 E1：命令和参数需要按你的线路/固件核对后才能算 E2；吞吐/延迟结论必须真实 WAN，标 E3。
+
+## 先判断是不是 bufferbloat
+
+典型特征：
+
+- 空载 ping 正常，一下载/上传就延迟飙升、游戏跳 ping、会议卡顿；
+- 限制下载/上传速度后，延迟明显回落；
+- 换 Wi-Fi/有线、换终端仍然出现，说明更像 WAN 队列问题。
+
+不像 bufferbloat：
+
+- 只有 Wi-Fi 某个房间卡；优先查信号/干扰/漫游；
+- 空载也丢包/高延迟；查光猫、运营商、线路；
+- 路由器 CPU 已满；先看 `top`，SQM 可能加重负担。
+
+## 关键参数
+
+| 参数 | 含义 | 常见错误 |
+|---|---|---|
+| `interface` | 整形接口，通常是 `wan` | 填成 `eth0`/`br-lan`，流量不经过 |
+| `download`/`upload` | 整形带宽（kbit/s） | 直接填套餐标称值，导致队列一直满 |
+| `qdisc` | `cake` 或 `fq_codel` | 只开 SQM 但 qdisc 仍是默认 |
+| `script` | `piece_of_cake.qos` / `simplest.qos` | 选错脚本，参数不生效 |
+| `linklayer`/`overhead` | 链路层开销 | PPPoE/VLAN 环境照抄以太网 |
+| CPU | CAKE 的计算成本 | 千兆线路跑 CAKE 但 CPU 不够 |
+
+带宽建议从实测吞吐的 **85%–95%** 起步，再按负载延迟调整；不要用“100M 套餐就填 100000”。
+
+## 改动前准备
+
+<Step where="router-shell" title="记录 WAN、CPU 和当前队列" expected="你知道改的是哪个接口，以及当前有没有 SQM。" >
+
+```sh
+ip -br link
+ip -br addr
+uci show network | grep -E "wan|device"
+uci show sqm 2>/dev/null || echo "sqm not installed"
+top -bn1 | head -15
+```
+
+把 WAN 逻辑接口、物理设备、套餐/实测带宽和 CPU 型号记下来。保留 LuCI/SSH 管理入口。
+
+</Step>
+
+<Step where="router-shell" title="做一次空载基线" expected="记录空载延迟/丢包，作为对照。" >
+
+```sh
+ping -c 20 1.1.1.1
+ping -c 20 192.168.50.1
+```
+
+如果条件允许，用 `irtt`/`flent` 记录更细的 RTT；没有就至少记录 min/avg/max/mdev 和丢包。
+
+</Step>
+
+## 最小步骤
+
+<Step where="router-shell" title="安装 SQM" expected="sqm-scripts 和 LuCI 应用已安装。" >
+
+```sh
+apk update
+apk add sqm-scripts luci-app-sqm
+```
+
+只装 `luci-app-sqm` 不会自动装脚本；以 `apk info -e sqm-scripts` 为准。
+
+</Step>
+
+<Step where="luci" title="在 LuCI 配置 SQM" expected="WAN 上有 cake/piece_of_cake，启停可控。" >
+
+打开 **网络 → SQM QoS**：
+
+1. 勾选启用；
+2. 接口选 `wan`（不是 `br-lan`）；
+3. 下载/上传填实测值的 85%–95%；
+4. 队列规则选 `cake`，脚本选 `piece_of_cake.qos`；
+5. 链路层按实际选（PPPoE/VLAN 不要直接套以太网）；
+6. 保存并应用。
+
+先用保守带宽，确认延迟改善后再逐步调高；不要一次填满。
+
+</Step>
+
+<Step where="router-shell" title="CLI 等价配置（先看 section 名）" expected="uci show sqm 能看到你改的 queue。" >
+
+```sh
+uci show sqm
+```
+
+`sqm` 的 section 名不一定是 `@queue[0]`，以实际输出为准。示例：
+
+```sh
+uci set sqm.@queue[0].enabled='1'
+uci set sqm.@queue[0].interface='wan'
+uci set sqm.@queue[0].download='90000'
+uci set sqm.@queue[0].upload='18000'
+uci set sqm.@queue[0].qdisc='cake'
+uci set sqm.@queue[0].script='piece_of_cake.qos'
+uci set sqm.@queue[0].linklayer='ethernet'
+uci set sqm.@queue[0].overhead='0'
+uci commit sqm
+/etc/init.d/sqm restart
+```
+
+上面的数字只是示例，不是你的线路参数；`linklayer`/`overhead` 必须按实际链路核对。
+
+</Step>
+
+<Step where="router-shell" title="确认 qdisc 真的挂上" expected="wan 上出现 cake/fq_codel，日志无错误。" >
+
+```sh
+tc -s qdisc show dev wan
+tc -s qdisc show | grep -E "cake|fq_codel|ifb"
+logread -e sqm | tail -30
+```
+
+如果只有 `noqueue`/`pfifo_fast`，SQM 没有生效；先查接口名和 `/etc/init.d/sqm` 日志。
+
+</Step>
+
+## 负载验证
+
+<Step where="client" title="下载/上传时测延迟" expected="有前后对比数据，而不是主观感觉。" >
+
+在一个终端持续 ping，在另一个终端压满下载/上传：
+
+```sh
+# 终端 A
+ping -i 0.2 1.1.1.1
+
+# 终端 B：用你信任的测速/下载工具压满带宽
+```
+
+记录：
+
+- 空载 vs 负载的 min/avg/max/mdev；
+- 丢包率；
+- 吞吐是否明显低于线路；
+- 路由器 CPU 单核是否打满。
+
+没有这些数据，不要写“SQM 降低了延迟”。
+
+</Step>
+
+## 失败分支与恢复
+
+### SQM 起不来 / qdisc 没挂上
+
+```sh
+logread -e sqm | tail -50
+tc -s qdisc show dev wan
+uci show sqm
+```
+
+常见原因：接口名错、`sqm-scripts` 没装、qdisc/script 组合不支持、`tc` 报错。先关掉 SQM，恢复原状再逐项排查。
+
+### 吞吐明显下降 / CPU 打满
+
+- 带宽填得过低：按实测值逐步上调；
+- CAKE 在低性能 CPU 上成本高：换 `fq_codel` 或降低线路速率；
+- 链路开销填错：按 PPPoE/VLAN 实际值修正；
+- 先关 SQM，确认不开时吞吐正常。
+
+### 开了没效果
+
+- 流量没经过路由器（AP/旁路/交换机直通）；
+- 主要瓶颈是 Wi-Fi 或运营商拥塞；
+- 只整形了下载，上传仍拥塞；
+- 测的是空载延迟，不是负载延迟。
+
+### 快速关闭
+
+```sh
+uci set sqm.@queue[0].enabled='0'
+uci commit sqm
+/etc/init.d/sqm restart
+```
+
+或恢复改动前的 `/etc/config/sqm` 备份。
+
+## E1 状态与来源
+
+- 本页是 E1：包名、配置项、验证方法已按 OpenWrt 25.12 资料整理；没有在真实 WAN 上执行，也没有吞吐/延迟数字。
+- 下一步按 `tests/recipes/sqm-25.12.md` 在真实主路由上做空载/负载对比，记录线路、CPU、qdisc 和前后数据，再升级 E2；只有真实线路的前后数据才能支撑 E3。
+- 虚拟网卡/VM 里跑 CAKE 只能验证命令和 qdisc 是否挂上，不能代表家庭宽带；不要用 VM 数字写“有效”。
+
+<PageSources />
