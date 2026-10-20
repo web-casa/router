@@ -2,10 +2,11 @@
 title: PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验
 description: 只有一块物理网卡的 PVE 上，用旁路网关或内部 bridge 跑 OpenWrt，并保留宿主机管理入口。
 pageType: install
-tested: false
+tested: true
 testedVersions: ['25.12.6']
-evidenceLevel: E1
-testEnvironment: 'Proxmox VE 9.2.2，单 Realtek RTL8111 网口，vmbr0 192.168.50.2/24'
+evidenceLevel: E2
+testEnvironment: 'Proxmox VE 9.2.2，单 Realtek RTL8111；OpenWrt 25.12.6 VM 200；netns DHCP 客户端'
+lastVerifiedAt: '2026-10-20'
 testRecipe: 'tests/recipes/pve-single-nic-25.12.md'
 aliases: ['openwrt proxmox', 'pve 安装 openwrt', 'pve 单网口 openwrt']
 symptoms: ['安装后无法上网', '宿主机失联', 'PVE 只有一个网口']
@@ -26,13 +27,14 @@ import TestRecord from '@components/TestRecord.astro';
 import TopologyTable from '@components/TopologyTable.astro';
 import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="Proxmox VE" version="9.2.2" packageManager="—" device="单网口 x86 主机" tested={false} evidence="E1" />
+<EnvCard firmware="Proxmox VE" version="9.2.2" packageManager="—" device="单网口 x86 主机" tested={true} evidence="E2" />
 
 <TestRecord
-  status="planned"
-  environment="Proxmox VE 9.2.2，单 Realtek RTL8111，vmbr0 192.168.50.2/24"
+  status="partial"
+  environment="Proxmox VE 9.2.2，单 Realtek RTL8111；OpenWrt 25.12.6 VM 200；netns DHCP 客户端"
   recipe="tests/recipes/pve-single-nic-25.12.md"
-  result="尚未执行；VM 200、vmbr1 和 OpenWrt 25.12.6 的步骤待按配方复现"
+  result="WAN DHCP 192.168.50.77；LAN 192.168.1.1；客户端 DHCP 192.168.1.191；DNS/HTTP 通过；qm stop 200 后宿主机仍可 SSH"
+  date="2026-10-20"
 />
 
 ## 完成后你能确认什么
@@ -151,12 +153,12 @@ qm terminal 200
 如果串口没有输出，用 PVE 的 VNC 控制台。进去后：
 
 ```sh
-ip -br link
-ip -br addr
+ip link show
+ip addr show
 uci show network
 ```
 
-OpenWrt x86 镜像的 `eth0/eth1` 顺序不一定等于 `net0/net1`；以 MAC/链路和 `uci show network` 为准。不要直接把 `eth0` 当 WAN。
+OpenWrt x86 镜像的 `eth0/eth1` 顺序不一定等于 `net0/net1`；以 MAC/链路和 `uci show network` 为准。不要直接把 `eth0` 当 WAN。本实验环境中 `net0=eth0=WAN`、`net1=eth1=LAN`，但换环境仍需核对。
 
 </Step>
 
@@ -203,7 +205,7 @@ nslookup openwrt.org
 ## 终端验证
 
 - `qm status 200` 为 running；`qm config 200` 里 `net0` 在 `vmbr0`、`net1` 在 `vmbr1`。
-- OpenWrt 里 `ip -br addr`：WAN 有 `192.168.50.x`，LAN 是 `192.168.1.1/24`。
+- OpenWrt 里 `ip addr show`：WAN 有 `192.168.50.x`，LAN 是 `192.168.1.1/24`。
 - 测试客户端：默认网关是 `192.168.1.1`，能 `ping 192.168.50.1`，能解析 `openwrt.org`。
 - 宿主机：`ssh root@192.168.50.2` 仍然可用；PVE Web UI 仍然可开。
 - 关掉路由 VM：`qm stop 200`，宿主机管理入口仍在；再 `qm start 200` 恢复。
@@ -241,7 +243,7 @@ qm config 200
 qm terminal 200
 ```
 
-在 OpenWrt 里查 `ip -br link`、`uci show network`、`logread`。确认 `net0` 在 `vmbr0`，且 `vmbr0` 的物理口 `nic0` 是 UP；不要在 `vmbr0` 上再建一个 DHCP 服务器。
+在 OpenWrt 里查 `ip link show`、`uci show network`、`logread`。确认 `net0` 在 `vmbr0`，且 `vmbr0` 的物理口 `nic0` 是 UP；不要在 `vmbr0` 上再建一个 DHCP 服务器。
 
 ### 客户端拿不到 192.168.1.x
 
@@ -251,10 +253,18 @@ qm terminal 200
 
 这是本页的恢复验收项：在 `qm stop 200` 后，从另一台机器访问 `https://192.168.50.2:8006` 和 SSH。若不能，说明你把宿主机管理路径建在了依赖 OpenWrt 的链路上，先修管理路径，再继续。
 
+## E2 实测记录（2026-10-20）
+
+- 环境：PVE 9.2.2，单 Realtek RTL8111，`vmbr0 192.168.50.2/24`；OpenWrt 25.12.6 x86_64 VM 200，512MB/2 vCPU。
+- OpenWrt WAN `eth0` 从 `192.168.50.1` 通过 DHCP 获得 `192.168.50.77`；LAN `eth1` 为 `192.168.1.1/24`。
+- `vmbr1` 内部 LAN 上的 netns 客户端通过 DHCP 获得 `192.168.1.191`，默认路由 `192.168.1.1`，DNS 解析 `openwrt.org`，HTTP 返回 200。
+- `qm stop 200` 后，从另一条 SSH 连接仍能登录 PVE，`vmbr0` 仍是 `192.168.50.2/24`。
+- 未测：物理 LAN 客户端、双网口、长期稳定性、PPPoE/IPv6 上游；这些不属于本次 E2 结论。
+
 ## 来源与复核
 
-- 本页是 E1 草稿：PVE 版本与单网口布局来自实际环境采集；OpenWrt VM 创建/路由步骤尚未在本机执行。
-- 下一步按 `tests/recipes/pve-single-nic-25.12.md` 在 VM 200 上复现，记录 `qm config`、OpenWrt `ip -br addr`、客户端路由和关 VM 恢复结果，再升级为 E2。
+- 本页已在 PVE 9.2.2 单网口环境完成 E2 实验，不是纯 E1 草稿；但未做独立复核，也未在真实物理 LAN 上验证。
+- 复现配方：`tests/recipes/pve-single-nic-25.12.md`。步骤、镜像 SHA-256、`qm config 200` 和客户端结果已记录。
 - 单网口不等于双网口：不要在本页基础上直接写“WAN/LAN 物理分离”；需要第二块网卡或 VLAN 交换机时另写一篇。
 
 <PageSources />

@@ -10,8 +10,17 @@ const locale = (Astro.locals as any).starlightRoute?.locale ?? 'en';
 const isEn = locale === 'en';
 const { status, environment = isEn ? 'Not specified' : '未注明', recipe = isEn ? 'Not registered' : '未登记', result, date } = Astro.props;
 const labels = isEn
-  ? { planned: 'Planned', partial: 'Partially verified', verified: 'Verified' }
-  : { planned: '计划中', partial: '部分验证', verified: '已验证' };
+  ? { planned: 'Planned', partial: 'E2 lab reproduced', verified: 'Verified' }
+  : { planned: '计划中', partial: 'E2 实验已复现', verified: '已验证' };
+const warning = status === 'planned'
+  ? (isEn
+      ? 'Not tested yet. Run the fixed recipe before promoting this page to E2/E3.'
+      : '尚未实测；先按固定配方复现，再标记 E2/E3。')
+  : status === 'partial'
+    ? (isEn
+        ? 'E2 lab reproduced; not independently reviewed or tested on a physical network. E3 still needs real hardware.'
+        : '已在固定实验环境完成 E2 复现；未做独立复核或真实物理网络验证，E3 仍需真实设备。')
+    : '';
 ---
 <aside class={`test-record test-record-${status}`} aria-label={isEn ? 'Test record' : '测试记录'}>
   <strong>{isEn ? 'Test record' : '测试记录'}</strong>
@@ -22,11 +31,5 @@ const labels = isEn
     {date && <><dt>{isEn ? 'Date' : '日期'}</dt><dd>{date}</dd></>}
     {result && <><dt>{isEn ? 'Result' : '结果'}</dt><dd>{result}</dd></>}
   </dl>
-  {status !== 'verified' && (
-    <p class="test-warning">
-      {isEn
-        ? 'This page has not been independently tested. Promote it to E2/E3 only after running the fixed recipe.'
-        : '本页尚未完成独立实测；命令与恢复路径以固定环境复现后再标记 E2/E3。'}
-    </p>
-  )}
+  {warning && <p class="test-warning">{warning}</p>}
 </aside>

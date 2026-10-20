@@ -42,7 +42,7 @@
    qm set 200 --boot order=scsi0
    qm start 200
    ```
-5. Open `qm terminal 200` or the VNC console; identify `eth0/eth1` with `ip -br link`, `ip -br addr`, `uci show network`.
+5. Open `qm terminal 200` or the VNC console; identify `eth0/eth1` with `ip link show`, `ip addr show`, `uci show network`. BusyBox `ip` on OpenWrt does not support `-br`.
 6. Configure WAN DHCP on the upstream interface, LAN `192.168.1.1/24` on the internal interface; set `dhcp.wan.ignore='1'`; commit and reload network.
 7. Create a test client VM on `vmbr1`; verify lease, gateway, `ping 192.168.50.1`, `nslookup openwrt.org`.
 8. Stop VM 200 (`qm stop 200`); verify PVE SSH and web UI from another machine; start it again.
@@ -58,7 +58,17 @@
 ## Evidence to capture
 
 - `qm config 200`
-- OpenWrt `ip -br addr`, `uci show network`, `uci show dhcp`
-- Client `ip route`, `nslookup openwrt.org`
+- OpenWrt `ip addr show`, `uci show network`, `uci show dhcp`
+- Client `ip route`, DHCP lease, `dig @192.168.1.1 openwrt.org`, HTTP status
 - `qm stop 200` + host SSH/UI result
 - PVE version and image SHA-256
+
+## Run log 2026-10-20
+
+- Image SHA-256: `f8538784d0288b4133a99ac2a68443e4922ffde6343e80df56a5882364b9d499`.
+- VM 200: 512MB, 2 vCPU, `net0` on `vmbr0`, `net1` on `vmbr1`.
+- OpenWrt WAN `eth0`: DHCP `192.168.50.77/24`, default via `192.168.50.1`.
+- OpenWrt LAN `eth1`: `192.168.1.1/24`; `dhcp.wan.ignore='1'`.
+- netns client: DHCP `192.168.1.191/24`, default via `192.168.1.1`; DNS resolved; HTTP 200.
+- `qm stop 200`: host SSH worked again; `vmbr0` stayed `192.168.50.2/24`.
+- Findings: OpenWrt BusyBox `ip` has no `-br`; use `ip addr show`. PVE `dhclient` in netns hit `/tmp`/AppArmor limits, so the client test used `busybox udhcpc`. Physical LAN clients and dual-NIC are not covered.
