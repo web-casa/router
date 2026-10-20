@@ -150,9 +150,21 @@ if (project.trailingSlash === 'never') dataAttributes['data-strip-trailing-slash
 						showSubResults: true,
 						processTerm: (term: string) => {
 							if (!term) return term;
-							// Pagefind's zh-cn tokenizer drops some two-character terms; map the
-							// package-mirror sense to the English term already in the body.
-							return term.replace(/国内镜像/g, 'mirror').replace(/镜像站/g, 'mirror');
+							// Pagefind's zh-cn tokenizer drops some two-character terms. Expand by
+							// context instead of mapping every "镜像" to one meaning.
+							return term
+								.split(/\s+/)
+								.map((word) => {
+									if (/国内镜像|镜像站|软件源镜像/.test(word)) {
+										return word.replace(/国内镜像|镜像站|软件源镜像/g, 'mirror');
+									}
+									if (/系统镜像|固件镜像|刷机镜像/.test(word)) {
+										return word.replace(/系统镜像|固件镜像|刷机镜像/g, 'sysupgrade');
+									}
+									if (word === '镜像') return '镜';
+									return word;
+								})
+								.join(' ');
 						},
 						processResult: (result: { url: string; sub_results: Array<{ url: string }> }) => {
 							result.url = formatURL(result.url);

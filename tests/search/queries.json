@@ -20,6 +20,9 @@
     { "id": "zh-oc-02", "locale": "zh", "query": "openclash 停用 恢复", "expectedUrls": ["/zh/software/openclash/"], "category": "openclash", "aliasCase": false },
     { "id": "zh-pkg-01", "locale": "zh", "query": "apk opkg 区别", "expectedUrls": ["/zh/software/package-sources/"], "category": "package-sources", "aliasCase": false },
     { "id": "zh-pkg-02", "locale": "zh", "query": "openwrt 国内镜像", "expectedUrls": ["/zh/software/package-sources/"], "category": "package-sources", "aliasCase": true },
+    { "id": "zh-mirror-01", "locale": "zh", "query": "镜像", "expectedUrls": ["/zh/software/package-sources/", "/zh/getting-started/which-openwrt/"], "category": "search-context", "aliasCase": true },
+    { "id": "zh-mirror-02", "locale": "zh", "query": "系统镜像", "expectedUrls": ["/zh/getting-started/which-openwrt/"], "category": "search-context", "aliasCase": false },
+    { "id": "zh-mirror-03", "locale": "zh", "query": "openwrt 镜像", "expectedUrls": ["/zh/software/package-sources/", "/zh/getting-started/which-openwrt/"], "category": "search-context", "aliasCase": false },
     { "id": "zh-rec-01", "locale": "zh", "query": "进不去后台", "expectedUrls": ["/zh/troubleshooting/no-web-ui/"], "category": "recovery", "aliasCase": true },
     { "id": "zh-rec-02", "locale": "zh", "query": "uhttpd failsafe", "expectedUrls": ["/zh/troubleshooting/no-web-ui/"], "category": "recovery", "aliasCase": false },
 

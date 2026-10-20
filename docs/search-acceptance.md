@@ -1,7 +1,7 @@
-# 40 查询搜索验收（Pagefind UI）
+# 搜索验收：43 正向 + 5 负向（Pagefind UI）
 
 日期：2026-10-20
-状态：通过（40/40，Top 5）
+状态：通过（43/43 正向，5/5 负向，Top 5）
 
 ## 环境
 
@@ -15,43 +15,52 @@
 2. 启动本地静态服务器，Chromium 打开 `/zh/` 或 `/en/`。
 3. 打开 Starlight 搜索弹窗，向 Pagefind UI 输入查询，等待防抖/结果。
 4. 取前 5 个唯一页面链接（去掉重复子结果/锚点），检查预期 URL 是否在 Top 5。
-5. 40 条查询：20 中文 + 20 英文；21 条标记为 alias/symptom 场景。
-6. 结果写入 `tests/search/last-run.json`；失败时退出码非 0。
+5. 正向 43 条：23 中文 + 20 英文；其中 22 条是 alias/symptom 场景。
+6. 负向 5 条：4 条断言“某个误导页不得出现”，1 条断言空结果。
+7. 结果写入 `tests/search/last-run.json`；失败时退出码非 0。
 
 ## 结果
 
-- 40/40 通过，0 失败。
-- 20/20 中文、20/20 英文。
-- 21/21 alias 场景通过。
+- 正向 43/43，0 失败；23/23 中文、20/20 英文。
+- 负向 5/5；alias 场景 22/22。
 - 所有查询均通过真实 Pagefind UI，包含自定义 `processTerm` 查询扩展。
 
-## 已知分词限制与处理
+## 镜像/图片歧义处理
 
-Pagefind 1.5.2 的 `zh-cn` 分词器对部分双字词不稳定：`国内` 可搜，但 `镜像`、`国内镜像`、`镜像站` 直接搜索会返回 0。内容里即使有这些词也一样。
+Pagefind 1.5.2 的 `zh-cn` 分词器对部分双字词不稳定：`国内`、`镜`、`像` 可搜，但 `镜像`、`国内镜像`、`镜像站` 直接搜索会返回 0。内容里即使有这些词也一样。
 
-处理：
+`src/components/Search.astro` 覆盖 Starlight 内置搜索，给 Pagefind UI 加按 token 的 `processTerm`：
 
-- `src/components/Search.astro` 覆盖 Starlight 内置搜索，给 Pagefind UI 加 `processTerm`：
-  - `国内镜像` → `mirror`
-  - `镜像站` → `mirror`
-- 页面正文加入可见的 `mirror` 解释，保证扩展后的词能命中。
-- 这不等于修好分词；`镜像` 单独搜索仍可能为 0。后续应：
-  - 给 `镜像` 做上下文判断（系统镜像 vs 软件源镜像），或
-  - 升级 Pagefind 后重测，或
-  - 增加同义词/查询扩展表。
+| 输入 | 扩展 | 语义 |
+|---|---|---|
+| `国内镜像` / `镜像站` / `软件源镜像` | `mirror` | 软件源镜像 |
+| `系统镜像` / `固件镜像` / `刷机镜像` | `sysupgrade` | 固件/刷机镜像 |
+| 单独 `镜像` | `镜` | 分词器回退，保留两种结果 |
+
+页面正文加入可见的 `mirror` 解释，保证扩展后的词能命中。单独 `镜像` 的 Top 5 同时包含软件源页和固件辨识页，不强行二选一。
+
+## 负样本怎么做
+
+Pagefind 对无意义查询会做模糊回退，例如 `zxqv plugh 98765` 仍返回一个结果。因此**不能**把“所有负样本都必须 0 结果”当验收标准；负样本改为：
+
+- 4 条“误导页不得出现”：打印机/Windows/量子路由等查询，不得路由到恢复、SQM、OpenClash 等明显无关页；
+- 1 条真实空结果：`sqm 斐讯 k3 梅林`，站点没有任何 K3/梅林内容。
+
+这比“随便找词必须 0 结果”更可维护，也暴露了 Pagefind 模糊回退的真实行为。
 
 ## 变更
 
-- `tests/search/queries.json`：40 条查询契约。
-- `scripts/checks/search.ts`：Playwright + Pagefind UI 验收。
-- `sites/router-homes/src/components/Search.astro`：Starlight Search 覆盖 + `processTerm`。
+- `tests/search/queries.json`：43 条正向契约。
+- `tests/search/negative.json`：5 条负向契约。
+- `scripts/checks/search.ts`：Playwright + Pagefind UI 正向/负向验收。
+- `sites/router-homes/src/components/Search.astro`：Starlight Search 覆盖 + 上下文 `processTerm`。
 - `sites/router-homes/site.meta.ts`：`components.Search` 指向覆盖组件。
 - 依赖：`playwright-core`（根）、`@pagefind/default-ui`（站点，提供 UI/CSS）。
 
 ## 运行
 
 ```sh
-# 构建并跑 40 条
+# 构建并跑 43 正向 + 5 负向
 pnpm test:search
 
 # 已有 dist 时只跑测试
@@ -63,6 +72,7 @@ pnpm test:search:only
 ## 限制
 
 - 只测搜索弹窗和 Top 5 命中，不测排序质量、搜索性能、键盘可访问性。
-- 40 条是人工契约，不是全站查询日志；没有负样本/无结果断言。
+- 正向查询是人工契约，不是全站查询日志；负向只覆盖 5 个误导场景。
+- Pagefind 模糊回退会返回弱相关结果；没有做分数阈值过滤。
 - 覆盖组件复制自 Starlight 0.42.6；升级 Starlight 时需要重新对比 `Search.astro`，避免丢失上游修复。
-- 查询扩展只覆盖 `国内镜像`/`镜像站`，不是通用同义词系统。
+- 查询扩展覆盖镜像/固件镜像，不是通用同义词系统。

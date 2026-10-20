@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "topK": 5,
+  "queries": [
+    { "id": "neg-01", "locale": "zh", "query": "zxqv plugh 98765", "category": "negative", "expectEmpty": false, "forbiddenUrls": ["/zh/getting-started/which-openwrt/"], "rationale": "nonsense must not route to firmware identification" },
+    { "id": "neg-02", "locale": "zh", "query": "openwrt 打印机驱动", "category": "negative", "expectEmpty": false, "forbiddenUrls": ["/zh/troubleshooting/no-web-ui/"], "rationale": "printer query must not route to no-LuCI recovery" },
+    { "id": "neg-03", "locale": "en", "query": "adguard home windows installer", "category": "negative", "expectEmpty": false, "forbiddenUrls": ["/en/software/sqm/"], "rationale": "Windows installer query must not route to SQM" },
+    { "id": "neg-04", "locale": "zh", "query": "sqm 斐讯 k3 梅林", "category": "negative", "expectEmpty": true, "forbiddenUrls": [], "rationale": "no K3/Merlin coverage; empty result" },
+    { "id": "neg-05", "locale": "en", "query": "openwrt quantum router xyzzy", "category": "negative", "expectEmpty": false, "forbiddenUrls": ["/en/software/openclash/"], "rationale": "nonsense must not route to OpenClash" }
+  ]
+}

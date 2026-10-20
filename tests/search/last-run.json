@@ -1,929 +1,1141 @@
 {
-  "generatedAt": "2026-10-20T15:47:08.503Z",
-  "base": "http://127.0.0.1:39951",
+  "generatedAt": "2026-10-20T15:55:38.248Z",
+  "base": "http://127.0.0.1:36833",
   "topK": 5,
-  "total": 40,
-  "passed": 40,
-  "failed": 0,
-  "aliasCases": {
-    "total": 21,
-    "passed": 21
+  "positive": {
+    "total": 43,
+    "passed": 43,
+    "failed": 0,
+    "aliasCases": {
+      "total": 22,
+      "passed": 22
+    },
+    "results": [
+      {
+        "id": "zh-dns-01",
+        "locale": "zh",
+        "query": "openwrt dns 设置",
+        "category": "dns",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh/network/dns/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/network/dns/",
+            "title": "OpenWrt DNS 怎么设置：路由器、电脑和浏览器分别走哪里",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/adguard-home/",
+            "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-dns-02",
+        "locale": "zh",
+        "query": "dnsmasq 上游 dns",
+        "category": "dns",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh/network/dns/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/network/dns/",
+            "title": "OpenWrt DNS 怎么设置：路由器、电脑和浏览器分别走哪里",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/adguard-home/",
+            "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/openclash/",
+            "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/installation/proxmox/",
+            "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-pve-01",
+        "locale": "zh",
+        "query": "pve 单网口 openwrt",
+        "category": "pve",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh/installation/proxmox/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/installation/proxmox/",
+            "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/adguard-home/",
+            "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-pve-02",
+        "locale": "zh",
+        "query": "proxmox 安装 openwrt",
+        "category": "pve",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh/installation/proxmox/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/installation/proxmox/",
+            "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-agh-01",
+        "locale": "zh",
+        "query": "adguard home openwrt",
+        "category": "adguard-home",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh/software/adguard-home/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/software/adguard-home/",
+            "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/openclash/",
+            "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/installation/proxmox/",
+            "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-agh-02",
+        "locale": "zh",
+        "query": "adguardhome 广告拦截",
+        "category": "adguard-home",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh/software/adguard-home/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/software/adguard-home/",
+            "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-agh-03",
+        "locale": "zh",
+        "query": "dnsmasq 5353",
+        "category": "adguard-home",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh/software/adguard-home/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/software/adguard-home/",
+            "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/openclash/",
+            "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-sqm-01",
+        "locale": "zh",
+        "query": "sqm cake",
+        "category": "sqm",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh/software/sqm/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/software/sqm/",
+            "title": "下载时游戏/会议变卡：SQM 与 CAKE 怎么配、怎么测",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-sqm-02",
+        "locale": "zh",
+        "query": "bufferbloat 延迟",
+        "category": "sqm",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh/software/sqm/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/software/sqm/",
+            "title": "下载时游戏/会议变卡：SQM 与 CAKE 怎么配、怎么测",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-sqm-03",
+        "locale": "zh",
+        "query": "下载时游戏卡",
+        "category": "sqm",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh/software/sqm/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/software/sqm/",
+            "title": "下载时游戏/会议变卡：SQM 与 CAKE 怎么配、怎么测",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-luci-01",
+        "locale": "zh",
+        "query": "luci 首次登录",
+        "category": "luci",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh/getting-started/luci-first-login/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/getting-started/luci-first-login/",
+            "title": "首次登录 LuCI：默认地址、密码与中文界面",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-luci-02",
+        "locale": "zh",
+        "query": "openwrt 中文界面",
+        "category": "luci",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh/getting-started/luci-first-login/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/getting-started/luci-first-login/",
+            "title": "首次登录 LuCI：默认地址、密码与中文界面",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-fw-01",
+        "locale": "zh",
+        "query": "immortalwrt istoreos 区别",
+        "category": "firmware",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh/getting-started/which-openwrt/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/getting-started/which-openwrt/",
+            "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/package-sources/",
+            "title": "软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-fw-02",
+        "locale": "zh",
+        "query": "openwrt 固件 target",
+        "category": "firmware",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh/getting-started/which-openwrt/"
+        ],
+        "rank": 2,
+        "results": [
+          {
+            "url": "/zh/software/package-sources/",
+            "title": "软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/getting-started/which-openwrt/",
+            "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/adguard-home/",
+            "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/openclash/",
+            "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/installation/proxmox/",
+            "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-oc-01",
+        "locale": "zh",
+        "query": "openclash dns 冲突",
+        "category": "openclash",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh/software/openclash/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/software/openclash/",
+            "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-oc-02",
+        "locale": "zh",
+        "query": "openclash 停用 恢复",
+        "category": "openclash",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh/software/openclash/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/software/openclash/",
+            "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-pkg-01",
+        "locale": "zh",
+        "query": "apk opkg 区别",
+        "category": "package-sources",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh/software/package-sources/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/software/package-sources/",
+            "title": "软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/getting-started/which-openwrt/",
+            "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-pkg-02",
+        "locale": "zh",
+        "query": "openwrt 国内镜像",
+        "category": "package-sources",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh/software/package-sources/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/software/package-sources/",
+            "title": "软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-mirror-01",
+        "locale": "zh",
+        "query": "镜像",
+        "category": "search-context",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh/software/package-sources/",
+          "/zh/getting-started/which-openwrt/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/software/package-sources/",
+            "title": "软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/getting-started/which-openwrt/",
+            "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/getting-started/luci-first-login/",
+            "title": "首次登录 LuCI：默认地址、密码与中文界面",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/installation/proxmox/",
+            "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/adguard-home/",
+            "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-mirror-02",
+        "locale": "zh",
+        "query": "系统镜像",
+        "category": "search-context",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh/getting-started/which-openwrt/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/getting-started/which-openwrt/",
+            "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/package-sources/",
+            "title": "软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-mirror-03",
+        "locale": "zh",
+        "query": "openwrt 镜像",
+        "category": "search-context",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh/software/package-sources/",
+          "/zh/getting-started/which-openwrt/"
+        ],
+        "rank": 2,
+        "results": [
+          {
+            "url": "/zh/installation/proxmox/",
+            "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/getting-started/which-openwrt/",
+            "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/package-sources/",
+            "title": "软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/adguard-home/",
+            "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/getting-started/luci-first-login/",
+            "title": "首次登录 LuCI：默认地址、密码与中文界面",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-rec-01",
+        "locale": "zh",
+        "query": "进不去后台",
+        "category": "recovery",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh/troubleshooting/no-web-ui/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/troubleshooting/no-web-ui/",
+            "title": "进不去后台：IP、网口、DHCP 与本地控制台恢复",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/software/adguard-home/",
+            "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/getting-started/luci-first-login/",
+            "title": "首次登录 LuCI：默认地址、密码与中文界面",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-rec-02",
+        "locale": "zh",
+        "query": "uhttpd failsafe",
+        "category": "recovery",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh/troubleshooting/no-web-ui/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh/troubleshooting/no-web-ui/",
+            "title": "进不去后台：IP、网口、DHCP 与本地控制台恢复",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/getting-started/luci-first-login/",
+            "title": "首次登录 LuCI：默认地址、密码与中文界面",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-dns-01",
+        "locale": "en",
+        "query": "openwrt dns settings",
+        "category": "dns",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/en/network/dns/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/network/dns/",
+            "title": "Configure DNS and verify router, client and browser",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/openclash/",
+            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/installation/proxmox/",
+            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/troubleshooting/no-web-ui/",
+            "title": "Cannot reach LuCI: IP, port, DHCP and console recovery",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-dns-02",
+        "locale": "en",
+        "query": "dnsmasq upstream",
+        "category": "dns",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/en/network/dns/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/network/dns/",
+            "title": "Configure DNS and verify router, client and browser",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/openclash/",
+            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/installation/proxmox/",
+            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-pve-01",
+        "locale": "en",
+        "query": "pve single nic openwrt",
+        "category": "pve",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/en/installation/proxmox/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/installation/proxmox/",
+            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/network/dns/",
+            "title": "Configure DNS and verify router, client and browser",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/sqm/",
+            "title": "SQM and CAKE: stop lag under download and upload",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-pve-02",
+        "locale": "en",
+        "query": "proxmox openwrt",
+        "category": "pve",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/en/installation/proxmox/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/installation/proxmox/",
+            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-agh-01",
+        "locale": "en",
+        "query": "adguard home openwrt",
+        "category": "adguard-home",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/en/software/adguard-home/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/openclash/",
+            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/installation/proxmox/",
+            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-agh-02",
+        "locale": "en",
+        "query": "adguardhome filtering",
+        "category": "adguard-home",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/en/software/adguard-home/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-agh-03",
+        "locale": "en",
+        "query": "dnsmasq 5353",
+        "category": "adguard-home",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/en/software/adguard-home/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/openclash/",
+            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-sqm-01",
+        "locale": "en",
+        "query": "sqm cake bufferbloat",
+        "category": "sqm",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/en/software/sqm/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/software/sqm/",
+            "title": "SQM and CAKE: stop lag under download and upload",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-sqm-02",
+        "locale": "en",
+        "query": "game lag while downloading",
+        "category": "sqm",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/en/software/sqm/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/software/sqm/",
+            "title": "SQM and CAKE: stop lag under download and upload",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-sqm-03",
+        "locale": "en",
+        "query": "openwrt sqm",
+        "category": "sqm",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/en/software/sqm/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/software/sqm/",
+            "title": "SQM and CAKE: stop lag under download and upload",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-luci-01",
+        "locale": "en",
+        "query": "first luci login",
+        "category": "luci",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/en/getting-started/luci-first-login/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/getting-started/luci-first-login/",
+            "title": "First LuCI login: address, password and Chinese UI",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/troubleshooting/no-web-ui/",
+            "title": "Cannot reach LuCI: IP, port, DHCP and console recovery",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-luci-02",
+        "locale": "en",
+        "query": "luci chinese language",
+        "category": "luci",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/en/getting-started/luci-first-login/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/getting-started/luci-first-login/",
+            "title": "First LuCI login: address, password and Chinese UI",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-fw-01",
+        "locale": "en",
+        "query": "immortalwrt istoreos vendor firmware",
+        "category": "firmware",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/en/getting-started/which-openwrt/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/getting-started/which-openwrt/",
+            "title": "Which OpenWrt is this: official, ImmortalWrt, iStoreOS or vendor firmware?",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/getting-started/luci-first-login/",
+            "title": "First LuCI login: address, password and Chinese UI",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-fw-02",
+        "locale": "en",
+        "query": "openwrt firmware target",
+        "category": "firmware",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/en/getting-started/which-openwrt/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/getting-started/which-openwrt/",
+            "title": "Which OpenWrt is this: official, ImmortalWrt, iStoreOS or vendor firmware?",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/package-sources/",
+            "title": "Package feeds and China mirrors: keep apk and opkg separate",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/installation/proxmox/",
+            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/openclash/",
+            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-oc-01",
+        "locale": "en",
+        "query": "openclash dns conflict",
+        "category": "openclash",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/en/software/openclash/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/software/openclash/",
+            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-oc-02",
+        "locale": "en",
+        "query": "openclash disable",
+        "category": "openclash",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/en/software/openclash/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/software/openclash/",
+            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/installation/proxmox/",
+            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-pkg-01",
+        "locale": "en",
+        "query": "apk opkg feeds",
+        "category": "package-sources",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/en/software/package-sources/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/software/package-sources/",
+            "title": "Package feeds and China mirrors: keep apk and opkg separate",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/getting-started/which-openwrt/",
+            "title": "Which OpenWrt is this: official, ImmortalWrt, iStoreOS or vendor firmware?",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-pkg-02",
+        "locale": "en",
+        "query": "openwrt china mirror",
+        "category": "package-sources",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/en/software/package-sources/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/software/package-sources/",
+            "title": "Package feeds and China mirrors: keep apk and opkg separate",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-rec-01",
+        "locale": "en",
+        "query": "cannot reach luci",
+        "category": "recovery",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/en/troubleshooting/no-web-ui/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/troubleshooting/no-web-ui/",
+            "title": "Cannot reach LuCI: IP, port, DHCP and console recovery",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "en-rec-02",
+        "locale": "en",
+        "query": "uhttpd failsafe",
+        "category": "recovery",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/en/troubleshooting/no-web-ui/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/en/troubleshooting/no-web-ui/",
+            "title": "Cannot reach LuCI: IP, port, DHCP and console recovery",
+            "excerpt": ""
+          }
+        ]
+      }
+    ]
   },
-  "results": [
-    {
-      "id": "zh-dns-01",
-      "locale": "zh",
-      "query": "openwrt dns 设置",
-      "category": "dns",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/zh/network/dns/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/network/dns/",
-          "title": "OpenWrt DNS 怎么设置：路由器、电脑和浏览器分别走哪里",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/software/adguard-home/",
-          "title": "AdGuard Home：从后台到终端过滤验证",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-dns-02",
-      "locale": "zh",
-      "query": "dnsmasq 上游 dns",
-      "category": "dns",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/zh/network/dns/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/network/dns/",
-          "title": "OpenWrt DNS 怎么设置：路由器、电脑和浏览器分别走哪里",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/software/adguard-home/",
-          "title": "AdGuard Home：从后台到终端过滤验证",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/software/openclash/",
-          "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/installation/proxmox/",
-          "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-pve-01",
-      "locale": "zh",
-      "query": "pve 单网口 openwrt",
-      "category": "pve",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/zh/installation/proxmox/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/installation/proxmox/",
-          "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/software/adguard-home/",
-          "title": "AdGuard Home：从后台到终端过滤验证",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-pve-02",
-      "locale": "zh",
-      "query": "proxmox 安装 openwrt",
-      "category": "pve",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/zh/installation/proxmox/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/installation/proxmox/",
-          "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-agh-01",
-      "locale": "zh",
-      "query": "adguard home openwrt",
-      "category": "adguard-home",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/zh/software/adguard-home/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/software/adguard-home/",
-          "title": "AdGuard Home：从后台到终端过滤验证",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/software/openclash/",
-          "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/installation/proxmox/",
-          "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-agh-02",
-      "locale": "zh",
-      "query": "adguardhome 广告拦截",
-      "category": "adguard-home",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/zh/software/adguard-home/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/software/adguard-home/",
-          "title": "AdGuard Home：从后台到终端过滤验证",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-agh-03",
-      "locale": "zh",
-      "query": "dnsmasq 5353",
-      "category": "adguard-home",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/zh/software/adguard-home/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/software/adguard-home/",
-          "title": "AdGuard Home：从后台到终端过滤验证",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/software/openclash/",
-          "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-sqm-01",
-      "locale": "zh",
-      "query": "sqm cake",
-      "category": "sqm",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/zh/software/sqm/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/software/sqm/",
-          "title": "下载时游戏/会议变卡：SQM 与 CAKE 怎么配、怎么测",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-sqm-02",
-      "locale": "zh",
-      "query": "bufferbloat 延迟",
-      "category": "sqm",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/zh/software/sqm/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/software/sqm/",
-          "title": "下载时游戏/会议变卡：SQM 与 CAKE 怎么配、怎么测",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-sqm-03",
-      "locale": "zh",
-      "query": "下载时游戏卡",
-      "category": "sqm",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/zh/software/sqm/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/software/sqm/",
-          "title": "下载时游戏/会议变卡：SQM 与 CAKE 怎么配、怎么测",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-luci-01",
-      "locale": "zh",
-      "query": "luci 首次登录",
-      "category": "luci",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/zh/getting-started/luci-first-login/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/getting-started/luci-first-login/",
-          "title": "首次登录 LuCI：默认地址、密码与中文界面",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-luci-02",
-      "locale": "zh",
-      "query": "openwrt 中文界面",
-      "category": "luci",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/zh/getting-started/luci-first-login/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/getting-started/luci-first-login/",
-          "title": "首次登录 LuCI：默认地址、密码与中文界面",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-fw-01",
-      "locale": "zh",
-      "query": "immortalwrt istoreos 区别",
-      "category": "firmware",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/zh/getting-started/which-openwrt/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/getting-started/which-openwrt/",
-          "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/software/package-sources/",
-          "title": "软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-fw-02",
-      "locale": "zh",
-      "query": "openwrt 固件 target",
-      "category": "firmware",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/zh/getting-started/which-openwrt/"
-      ],
-      "rank": 2,
-      "results": [
-        {
-          "url": "/zh/software/package-sources/",
-          "title": "软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/getting-started/which-openwrt/",
-          "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/software/adguard-home/",
-          "title": "AdGuard Home：从后台到终端过滤验证",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/software/openclash/",
-          "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/installation/proxmox/",
-          "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-oc-01",
-      "locale": "zh",
-      "query": "openclash dns 冲突",
-      "category": "openclash",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/zh/software/openclash/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/software/openclash/",
-          "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-oc-02",
-      "locale": "zh",
-      "query": "openclash 停用 恢复",
-      "category": "openclash",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/zh/software/openclash/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/software/openclash/",
-          "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-pkg-01",
-      "locale": "zh",
-      "query": "apk opkg 区别",
-      "category": "package-sources",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/zh/software/package-sources/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/software/package-sources/",
-          "title": "软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/getting-started/which-openwrt/",
-          "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-pkg-02",
-      "locale": "zh",
-      "query": "openwrt 国内镜像",
-      "category": "package-sources",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/zh/software/package-sources/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/software/package-sources/",
-          "title": "软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-rec-01",
-      "locale": "zh",
-      "query": "进不去后台",
-      "category": "recovery",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/zh/troubleshooting/no-web-ui/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/troubleshooting/no-web-ui/",
-          "title": "进不去后台：IP、网口、DHCP 与本地控制台恢复",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/software/adguard-home/",
-          "title": "AdGuard Home：从后台到终端过滤验证",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/getting-started/luci-first-login/",
-          "title": "首次登录 LuCI：默认地址、密码与中文界面",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "zh-rec-02",
-      "locale": "zh",
-      "query": "uhttpd failsafe",
-      "category": "recovery",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/zh/troubleshooting/no-web-ui/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/zh/troubleshooting/no-web-ui/",
-          "title": "进不去后台：IP、网口、DHCP 与本地控制台恢复",
-          "excerpt": ""
-        },
-        {
-          "url": "/zh/getting-started/luci-first-login/",
-          "title": "首次登录 LuCI：默认地址、密码与中文界面",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-dns-01",
-      "locale": "en",
-      "query": "openwrt dns settings",
-      "category": "dns",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/en/network/dns/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/network/dns/",
-          "title": "Configure DNS and verify router, client and browser",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/software/openclash/",
-          "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/installation/proxmox/",
-          "title": "Install OpenWrt on a single-NIC Proxmox VE host",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/software/adguard-home/",
-          "title": "AdGuard Home: from web UI to client filtering",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/troubleshooting/no-web-ui/",
-          "title": "Cannot reach LuCI: IP, port, DHCP and console recovery",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-dns-02",
-      "locale": "en",
-      "query": "dnsmasq upstream",
-      "category": "dns",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/en/network/dns/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/network/dns/",
-          "title": "Configure DNS and verify router, client and browser",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/software/adguard-home/",
-          "title": "AdGuard Home: from web UI to client filtering",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/software/openclash/",
-          "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/installation/proxmox/",
-          "title": "Install OpenWrt on a single-NIC Proxmox VE host",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-pve-01",
-      "locale": "en",
-      "query": "pve single nic openwrt",
-      "category": "pve",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/en/installation/proxmox/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/installation/proxmox/",
-          "title": "Install OpenWrt on a single-NIC Proxmox VE host",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/software/adguard-home/",
-          "title": "AdGuard Home: from web UI to client filtering",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/network/dns/",
-          "title": "Configure DNS and verify router, client and browser",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/software/sqm/",
-          "title": "SQM and CAKE: stop lag under download and upload",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-pve-02",
-      "locale": "en",
-      "query": "proxmox openwrt",
-      "category": "pve",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/en/installation/proxmox/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/installation/proxmox/",
-          "title": "Install OpenWrt on a single-NIC Proxmox VE host",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-agh-01",
-      "locale": "en",
-      "query": "adguard home openwrt",
-      "category": "adguard-home",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/en/software/adguard-home/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/software/adguard-home/",
-          "title": "AdGuard Home: from web UI to client filtering",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/software/openclash/",
-          "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/installation/proxmox/",
-          "title": "Install OpenWrt on a single-NIC Proxmox VE host",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-agh-02",
-      "locale": "en",
-      "query": "adguardhome filtering",
-      "category": "adguard-home",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/en/software/adguard-home/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/software/adguard-home/",
-          "title": "AdGuard Home: from web UI to client filtering",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-agh-03",
-      "locale": "en",
-      "query": "dnsmasq 5353",
-      "category": "adguard-home",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/en/software/adguard-home/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/software/adguard-home/",
-          "title": "AdGuard Home: from web UI to client filtering",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/software/openclash/",
-          "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-sqm-01",
-      "locale": "en",
-      "query": "sqm cake bufferbloat",
-      "category": "sqm",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/en/software/sqm/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/software/sqm/",
-          "title": "SQM and CAKE: stop lag under download and upload",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-sqm-02",
-      "locale": "en",
-      "query": "game lag while downloading",
-      "category": "sqm",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/en/software/sqm/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/software/sqm/",
-          "title": "SQM and CAKE: stop lag under download and upload",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-sqm-03",
-      "locale": "en",
-      "query": "openwrt sqm",
-      "category": "sqm",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/en/software/sqm/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/software/sqm/",
-          "title": "SQM and CAKE: stop lag under download and upload",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-luci-01",
-      "locale": "en",
-      "query": "first luci login",
-      "category": "luci",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/en/getting-started/luci-first-login/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/getting-started/luci-first-login/",
-          "title": "First LuCI login: address, password and Chinese UI",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/troubleshooting/no-web-ui/",
-          "title": "Cannot reach LuCI: IP, port, DHCP and console recovery",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-luci-02",
-      "locale": "en",
-      "query": "luci chinese language",
-      "category": "luci",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/en/getting-started/luci-first-login/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/getting-started/luci-first-login/",
-          "title": "First LuCI login: address, password and Chinese UI",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-fw-01",
-      "locale": "en",
-      "query": "immortalwrt istoreos vendor firmware",
-      "category": "firmware",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/en/getting-started/which-openwrt/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/getting-started/which-openwrt/",
-          "title": "Which OpenWrt is this: official, ImmortalWrt, iStoreOS or vendor firmware?",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/getting-started/luci-first-login/",
-          "title": "First LuCI login: address, password and Chinese UI",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-fw-02",
-      "locale": "en",
-      "query": "openwrt firmware target",
-      "category": "firmware",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/en/getting-started/which-openwrt/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/getting-started/which-openwrt/",
-          "title": "Which OpenWrt is this: official, ImmortalWrt, iStoreOS or vendor firmware?",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/software/package-sources/",
-          "title": "Package feeds and China mirrors: keep apk and opkg separate",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/software/adguard-home/",
-          "title": "AdGuard Home: from web UI to client filtering",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/installation/proxmox/",
-          "title": "Install OpenWrt on a single-NIC Proxmox VE host",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/software/openclash/",
-          "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-oc-01",
-      "locale": "en",
-      "query": "openclash dns conflict",
-      "category": "openclash",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/en/software/openclash/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/software/openclash/",
-          "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-oc-02",
-      "locale": "en",
-      "query": "openclash disable",
-      "category": "openclash",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/en/software/openclash/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/software/openclash/",
-          "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/installation/proxmox/",
-          "title": "Install OpenWrt on a single-NIC Proxmox VE host",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-pkg-01",
-      "locale": "en",
-      "query": "apk opkg feeds",
-      "category": "package-sources",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/en/software/package-sources/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/software/package-sources/",
-          "title": "Package feeds and China mirrors: keep apk and opkg separate",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/getting-started/which-openwrt/",
-          "title": "Which OpenWrt is this: official, ImmortalWrt, iStoreOS or vendor firmware?",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-pkg-02",
-      "locale": "en",
-      "query": "openwrt china mirror",
-      "category": "package-sources",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/en/software/package-sources/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/software/package-sources/",
-          "title": "Package feeds and China mirrors: keep apk and opkg separate",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-rec-01",
-      "locale": "en",
-      "query": "cannot reach luci",
-      "category": "recovery",
-      "aliasCase": true,
-      "expectedUrls": [
-        "/en/troubleshooting/no-web-ui/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/troubleshooting/no-web-ui/",
-          "title": "Cannot reach LuCI: IP, port, DHCP and console recovery",
-          "excerpt": ""
-        },
-        {
-          "url": "/en/software/adguard-home/",
-          "title": "AdGuard Home: from web UI to client filtering",
-          "excerpt": ""
-        }
-      ]
-    },
-    {
-      "id": "en-rec-02",
-      "locale": "en",
-      "query": "uhttpd failsafe",
-      "category": "recovery",
-      "aliasCase": false,
-      "expectedUrls": [
-        "/en/troubleshooting/no-web-ui/"
-      ],
-      "rank": 1,
-      "results": [
-        {
-          "url": "/en/troubleshooting/no-web-ui/",
-          "title": "Cannot reach LuCI: IP, port, DHCP and console recovery",
-          "excerpt": ""
-        }
-      ]
-    }
-  ]
+  "negative": {
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "results": [
+      {
+        "id": "neg-01",
+        "locale": "zh",
+        "query": "zxqv plugh 98765",
+        "category": "negative",
+        "expectEmpty": false,
+        "forbiddenUrls": [
+          "/zh/getting-started/which-openwrt/"
+        ],
+        "rationale": "nonsense must not route to firmware identification",
+        "results": [
+          {
+            "url": "/zh/software/adguard-home/",
+            "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          }
+        ],
+        "passed": true
+      },
+      {
+        "id": "neg-02",
+        "locale": "zh",
+        "query": "openwrt 打印机驱动",
+        "category": "negative",
+        "expectEmpty": false,
+        "forbiddenUrls": [
+          "/zh/troubleshooting/no-web-ui/"
+        ],
+        "rationale": "printer query must not route to no-LuCI recovery",
+        "results": [
+          {
+            "url": "/zh/software/sqm/",
+            "title": "下载时游戏/会议变卡：SQM 与 CAKE 怎么配、怎么测",
+            "excerpt": ""
+          }
+        ],
+        "passed": true
+      },
+      {
+        "id": "neg-03",
+        "locale": "en",
+        "query": "adguard home windows installer",
+        "category": "negative",
+        "expectEmpty": false,
+        "forbiddenUrls": [
+          "/en/software/sqm/"
+        ],
+        "rationale": "Windows installer query must not route to SQM",
+        "results": [
+          {
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/openclash/",
+            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/installation/proxmox/",
+            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "excerpt": ""
+          }
+        ],
+        "passed": true
+      },
+      {
+        "id": "neg-04",
+        "locale": "zh",
+        "query": "sqm 斐讯 k3 梅林",
+        "category": "negative",
+        "expectEmpty": true,
+        "forbiddenUrls": [],
+        "rationale": "no K3/Merlin coverage; empty result",
+        "results": [],
+        "passed": true
+      },
+      {
+        "id": "neg-05",
+        "locale": "en",
+        "query": "openwrt quantum router xyzzy",
+        "category": "negative",
+        "expectEmpty": false,
+        "forbiddenUrls": [
+          "/en/software/openclash/"
+        ],
+        "rationale": "nonsense must not route to OpenClash",
+        "results": [
+          {
+            "url": "/en/network/dns/",
+            "title": "Configure DNS and verify router, client and browser",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
+            "excerpt": ""
+          }
+        ],
+        "passed": true
+      }
+    ]
+  }
 }

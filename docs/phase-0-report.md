@@ -30,13 +30,13 @@
 2. **Starlight 会为缺译内容生成 fallback**。把 `en/only-en/` 留在 `src/content/docs` 时，构建生成了 `/zh/only-en/`，并写入 canonical、hreflang、sitemap。因此 v1 规则改为：**单语页面只放 `content/drafts/`，不进入 `src/content/docs`**；`scripts/validate.ts` 在构建前强制中英文件配对。
 3. **canonical/hreflang/sitemap 在成对页面上正确**。`x-default` 指向英文；中文 canonical 不指向英文。
 4. **MDX 组件可用**，不需要在 Starlight 之前显式加 `mdx()` 集成；Starlight 自带 expressive-code/集成顺序，手动加 `mdx()` 会报 integration order 错误。
-5. **Pagefind 生成双语索引**，并已完成 40 条查询的浏览器/Pagefind UI 验收；见 `docs/search-acceptance.md`。
+5. **Pagefind 生成双语索引**，并已完成 43 条正向 + 5 条负向查询的浏览器/Pagefind UI 验收；见 `docs/search-acceptance.md`。
 6. Hero action 的 `icon` 必须是 SVG 字符串，不能用 `right-arrow` 名称；Phase 0 先移除以保证构建。
 
 ## 尚未完成
 
 - DNS、PVE、AGH 均已完成 E2 实验（见 `docs/dns-e2-run.md`、`docs/pve-e2-run.md`、`docs/agh-e2-run.md`）；SQM、005 LuCI、041 固件辨识、043 OpenClash、014 软件源、016 进不去后台已补 E1 页；OpenClash 严格限定兼容性/DNS/停用恢复，不含代理订阅或绕过内容。
-- 40 条搜索查询浏览器验收：40/40，Top 5；21/21 alias 场景通过；见 `docs/search-acceptance.md`。
+- 搜索验收：43/43 正向 + 5/5 负向，Top 5；22/22 alias 场景通过；见 `docs/search-acceptance.md`。
 - Pagefind extended 中文分词配置与查询扩展层。
 - 域名绑定、golden placeholder、Pages 生产部署与回滚。
 - 真实设备 E3 测试。
