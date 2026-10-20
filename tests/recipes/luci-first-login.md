@@ -2,7 +2,7 @@
 
 ## Status
 
-E1 plan, not executed. Vendor/community firmware defaults differ; record the actual device.
+E2 run completed 2026-10-20 on the official x86_64 image. Vendor/community firmware and failsafe are not covered.
 
 ## Environment
 
@@ -48,3 +48,12 @@ E1 plan, not executed. Vendor/community firmware defaults differ; record the act
 - `apk info -e luci-i18n-base-zh-cn` (or `opkg list-installed`).
 - Before/after language screenshots or HTML `lang` attribute.
 - Any vendor-specific defaults.
+
+## Run log 2026-10-20
+
+- VM 200, official OpenWrt 25.12.6 x86_64 combined ext4 image; LAN `192.168.1.1/24`.
+- First LuCI login allowed a blank password and showed "No password set!"; set a temporary lab password.
+- Installed `luci-i18n-base-zh-cn 26.288.56989~75a306d`; set `luci.main.lang='zh_cn'`; UI switched to Chinese.
+- SSH login with the same password worked; no wrong-password lockout test was run.
+- Screenshots: `src/assets/screenshots/luci/first-login-password.webp`, `language-zh.webp`.
+- Not tested: vendor/community firmware defaults, failsafe, factory reset, wrong-password lockout.

@@ -22,6 +22,10 @@ sources:
 ---
 
 import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import aghSetup from '@assets/screenshots/agh/setup-welcome.webp';
+import aghDashboard from '@assets/screenshots/agh/dashboard.webp';
+import aghFilters from '@assets/screenshots/agh/filters.webp';
 import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import TopologyTable from '@components/TopologyTable.astro';
@@ -82,6 +86,8 @@ Keep console or LAN access to OpenWrt. Do not make the only management path depe
 </Step>
 
 ## Minimal steps
+
+<Figure src={aghSetup} alt="AdGuard Home first-run welcome page with Get Started and Step 1/5" caption="The AGH 0.107.79 first-run welcome page. Click Get Started to open the setup wizard. Captured in a temporary lab; the Chinese language is selected." />
 
 <Step where="router-shell" title="Install AGH, data-disk tools and fstab support" expected="adguardhome, block-mount and e2fsprogs are installed.">
 
@@ -187,6 +193,8 @@ This is a reserved test domain. Add maintained filter lists later for real use. 
 
 ## Verification
 
+<Figure src={aghDashboard} alt="AdGuard Home dashboard with DNS query and filtering statistics" caption="The dashboard after setup. Zero queries immediately after configuration is normal; verify the DNS port and upstream first." />
+
 <Step where="router-shell" title="Check ports and local resolution" expected="AGH listens on 53/3000; dnsmasq on 5353.">
 
 ```sh
@@ -272,6 +280,8 @@ logread | grep -i fstab
 Check the fstab UUID, target and enabled flag; mount manually, then restart AGH.
 
 ### Filtering does not work
+
+<Figure src={aghFilters} alt="AdGuard Home filters page showing the default blocklists" caption="The filters page lists enabled blocklists. This capture shows only the defaults, with no third-party subscription; add a test rule separately." />
 
 - Confirm the client actually uses AGH as DNS.
 - Confirm the rule is under **Custom filtering rules**, not a subscription.

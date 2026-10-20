@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-20T15:55:38.248Z",
-  "base": "http://127.0.0.1:36833",
+  "generatedAt": "2026-10-20T16:46:17.677Z",
+  "base": "http://127.0.0.1:33055",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -579,13 +579,13 @@
             "excerpt": ""
           },
           {
-            "url": "/en/installation/proxmox/",
-            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
             "excerpt": ""
           },
           {
-            "url": "/en/software/adguard-home/",
-            "title": "AdGuard Home: from web UI to client filtering",
+            "url": "/en/installation/proxmox/",
+            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
             "excerpt": ""
           },
           {
@@ -840,6 +840,11 @@
             "url": "/en/getting-started/luci-first-login/",
             "title": "First LuCI login: address, password and Chinese UI",
             "excerpt": ""
+          },
+          {
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
+            "excerpt": ""
           }
         ]
       },
@@ -1000,6 +1005,11 @@
           {
             "url": "/en/troubleshooting/no-web-ui/",
             "title": "Cannot reach LuCI: IP, port, DHCP and console recovery",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/getting-started/luci-first-login/",
+            "title": "First LuCI login: address, password and Chinese UI",
             "excerpt": ""
           },
           {

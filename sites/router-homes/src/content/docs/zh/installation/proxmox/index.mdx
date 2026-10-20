@@ -22,6 +22,8 @@ sources:
 ---
 
 import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import pveConsole from '@assets/screenshots/pve/openwrt-console-login.webp';
 import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import TopologyTable from '@components/TopologyTable.astro';
@@ -203,6 +205,8 @@ nslookup openwrt.org
 </Step>
 
 ## 终端验证
+
+<Figure src={pveConsole} alt="Proxmox VE 虚拟机控制台里 OpenWrt 25.12.6 的 root shell 和 apk 提示" caption="OpenWrt 25.12.6 在 PVE 虚拟机控制台启动后的 root shell。截图来自临时截图 VM；网卡名、网段和磁盘参数以你的 PVE 拓扑为准。" />
 
 - `qm status 200` 为 running；`qm config 200` 里 `net0` 在 `vmbr0`、`net1` 在 `vmbr1`。
 - OpenWrt 里 `ip addr show`：WAN 有 `192.168.50.x`，LAN 是 `192.168.1.1/24`。

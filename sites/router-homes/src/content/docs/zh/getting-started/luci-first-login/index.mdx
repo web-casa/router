@@ -2,10 +2,11 @@
 title: 首次登录 LuCI：默认地址、密码与中文界面
 description: 找到 OpenWrt 管理地址、设置 root 密码、安装中文语言包，并保留进不去后台时的恢复路径。
 pageType: overview
-tested: false
+tested: true
 testedVersions: ['25.12.6']
-evidenceLevel: E1
-testEnvironment: '待 OpenWrt 25.12.6 首次启动环境；厂商/改装固件默认值可能不同'
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86_64 VM 200；LuCI 26.288；官方镜像，厂商固件未测'
+lastVerifiedAt: '2026-10-20'
 testRecipe: 'tests/recipes/luci-first-login.md'
 aliases: ['openwrt 登录', 'luci 默认密码', '192.168.1.1', 'openwrt 中文界面']
 symptoms: ['进不去后台', '默认密码不对', 'LuCI 是英文']
@@ -21,17 +22,21 @@ sources:
 ---
 
 import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import luciPassword from '@assets/screenshots/luci/first-login-password.webp';
+import luciLanguage from '@assets/screenshots/luci/language-zh.webp';
 import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="全新官方镜像" tested={false} evidence="E1" />
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="全新官方镜像" tested={true} evidence="E2" />
 
 <TestRecord
-  status="planned"
-  environment="待 OpenWrt 25.12.6 首次启动环境；厂商/改装固件默认值可能不同"
+  status="partial"
+  environment="OpenWrt 25.12.6 x86_64 VM 200；LuCI 26.288；官方镜像，厂商固件未测"
   recipe="tests/recipes/luci-first-login.md"
-  result="E1：默认地址、首次设密、中文包和恢复路径已整理；未在本次实验环境复测"
+  result="E2：官方镜像可进 LuCI；首次提示设密；中文包安装并切换成功；SSH 用同一密码登录；厂商固件/failsafe 未测"
+  date="2026-10-20"
 />
 
 ## 完成后你能确认什么
@@ -90,6 +95,8 @@ OpenWrt 的 LuCI 默认是 HTTP 80，不是 HTTPS；如果浏览器自动跳 HTT
 
 ## 首次设置密码
 
+<Figure src={luciPassword} alt="LuCI 的 Router Password 页面，提示尚未设置密码，并显示 Password 和 Confirmation 两个输入框" caption="首次进入 LuCI 时的密码设置页。若已经设置过密码，直接登录即可；不要在这两个框里填示例密码。" />
+
 <Step where="luci" title="设置 root 密码" expected="能登录 LuCI，SSH 也能用同一密码。" >
 
 官方镜像首次进入时，LuCI 通常会提示设置密码；如果没有提示，进入 **System → Administration** 设置 root 密码。也可以先 SSH：
@@ -110,6 +117,8 @@ passwd
 </Step>
 
 ## 切换中文界面
+
+<Figure src={luciLanguage} alt="LuCI 系统设置的语言和界面标签页，语言下拉框选择简体中文" caption="安装中文语言包后，在“语言和界面”里选择“简体中文”。截图来自 OpenWrt 25.12.6 临时实验环境。" />
 
 <Step where="luci" title="查看已安装语言" expected="语言下拉框里有简体中文，或知道需要装包。" >
 
@@ -173,10 +182,10 @@ opkg install luci-i18n-base-zh-cn
 - 看 LuCI 的 **System → Administration** 是否允许 SSH；
 - 用 `logread` 看 dropbear 错误，不要连续试错触发封禁。
 
-## E1 状态与来源
+## E2 状态与来源
 
-- 本页是 E1：默认地址、首次设密、中文包名和恢复路径已按官方资料整理；没有在本次实验环境复测。
-- 不同厂商固件的默认地址/密码/语言包可能不同；发布前按具体设备核对，不能把官方默认值套到所有固件。
-- 下一步按 `tests/recipes/luci-first-login.md` 在全新 OpenWrt 25.12.6 环境走一遍，记录默认地址、首次提示、中文包安装和恢复结果，再升级 E2。
+- 本页核心流程已在官方 OpenWrt 25.12.6 x86_64 镜像上做 E2：首次进入、设置密码、安装 `luci-i18n-base-zh-cn`、切换中文、SSH 登录。
+- 厂商/改装固件的默认地址/密码/语言包可能不同；failsafe、恢复出厂和厂商限制仍按 E1 处理，不能把官方默认值套到所有固件。
+- 截图来自临时 VM 200；时间、网段等参数以你的环境为准。复现配方：`tests/recipes/luci-first-login.md`。
 
 <PageSources />

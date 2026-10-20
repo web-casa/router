@@ -2,10 +2,11 @@
 title: "First LuCI login: address, password and Chinese UI"
 description: Find the OpenWrt management address, set the root password, install the Chinese language pack, and keep a recovery path.
 pageType: overview
-tested: false
+tested: true
 testedVersions: ['25.12.6']
-evidenceLevel: E1
-testEnvironment: 'Fresh OpenWrt 25.12.6 environment pending; vendor/community firmware defaults may differ'
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86_64 VM 200; LuCI 26.288; official image, vendor firmware untested'
+lastVerifiedAt: '2026-10-20'
 testRecipe: 'tests/recipes/luci-first-login.md'
 aliases: ['openwrt login', 'luci default password', '192.168.1.1', 'openwrt chinese ui']
 symptoms: ['cannot open LuCI', 'default password does not work', 'LuCI is English']
@@ -21,17 +22,21 @@ sources:
 ---
 
 import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import luciPassword from '@assets/screenshots/luci/first-login-password.webp';
+import luciLanguage from '@assets/screenshots/luci/language-zh.webp';
 import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="fresh official image" tested={false} evidence="E1" />
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="fresh official image" tested={true} evidence="E2" />
 
 <TestRecord
-  status="planned"
-  environment="Fresh OpenWrt 25.12.6 environment pending; vendor/community firmware defaults may differ"
+  status="partial"
+  environment="OpenWrt 25.12.6 x86_64 VM 200; LuCI 26.288; official image, vendor firmware untested"
   recipe="tests/recipes/luci-first-login.md"
-  result="E1: default address, first password, language pack and recovery documented; not re-run in this environment"
+  result="E2: official image reached; first-run password prompt; Chinese pack installed and selected; SSH accepted the same password; vendor firmware/failsafe untested"
+  date="2026-10-20"
 />
 
 ## Outcome
@@ -90,6 +95,8 @@ LuCI defaults to HTTP port 80, not HTTPS. If the browser forces HTTPS and fails,
 
 ## Set the first password
 
+<Figure src={luciPassword} alt="LuCI Router Password page with a no-password warning and Password/Confirmation fields" caption="The password page on a fresh LuCI login. If a password is already set, sign in instead; do not type an example password here." />
+
 <Step where="luci" title="Set the root password" expected="You can log in to LuCI and SSH with the same password.">
 
 A fresh official image usually prompts for a password on first login. If it does not, open **System → Administration**. You can also use SSH first:
@@ -110,6 +117,8 @@ Log out of LuCI and log in again; then confirm SSH accepts the same password. St
 </Step>
 
 ## Switch to Chinese
+
+<Figure src={luciLanguage} alt="LuCI System settings, Language and Style tab, with Simplified Chinese selected" caption="After installing the language pack, select Simplified Chinese under Language and Style. Captured on a temporary OpenWrt 25.12.6 lab VM." />
 
 <Step where="luci" title="Check installed languages" expected="Simplified Chinese is listed, or you know it must be installed.">
 
@@ -173,10 +182,10 @@ Log out and back in. If it reverts to English, check whether the language settin
 - Check **System → Administration** for SSH access.
 - Use `logread` for dropbear errors; do not hammer the login.
 
-## E1 status and sources
+## E2 status and sources
 
-- This is E1: default address, first password, language package and recovery are based on official documentation; it was not re-run in this environment.
-- Vendor firmware may differ; verify the specific device before publishing.
-- Next: run `tests/recipes/luci-first-login.md` on a fresh OpenWrt 25.12.6 environment, record the default address, first-run prompt, language install and recovery, then promote to E2.
+- Core flow is E2 on the official OpenWrt 25.12.6 x86_64 image: first login, password setup, `luci-i18n-base-zh-cn` install, Chinese UI, SSH login.
+- Vendor/community firmware may differ; failsafe, factory reset and vendor restrictions remain E1. Do not generalize the official defaults.
+- Screenshots are from temporary VM 200; timing/network values depend on your environment. Recipe: `tests/recipes/luci-first-login.md`.
 
 <PageSources />

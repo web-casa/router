@@ -22,6 +22,8 @@ sources:
 ---
 
 import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import pveConsole from '@assets/screenshots/pve/openwrt-console-login.webp';
 import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import TopologyTable from '@components/TopologyTable.astro';
@@ -203,6 +205,8 @@ If the client gets no lease, inspect OpenWrt `dhcp.lan` and `dnsmasq` before cha
 </Step>
 
 ## Verification
+
+<Figure src={pveConsole} alt="OpenWrt 25.12.6 root shell and apk notice in a Proxmox VE VM console" caption="The OpenWrt 25.12.6 root shell after boot in a Proxmox VE VM console. Captured on a temporary screenshot VM; NIC names, subnets and disks depend on your topology." />
 
 - `qm status 200` is running; `qm config 200` shows `net0` on `vmbr0`, `net1` on `vmbr1`.
 - Inside OpenWrt, `ip addr show` shows WAN `192.168.50.x` and LAN `192.168.1.1/24`.

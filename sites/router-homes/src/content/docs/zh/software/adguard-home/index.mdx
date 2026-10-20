@@ -22,6 +22,10 @@ sources:
 ---
 
 import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import aghSetup from '@assets/screenshots/agh/setup-welcome.webp';
+import aghDashboard from '@assets/screenshots/agh/dashboard.webp';
+import aghFilters from '@assets/screenshots/agh/filters.webp';
 import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import TopologyTable from '@components/TopologyTable.astro';
@@ -82,6 +86,8 @@ cat /etc/config/dhcp
 </Step>
 
 ## 最小步骤
+
+<Figure src={aghSetup} alt="AdGuard Home 首次启动欢迎页，显示 Get Started 按钮和 Step 1/5" caption="AGH 0.107.79 首次启动的欢迎页；点 Get Started 进入设置向导。截图来自临时实验环境，中文语言已切换。" />
 
 <Step where="router-shell" title="安装 AGH、数据盘工具和 fstab 支持" expected="adguardhome、block-mount、e2fsprogs 已安装。" >
 
@@ -187,6 +193,8 @@ uci show dhcp.lan | grep dhcp_option
 
 ## 验证
 
+<Figure src={aghDashboard} alt="AdGuard Home 中文仪表盘，显示 DNS 查询和过滤统计" caption="完成安装后的仪表盘。刚配置完还没有查询时，统计为 0 是正常的；先确认 DNS 端口和上游可用。" />
+
 <Step where="router-shell" title="检查端口和本机解析" expected="AGH 监听 53/3000，dnsmasq 监听 5353。" >
 
 ```sh
@@ -272,6 +280,8 @@ logread | grep -i fstab
 检查 fstab 的 UUID、target、enabled；必要时手动 `mount /dev/sdb /opt/agh` 后重启 AGH。
 
 ### 过滤不生效
+
+<Figure src={aghFilters} alt="AdGuard Home 过滤器页面，显示默认黑名单列表" caption="过滤器页面可以看到已启用的黑名单。截图只显示默认列表，没有订阅第三方规则；自定义测试规则在设置向导/过滤规则里添加。" />
 
 - 确认 AGH 是客户端实际使用的 DNS；
 - 确认规则在 **Custom filtering rules**，不是订阅列表；
