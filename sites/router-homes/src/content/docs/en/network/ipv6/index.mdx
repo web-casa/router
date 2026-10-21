@@ -1,0 +1,215 @@
+---
+title: "IPv6 basics: verify ULA, RA/SLAAC, PD and DNS"
+description: Tell link-local, ULA, GUA, PD, RA, SLAAC and DHCPv6 apart; verify LAN ULA/RA first, then whether the upstream delegates GUA/PD, and finally check DNS/firewall.
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; LAN ULA fd2f:385b:7d0a::/48; RA/SLAAC client got /64; no upstream GUA/PD'
+testRecipe: 'tests/recipes/ipv6-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt ipv6', 'openwrt ipv6 setup', 'openwrt slaac', 'openwrt pd']
+symptoms: ['only fe80 address', 'no public IPv6', 'RA not working', 'IPv6 DNS fails']
+sources:
+  - label: OpenWrt IPv6 configuration
+    url: https://openwrt.org/docs/guide-user/network/ipv6/configuration
+  - label: OpenWrt DHCP and DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: IPv6 RA/SLAAC overview
+    url: https://www.rfc-editor.org/rfc/rfc4862
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; LAN ULA fd2f:385b:7d0a::/48; RA/SLAAC client got /64; no upstream GUA/PD"
+  recipe="tests/recipes/ipv6-25.12.md"
+  result="E2 partial: LAN had ULA fd2f:385b:7d0a::1/60 and an RA/SLAAC client got fd2f:385b:7d0a:0:.../64 and pinged the router; no upstream GUA/PD, WAN IPv6 untested"
+  date="2026-10-20"
+/>
+
+## Five address/mechanism terms
+
+| Name | Example/role | Common mistake |
+|---|---|---|
+| link-local | `fe80::/10` | every NIC has one; not public |
+| ULA | inside `fd00::/8` | not directly routable on the internet |
+| GUA | `2000::/3` public address | requires upstream PD/allocation |
+| RA | router advertises prefix/gateway/DNS | no RA → no SLAAC |
+| SLAAC | client generates an address from RA prefix | not DHCPv6 |
+| DHCPv6 | server assigns address/prefix/DNS | different from IPv4 DHCP |
+| PD | upstream delegates a prefix to the router | no PD → no LAN GUA |
+
+## Current state
+
+<Step where="router-shell" title="Check addresses, routes and UCI" expected="Know whether you have only link-local, ULA, or GUA.">
+
+```sh
+ip -6 addr show
+ip -6 route
+uci show network.lan
+uci show dhcp.lan
+uci show network.globals
+logread -e odhcpd | tail -30
+```
+
+This lab: `br-lan` had ULA `fd2f:385b:7d0a::1/60` and link-local; no default IPv6 route and no GUA.
+
+</Step>
+
+## LAN: ULA + RA/SLAAC
+
+<Step where="router-shell" title="Confirm LAN prefix and RA service" expected="LAN has a ULA prefix and odhcpd sends RA.">
+
+```sh
+uci show network.globals.ula_prefix
+uci show network.lan.ip6assign
+uci show dhcp.lan.ra
+uci show dhcp.lan.ra_slaac
+uci show dhcp.lan.dhcpv6
+ps | grep [o]dhcpd
+```
+
+This lab:
+
+```text
+network.globals.ula_prefix='fd2f:385b:7d0a::/48'
+network.lan.ip6assign='60'
+dhcp.lan.ra='server'
+dhcp.lan.ra_slaac='1'
+dhcp.lan.dhcpv6='server'
+```
+
+`ip6assign='60'` takes a `/60` for LAN out of the ULA `/48`; clients usually get `/64`.
+
+</Step>
+
+<Step where="client" title="Let a client get an address from RA" expected="The client gets a ULA and can ping the router IPv6.">
+
+Linux example (`accept_ra=2` only in this netns; normal clients usually keep defaults):
+
+```sh
+sysctl -w net.ipv6.conf.eth0.accept_ra=2
+ip -6 addr show eth0
+ip -6 route
+ping -6 -c 2 <router-ULA>
+```
+
+This lab netns client got:
+
+```text
+fd2f:385b:7d0a:0:5088:71ff:fed4:32d2/64  scope global dynamic
+fe80::5088:71ff:fed4:32d2/64             scope link
+```
+
+and pinged `fd2f:385b:7d0a::1`. The client only had `fd2f:385b:7d0a::/64`, no default IPv6 route (no upstream).
+
+</Step>
+
+## WAN: GUA and PD
+
+<Step where="router-shell" title="Check whether WAN6/upstream provides a prefix" expected="A GUA and default route, or a clear upstream “no IPv6”.">
+
+```sh
+uci show network.wan6 2>/dev/null
+ubus call network.interface.wan6 status 2>/dev/null
+ip -6 route
+ip -6 addr show eth1
+logread | grep -Ei 'odhcp6c|dhcpv6|pd' | tail -30
+```
+
+Typical main router:
+
+```sh
+uci set network.wan6=interface
+uci set network.wan6.device='eth1'
+uci set network.wan6.proto='dhcpv6'
+uci commit network
+/etc/init.d/network reload
+```
+
+- Upstream must support IPv6/PD; some ONTs/ISPs give only `/64` or nothing;
+- Without PD, do not invent a “public prefix” on LAN;
+- This lab had no upstream IPv6, so GUA/PD were not verified; only ULA/RA/SLAAC were.
+
+</Step>
+
+## DNS and firewall
+
+<Step where="router-shell" title="Test AAAA and IPv6 DNS separately" expected="Know whether it is “no AAAA” or “DNS did not use IPv6”.">
+
+```sh
+nslookup -type=AAAA openwrt.org 127.0.0.1
+nslookup -type=AAAA openwrt.org <router-ULA>
+cat /tmp/resolv.conf.d/resolv.conf.auto
+```
+
+- AAAA can resolve even when DNS uses IPv4;
+- client DNS may come from RA/DHCPv6 or manual config;
+- Do not switch all DNS to IPv6 for “IPv6 works”; keep IPv4/IPv6 fallback.
+
+Firewall:
+
+```sh
+uci show firewall
+nft list ruleset 2>/dev/null | head -80
+```
+
+- Allow ICMPv6/ND/RA (otherwise IPv6 breaks);
+- Allow LAN→WAN IPv6 forward;
+- Do not disable the IPv6 firewall “to test connectivity”; that exposes the LAN.
+
+</Step>
+
+## Common failures
+
+### Only fe80 addresses
+
+- LAN has no ULA prefix/`ip6assign`;
+- odhcpd is not running / RA blocked;
+- client `accept_ra=0`;
+- switch/AP blocks multicast/ICMPv6.
+
+### ULA but no GUA
+
+- upstream has no IPv6/PD;
+- `wan6` not configured/prefix not received;
+- ISP gives only `/64`, cannot split for LAN;
+- relay/ND proxy scenarios are different; do not force it.
+
+### Address but no internet
+
+- no default IPv6 route;
+- firewall forward/ICMPv6;
+- DNS only on IPv4;
+- upstream route/prefix invalid.
+
+### IPv4 slows/breaks after enabling IPv6
+
+- DNS preference/dual-stack fallback;
+- client privacy addresses/RA parameters;
+- Keep IPv4 working; add IPv6 one step at a time.
+
+## E2 lab run (2026-10-20)
+
+- Environment: OpenWrt 25.12.6 x86 VM 200; LAN `192.168.1.2/24` + ULA `fd2f:385b:7d0a::1/60`.
+- ULA prefix `fd2f:385b:7d0a::/48`; `ip6assign=60`; `ra=server`, `ra_slaac=1`, `dhcpv6=server`; odhcpd running.
+- Client: SLAAC got `fd2f:385b:7d0a:0:5088:71ff:fed4:32d2/64`; pinged the router ULA.
+- No upstream IPv6/GUA/PD; WAN6, real ISP, DHCPv6 client and IPv6 firewall/NAT untested.
+- Recipe: `tests/recipes/ipv6-25.12.md`.
+
+## Sources and review
+
+- This is E2 partial: LAN ULA/RA/SLAAC were tested; WAN GUA/PD and a real ISP were not.
+- No independent reviewer; conclusions are limited to this VM/netns environment.
+- Do not turn “LAN has a ULA” into “IPv6 internet works”; ULA is internal only.
+
+<PageSources />

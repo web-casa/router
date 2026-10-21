@@ -51,6 +51,11 @@ const meta = {
           slug: 'network/dns',
         },
         {
+          label: 'IPv6',
+          translations: { 'zh-CN': 'IPv6' },
+          slug: 'network/ipv6',
+        },
+        {
           label: 'LAN address',
           translations: { 'zh-CN': '修改 LAN 地址' },
           slug: 'network/lan-address',

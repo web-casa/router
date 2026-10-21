@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-21T13:33:34.885Z",
-  "base": "http://127.0.0.1:34661",
+  "generatedAt": "2026-10-21T14:01:55.232Z",
+  "base": "http://127.0.0.1:44633",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -634,6 +634,11 @@
             "excerpt": ""
           },
           {
+            "url": "/en/network/ipv6/",
+            "title": "IPv6 basics: verify ULA, RA/SLAAC, PD and DNS",
+            "excerpt": ""
+          },
+          {
             "url": "/en/software/adguard-home/",
             "title": "AdGuard Home: from web UI to client filtering",
             "excerpt": ""
@@ -641,11 +646,6 @@
           {
             "url": "/en/software/openclash/",
             "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
-            "excerpt": ""
-          },
-          {
-            "url": "/en/installation/proxmox/",
-            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
             "excerpt": ""
           }
         ]
@@ -682,8 +682,8 @@
             "excerpt": ""
           },
           {
-            "url": "/en/network/ap-mode/",
-            "title": "Wired/wireless AP under an existing router: DHCP off, new LAN IP, LAN port",
+            "url": "/en/software/openclash/",
+            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
             "excerpt": ""
           }
         ]

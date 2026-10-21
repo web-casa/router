@@ -31,6 +31,8 @@ await mustExist(path.join(dist, 'en/getting-started/x86-image/index.html'), '/en
 await mustExist(path.join(dist, 'zh/getting-started/x86-image/index.html'), '/zh/getting-started/x86-image/');
 await mustExist(path.join(dist, 'en/network/dns/index.html'), '/en/network/dns/');
 await mustExist(path.join(dist, 'zh/network/dns/index.html'), '/zh/network/dns/');
+await mustExist(path.join(dist, 'en/network/ipv6/index.html'), '/en/network/ipv6/');
+await mustExist(path.join(dist, 'zh/network/ipv6/index.html'), '/zh/network/ipv6/');
 await mustExist(path.join(dist, 'en/network/lan-address/index.html'), '/en/network/lan-address/');
 await mustExist(path.join(dist, 'zh/network/lan-address/index.html'), '/zh/network/lan-address/');
 await mustExist(path.join(dist, 'en/network/wan-connectivity/index.html'), '/en/network/wan-connectivity/');
