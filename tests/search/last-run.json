@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-21T08:57:38.007Z",
-  "base": "http://127.0.0.1:45023",
+  "generatedAt": "2026-10-21T11:13:28.571Z",
+  "base": "http://127.0.0.1:33215",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -66,8 +66,8 @@
             "excerpt": ""
           },
           {
-            "url": "/zh/network/bypass-gateway/",
-            "title": "旁路网关：关 DHCP、指定网关/DNS 与客户端切换",
+            "url": "/zh/software/openclash/",
+            "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
             "excerpt": ""
           }
         ]
@@ -683,11 +683,6 @@
             "url": "/en/network/dns/",
             "title": "Configure DNS and verify router, client and browser",
             "excerpt": ""
-          },
-          {
-            "url": "/en/software/sqm/",
-            "title": "SQM and CAKE: stop lag under download and upload",
-            "excerpt": ""
           }
         ]
       },
@@ -833,6 +828,11 @@
           {
             "url": "/en/troubleshooting/plugin-install/",
             "title": "Package will not install: download, architecture, dependencies, LuCI and postinst",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/software/package-sources/",
+            "title": "Package feeds and China mirrors: keep apk and opkg separate",
             "excerpt": ""
           }
         ]
@@ -1176,28 +1176,7 @@
           "/en/software/openclash/"
         ],
         "rationale": "nonsense must not route to OpenClash",
-        "results": [
-          {
-            "url": "/en/network/dns/",
-            "title": "Configure DNS and verify router, client and browser",
-            "excerpt": ""
-          },
-          {
-            "url": "/en/software/adguard-home/",
-            "title": "AdGuard Home: from web UI to client filtering",
-            "excerpt": ""
-          },
-          {
-            "url": "/en/network/bypass-gateway/",
-            "title": "Bypass gateway: disable DHCP, set client gateway/DNS, and switch back",
-            "excerpt": ""
-          },
-          {
-            "url": "/en/network/ap-mode/",
-            "title": "Wired/wireless AP under an existing router: DHCP off, new LAN IP, LAN port",
-            "excerpt": ""
-          }
-        ],
+        "results": [],
         "passed": true
       }
     ]

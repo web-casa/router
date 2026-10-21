@@ -2,10 +2,10 @@
 title: "OpenClash basics: compatibility, DNS conflicts and clean disable"
 description: Check OpenClash firmware/architecture/package compatibility in a lawful environment, resolve DNS conflicts, and keep basic connectivity recoverable after disable.
 pageType: app
-tested: false
+tested: true
 testedVersions: ['25.12.6']
-evidenceLevel: E1
-testEnvironment: 'Lawful test environment pending; no proxy endpoints/subscriptions provided'
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; luci-app-openclash 0.48.002 apk install/start/stop; no proxy endpoints/subscriptions'
 testRecipe: 'tests/recipes/openclash-25.12.md'
 aliases: ['openclash install', 'openclash compatibility', 'openclash dns']
 symptoms: ['OpenClash will not install', 'no internet after enabling OpenClash', 'DNS conflict']
@@ -25,13 +25,13 @@ import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86/ARM pending" tested={false} evidence="E1" />
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
 <TestRecord
-  status="planned"
-  environment="Lawful test environment pending; no proxy endpoints/subscriptions provided"
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; luci-app-openclash 0.48.002 apk install/start/stop; no proxy endpoints/subscriptions"
   recipe="tests/recipes/openclash-25.12.md"
-  result="E1: compatibility checks, DNS conflicts and disable recovery documented; not installed/run in this environment"
+  result="E2 partial: 0.48.002 apk installed (43 packages incl. luci-compat/ruby); start without config was inactive; after stop/disable DNS was refused until dnsmasq restart; no proxy endpoint or routing test"
 />
 
 > **Scope**: this page covers compatibility, DNS conflicts, start/stop and recovery in a lawful environment. It does not provide proxy servers, subscription links, rule sets, or steps to bypass network controls or service/region restrictions. Check local law, ISP terms and the terms of the service you access before use.
@@ -180,10 +180,19 @@ If a firewall rule blocks management, recover from the console; do not factory-r
 - OpenClash/Mihomo are third-party projects with fast-moving versions/dependencies; read release notes and keep a rollback package.
 - This is not legal advice; resolve compliance questions before deployment.
 
-## E1 status and sources
+## E2 lab run (2026-10-20)
 
-- This is E1: compatibility, DNS conflicts and disable recovery are based on public documentation; OpenClash was not installed/run in this environment.
-- Next: use `tests/recipes/openclash-25.12.md` in a lawful test environment, record firmware/package format/ports/disable recovery, then promote to E2. If there is no matching package or lawful configuration, keep it at E1.
+- Environment: OpenWrt 25.12.6 x86 VM 200; official `luci-app-openclash 0.48.002` `.apk`.
+- `apk add --allow-untrusted` installed 43 packages (including `luci-compat`, Ruby, unzip); `/etc/init.d/openclash` and the LuCI controller exist.
+- With no proxy config/endpoint, `start` reported `inactive`; this page does not claim “proxy works”.
+- After `stop` + `disable`, `nslookup openwrt.org 127.0.0.1` returned connection refused; `/etc/init.d/dnsmasq restart` restored DNS, and public ping worked.
+- Not tested: real proxy endpoint/subscription, routing/DNS hits, Mihomo core, TUN/firewall rules, performance/stability.
+- Recipe: `tests/recipes/openclash-25.12.md`.
+
+## E2 status and sources
+
+- This is E2 partial: 25.12 `.apk` install, no-config start, disable and DNS recovery were tested; actual proxy/routing remains E1/E3.
+- Without a lawful endpoint/config, do not turn “installed” into “proxy works”.
 - Do not expand this page into a proxy subscription/bypass tutorial; that is out of scope.
 
 <PageSources />

@@ -2,7 +2,7 @@
 
 ## Status
 
-E1 plan, not executed. Do not fill in numbers until a real WAN/router run is recorded.
+E2 partial, run 2026-10-20: CAKE qdisc attach/stop verified in a VM. No real-line throughput/latency; E3 data still pending.
 
 ## Environment
 
@@ -66,3 +66,12 @@ E1 plan, not executed. Do not fill in numbers until a real WAN/router run is rec
 ## Findings
 
 - Pending real-router run.
+
+## Run log 2026-10-20
+
+- Environment: OpenWrt 25.12.6 x86 VM 200; WAN eth1 DHCP 192.168.50.158/24.
+- Packages: sqm-scripts 1.7.2-r1, luci-app-sqm.
+- Config: eth1, 100000/20000 Kbps, piece_of_cake.qos, cake.
+- Start: success; `tc -s qdisc show dev eth1` showed cake 20Mbit.
+- Stop: restored fq_codel.
+- No real-line throughput/latency; do not claim performance.

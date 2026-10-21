@@ -2,7 +2,7 @@
 
 ## Status
 
-E1 plan, not executed. Use a lab device with console access; do not factory-reset a production device.
+E2 partial, run 2026-10-20: uhttpd stop/start and SSH retention verified; firewall/port/failsafe not tested. Use a lab device with console access; do not factory-reset a production device.
 
 ## Environment
 
@@ -51,3 +51,10 @@ E1 plan, not executed. Use a lab device with console access; do not factory-rese
 - Back up `/etc/config/network` and `/etc/config/dhcp`.
 - Do not run `firstboot` as a diagnostic.
 - Do not scan networks you do not own.
+
+## Run log 2026-10-20
+
+- Environment: OpenWrt 25.12.6 x86 VM 200; LAN 192.168.1.2; HTTP checked from PVE host.
+- `uhttpd stop`: `http=000` (connection failed); SSH still worked.
+- `uhttpd start`: `http=200`.
+- Not tested: firewall drop, port change, LuCI package removal, serial/failsafe sequence.

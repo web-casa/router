@@ -2,10 +2,10 @@
 title: OpenClash 入门：兼容性、DNS 冲突与停用恢复
 description: 在合法网络环境中检查 OpenClash 的固件/架构/包格式兼容性，处理 DNS 冲突，并保证停用后基础联网可恢复。
 pageType: app
-tested: false
+tested: true
 testedVersions: ['25.12.6']
-evidenceLevel: E1
-testEnvironment: '待合法测试环境；不提供代理端点/订阅'
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；luci-app-openclash 0.48.002 apk 安装/启停；无代理端点/订阅'
 testRecipe: 'tests/recipes/openclash-25.12.md'
 aliases: ['openclash 安装', 'openclash 兼容性', 'openclash dns']
 symptoms: ['OpenClash 装不上', '开了 OpenClash 后没网', 'DNS 冲突']
@@ -25,13 +25,13 @@ import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86/ARM 待确认" tested={false} evidence="E1" />
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
 <TestRecord
-  status="planned"
-  environment="待合法测试环境；不提供代理端点/订阅"
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；luci-app-openclash 0.48.002 apk 安装/启停；无代理端点/订阅"
   recipe="tests/recipes/openclash-25.12.md"
-  result="E1：兼容性检查、DNS 冲突、停用恢复已整理；未在本次环境安装/运行"
+  result="E2 partial：0.48.002 apk 安装成功（43 个包，含 luci-compat/ruby）；无配置启动为 inactive；停用后 DNS 拒绝，重启 dnsmasq 恢复；未接代理端点/未验证分流"
 />
 
 > **范围**：本页只讨论合法网络环境中的兼容性、DNS 冲突、启停与恢复，不提供代理服务器、订阅链接、规则集，也不提供绕过网络封锁或规避服务地域/访问控制的步骤。使用前请确认当地法律、网络服务商条款和你要访问的服务条款。
@@ -180,10 +180,19 @@ logread | tail -50
 - OpenClash/Mihomo 是第三方项目，版本和依赖变化快；升级前看发布说明，保留回退包。
 - 本页不构成法律意见；有合规疑问时先咨询，不要先部署。
 
-## E1 状态与来源
+## E2 实测记录（2026-10-20）
 
-- 本页是 E1：兼容性检查、DNS 冲突和停用恢复按公开资料整理；没有在本次环境安装/运行 OpenClash。
-- 下一步按 `tests/recipes/openclash-25.12.md` 在合法测试环境记录固件/包格式/端口/停用恢复，再升级 E2；没有匹配包或没有合法配置就保持 E1。
+- 环境：OpenWrt 25.12.6 x86 VM 200；`luci-app-openclash 0.48.002` 官方 `.apk`。
+- `apk add --allow-untrusted` 安装成功，共 43 个包（含 `luci-compat`、Ruby、unzip）；`/etc/init.d/openclash` 和 LuCI controller 存在。
+- 没有代理配置/端点时执行 `start`，状态为 `inactive`；没有把它写成“已成功代理”。
+- `stop` + `disable` 后，`nslookup openwrt.org 127.0.0.1` 返回 connection refused；`/etc/init.d/dnsmasq restart` 后 DNS 恢复，公网 ping 正常。
+- 未测：真实代理端点/订阅、分流/DNS 命中、Mihomo 内核、TUN/防火墙规则、性能与稳定性。
+- 配方：`tests/recipes/openclash-25.12.md`。
+
+## E2 状态与来源
+
+- 本页是 E2 partial：25.12 `.apk` 安装、无配置启动、停用和 DNS 恢复已实测；代理运行/分流仍是 E1/E3 范围。
+- 没有合法代理端点和配置，就不要把“安装成功”写成“代理可用”。
 - 不要把本页扩展成代理订阅/绕过教程；那超出站点范围。
 
 <PageSources />

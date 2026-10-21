@@ -35,7 +35,7 @@
 
 ## 尚未完成
 
-- DNS、PVE、AGH 均已完成 E2 实验（见 `docs/dns-e2-run.md`、`docs/pve-e2-run.md`、`docs/agh-e2-run.md`）；SQM、041 固件辨识、043 OpenClash、014 软件源、016 进不去后台、002 固件下载核对已补 E1 页；005 LuCI、006 修改 LAN 地址、007 WAN DHCP、017 插件装不上、015 无法上网、009 旁路网关、008 有线 AP 已用临时 VM 做 E2；008 的 Wi-Fi/真实上游未测；009 的纯单臂旁路未测；015 的间歇/物理/应用层未测；007 的 PPPoE 仍为 E1；017 的架构拒绝/postinst 失败未复现；017 已加 asciinema cast 试点；OpenClash 严格限定兼容性/DNS/停用恢复，不含代理订阅或绕过内容。
+- DNS、PVE、AGH、005 LuCI、006 LAN、007 WAN DHCP、008 有线 AP、009 旁路网关、014 软件源、015 无法上网、016 进不去后台、017 插件装不上、025 SQM 配置/启停、043 OpenClash 安装/停用恢复已用临时 VM 做 E2；002、041 仍为 E1；008 的 Wi-Fi/真实上游、009 的纯单臂旁路、015 的间歇/物理/应用层、007 的 PPPoE、017 的架构拒绝/postinst、025 的真实线路性能、043 的代理运行/分流未测；OpenClash 严格限定兼容性/DNS/停用恢复，不含代理订阅或绕过内容。
 - 搜索验收：43/43 正向 + 5/5 负向，Top 5；22/22 alias 场景通过；见 `docs/search-acceptance.md`。
 - Pagefind extended 中文分词配置与查询扩展层。
 - 域名绑定、golden placeholder、Pages 生产部署与回滚。

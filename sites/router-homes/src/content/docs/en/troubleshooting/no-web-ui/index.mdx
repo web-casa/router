@@ -2,10 +2,10 @@
 title: "Cannot reach LuCI: IP, port, DHCP and console recovery"
 description: Work from LAN port and client address to the real management IP, uhttpd/SSH/firewall, and keep console/failsafe recovery without a blind factory reset.
 pageType: troubleshoot
-tested: false
+tested: true
 testedVersions: ['25.12.6']
-evidenceLevel: E1
-testEnvironment: 'OpenWrt 25.12.6 device reproduction pending; read-only/low-risk commands'
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; uhttpd stop/recover, HTTP 80 check, SSH retained'
 testRecipe: 'tests/recipes/troubleshooting-no-web-ui.md'
 aliases: ['openwrt cannot open luci', 'luci not loading', '192.168.1.1 not working', 'openwrt unreachable']
 symptoms: ['cannot open 192.168.1.1', 'login page times out', 'lost access after LAN change', 'no DHCP address']
@@ -25,13 +25,13 @@ import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="device reproduction pending" tested={false} evidence="E1" />
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
 <TestRecord
-  status="planned"
-  environment="OpenWrt 25.12.6 device reproduction pending; read-only/low-risk commands"
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; uhttpd stop/recover, HTTP 80 check, SSH retained"
   recipe="tests/recipes/troubleshooting-no-web-ui.md"
-  result="E1: layered triage and console/failsafe boundaries documented; not reproduced in this environment"
+  result="E2 partial: after stopping uhttpd, HTTP 80 refused and SSH stayed available; start restored HTTP 200; firewall/port change/failsafe untested"
 />
 
 ## Outcome
@@ -225,10 +225,18 @@ If only the LAN address is wrong, change it back and reboot after verifying. If 
 - A firewall rule blocks LAN management.
 - uhttpd is missing/removed, but the network is restarted repeatedly.
 
-## E1 status and sources
+## E2 lab run (2026-10-20)
 
-- This is E1: layered triage and console/failsafe boundaries are based on public documentation; it was not reproduced in this environment.
-- Next: use `tests/recipes/troubleshooting-no-web-ui.md` on a real device to simulate a wrong LAN, a stopped uhttpd, and a static client; record recovery, then promote to E2.
-- Do not turn this into a “universal recovery command”; console/failsafe procedures differ by device/firmware. Read the device docs first.
+- Environment: OpenWrt 25.12.6 x86 VM 200; LAN `192.168.1.2`; HTTP checked from the PVE host.
+- `/etc/init.d/uhttpd stop`: curl to `http://192.168.1.2/` returned `http=000` (connection failed); SSH stayed available.
+- `/etc/init.d/uhttpd start`: HTTP returned `200`.
+- Not tested: firewall drop, uhttpd port change, missing LuCI package, real serial/failsafe key sequence.
+- Recipe: `tests/recipes/troubleshooting-no-web-ui.md`.
+
+## E2 status and sources
+
+- This is E2 partial: uhttpd stop/recover and SSH retention were tested; firewall, port and failsafe remain documentation.
+- Decide whether it is link, address, uhttpd or firewall first; do not factory-reset instead of layering the diagnosis.
+- Console/failsafe procedures differ by device/firmware; read the device docs first.
 
 <PageSources />

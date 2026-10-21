@@ -2,10 +2,10 @@
 title: 软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI
 description: 分清 OpenWrt 25.12 的 apk 与 24.10 的 opkg，核对 release/target/架构/kmods，再安全替换国内镜像。
 pageType: app
-tested: false
+tested: true
 testedVersions: ['25.12.6']
-evidenceLevel: E1
-testEnvironment: '待 OpenWrt 25.12/24.10 设备；软件源格式与镜像路径已核对'
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；官方源/TUNA 切换、apk update/search/install、恢复官方源'
 testRecipe: 'tests/recipes/package-sources.md'
 aliases: ['openwrt 软件源', 'openwrt 国内镜像', 'apk 源', 'opkg 源', 'openwrt 插件装不上']
 symptoms: ['apk update 404', 'opkg update 失败', '插件依赖不匹配', '软件源签名错误']
@@ -25,14 +25,16 @@ import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="25.12 / 24.10 设备" tested={false} evidence="E1" />
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
 <TestRecord
-  status="planned"
-  environment="待 OpenWrt 25.12/24.10 设备；软件源格式与镜像路径已核对"
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；官方源/TUNA 切换、apk update/search/install、恢复官方源"
   recipe="tests/recipes/package-sources.md"
-  result="E1：apk/opkg 区别、feed 路径、镜像替换和失败恢复已整理；未在本次环境执行"
+  result="E2 partial：25.12.6 x86 官方源更新 11220 包；切 TUNA 后同样 11220；安装 sqm-scripts 1.7.2；恢复官方源后再 update 正常；24.10 opkg 未测"
 />
+
+先记住一句话：**apk 与 opkg 的区别**首先是固件版本，不是“哪个源更快”。25.12 用 `apk`，24.10 用 `opkg`；包格式、源路径和校验方式都不同，不能互换。
 
 ## 完成后你能确认什么
 
@@ -210,10 +212,19 @@ opkg update
 
 如果换源后完全无法更新，先恢复官方源，确认 DNS/时间/证书正常，再尝试镜像；不要连续换多个源。
 
-## E1 状态与来源
+## E2 实测记录（2026-10-20）
 
-- 本页是 E1：apk/opkg 结构、feed 路径和镜像替换按 OpenWrt 25.12 资料与实际索引整理；没有在本次环境执行换源。
-- 镜像路径会随 release 变化；发布前用 `tests/recipes/package-sources.md` 在 25.12/24.10 各跑一次 `update` 和 `search`，记录 URL/输出，再升级 E2。
+- 环境：OpenWrt 25.12.6 x86 VM 200；`apk`；官方源与 TUNA 镜像。
+- 官方源 `apk update`：`OK: 11220 distinct packages available`；`apk search -x sqm-scripts` 找到 `sqm-scripts-1.7.2-r1`。
+- 切 TUNA：`apk update` 同样 11220；`apk add sqm-scripts` 成功安装 `1.7.2-r1`。
+- 恢复官方源：`apk update` 正常，最终 feed 回到 `downloads.openwrt.org`。
+- 未测：24.10 的 `opkg`、签名错误、混源/ABI 不匹配、镜像索引损坏。
+- 配方：`tests/recipes/package-sources.md`。
+
+## E2 状态与来源
+
+- 本页是 E2 partial：25.12 `apk` 的官方源/TUNA/安装/恢复已实测；`opkg` 和错误源分支仍是文档步骤。
+- 镜像路径会随 release 变化；发布前在目标 release/target/arch 上再跑一次 `update`/`search`。
 - 不要混用官方、ImmortalWrt、iStoreOS 的源；ABI/内核/签名都可能不匹配。
 
 <PageSources />

@@ -2,7 +2,7 @@
 
 ## Status
 
-E1 plan, not executed. Lawful test environment only; no proxy endpoints, subscriptions or bypass steps are provided.
+E2 partial, run 2026-10-20: 0.48.002 .apk installed, no-config start/stop and DNS recovery verified; no proxy endpoint/routing test. Lawful test environment only; no proxy endpoints, subscriptions or bypass steps are provided.
 
 ## Environment
 
@@ -66,6 +66,14 @@ E1 plan, not executed. Lawful test environment only; no proxy endpoints, subscri
 - Disabling restores DNS and basic connectivity without factory reset.
 - LuCI/SSH remain reachable throughout.
 - No circumvention, subscription or shared-account steps are used.
+
+## Run log 2026-10-20
+
+- Environment: OpenWrt 25.12.6 x86 VM 200; luci-app-openclash 0.48.002 .apk.
+- `apk add --allow-untrusted` installed 43 packages (luci-compat, Ruby, unzip); init and LuCI controller exist.
+- No proxy config: `start` -> inactive.
+- After stop/disable: DNS refused; `/etc/init.d/dnsmasq restart` restored DNS; public ping OK.
+- No proxy endpoint/subscription/routing test.
 
 ## Not covered
 

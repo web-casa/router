@@ -2,7 +2,7 @@
 
 ## Status
 
-E1 plan, not executed. Do not bulk-upgrade packages.
+E2 partial, run 2026-10-20 on OpenWrt 25.12.6 x86. apk official/TUNA/install/restore verified; 24.10 opkg not tested. Do not bulk-upgrade packages.
 
 ## Environment
 
@@ -66,3 +66,11 @@ E1 plan, not executed. Do not bulk-upgrade packages.
 - No mixing official/ImmortalWrt/iStoreOS feeds.
 - No routine `--allow-untrusted`.
 - Keep a console path if DNS/time/certs break.
+
+## Run log 2026-10-20
+
+- Environment: OpenWrt 25.12.6 x86 VM 200; apk.
+- Official feed: `OK: 11220 distinct packages available`; `apk search -x sqm-scripts` -> `sqm-scripts-1.7.2-r1`.
+- TUNA: update 11220; `apk add sqm-scripts` installed 1.7.2-r1.
+- Restored official feed; update OK.
+- Not tested: 24.10 opkg, signature failure, mixed feeds/ABI, corrupt index.

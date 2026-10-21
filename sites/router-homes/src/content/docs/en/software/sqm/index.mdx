@@ -2,10 +2,10 @@
 title: "SQM and CAKE: stop lag under download and upload"
 description: Check whether lag is bufferbloat, shape WAN traffic with SQM/CAKE, and verify with before/after latency data. Virtual NICs cannot represent a real line.
 pageType: app
-tested: false
+tested: true
 testedVersions: ['25.12.6']
-evidenceLevel: E1
-testEnvironment: 'Real WAN/router pending; PVE virtual NIC can only validate configuration, not throughput/latency'
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; sqm-scripts 1.7.2 + luci-app-sqm; WAN eth1 DHCP; CAKE qdisc attached; no real-line performance data'
 testRecipe: 'tests/recipes/sqm-25.12.md'
 aliases: ['openwrt sqm', 'openwrt cake', 'sqm setup', 'bufferbloat']
 symptoms: ['game lag while downloading', 'video call stutter', 'latency spikes', 'slow browsing while uploading']
@@ -25,13 +25,13 @@ import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="real WAN router (pending)" tested={false} evidence="E1" />
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
 <TestRecord
-  status="planned"
-  environment="Real WAN router pending; a PVE virtual NIC can only validate configuration, not throughput/latency"
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; sqm-scripts 1.7.2 + luci-app-sqm; WAN eth1 DHCP; CAKE qdisc attached; no real-line performance data"
   recipe="tests/recipes/sqm-25.12.md"
-  result="E1: package names, options and measurement method documented; no real-line before/after run yet"
+  result="E2 partial: SQM started on eth1 at 100/20 Mbit with piece_of_cake.qos; tc showed cake 20Mbit; stopping restored fq_codel; no real-line throughput/latency data"
 />
 
 ## Outcome
@@ -46,7 +46,7 @@ import PageSources from '@components/PageSources.astro';
 - OpenWrt 25.12.6 with `apk`; `sqm-scripts 1.7.2`; optional `luci-app-sqm`.
 - The router is the **main NAT gateway** and WAN traffic passes through it. On an AP/bypass router, SQM may not see the main traffic.
 - CAKE costs CPU; on gigabit lines check single-core usage before adding shaping.
-- This page is E1: commands and parameters must be checked against your line/firmware before it becomes E2. Throughput/latency claims need a real WAN and are E3.
+- This page is E2 partial: install and CAKE attach/stop were tested. Throughput/latency claims need a real WAN and are E3.
 
 ## Is it bufferbloat?
 
@@ -227,10 +227,20 @@ uci commit sqm
 
 Or restore the previous `/etc/config/sqm` backup.
 
-## E1 status and sources
+## E2 lab run (2026-10-20)
 
-- This is E1: package names, options and verification steps are based on OpenWrt 25.12 documentation; no real-WAN run and no throughput/latency numbers.
-- Next: run `tests/recipes/sqm-25.12.md` on a real main router, record line/CPU/qdisc and before/after data, then promote to E2. Only real-line data can support E3.
-- CAKE inside a VM only proves that commands/qdisc attach; it cannot represent a home broadband line. Do not use VM numbers to claim “it works”.
+- Environment: OpenWrt 25.12.6 x86 VM 200; WAN `eth1` DHCP `192.168.50.158/24`; `sqm-scripts 1.7.2-r1`, `luci-app-sqm`.
+- Config: `eth1`, download `100000 Kbps`, upload `20000 Kbps`, `piece_of_cake.qos`, `cake`.
+- Start: `SQM: ... started on eth1 successfully`; `tc -s qdisc show dev eth1` showed `qdisc cake ... bandwidth 20Mbit`.
+- Stop: `SQM: Stopping SQM on eth1`; qdisc returned to `fq_codel`.
+- **Do not** use these VM numbers to claim lower latency/better experience; no real line, load latency or throughput comparison.
+- Not tested: real broadband bufferbloat before/after, CPU single-core use, PPPoE/VLAN overhead, Wi-Fi bottleneck.
+- Recipe: `tests/recipes/sqm-25.12.md`.
+
+## E2 status and sources
+
+- This is E2 partial: install, CAKE attach/stop and recovery were tested; real-line performance remains E3 scope.
+- A VM only proves commands/qdisc attach; it cannot represent home broadband. Do not use VM numbers to claim “it works”.
+- In a real environment, record line/CPU/qdisc, idle/load latency and throughput before deciding to keep SQM.
 
 <PageSources />

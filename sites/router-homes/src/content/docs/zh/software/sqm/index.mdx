@@ -2,10 +2,10 @@
 title: 下载时游戏/会议变卡：SQM 与 CAKE 怎么配、怎么测
 description: 先判断是不是 bufferbloat，再用 SQM/CAKE 限速整形，并用前后数据验证；虚拟网卡不能代表真实线路。
 pageType: app
-tested: false
+tested: true
 testedVersions: ['25.12.6']
-evidenceLevel: E1
-testEnvironment: '待真实 WAN/路由器；PVE 虚拟网卡仅用于配置检查，不能代表吞吐/延迟'
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；sqm-scripts 1.7.2 + luci-app-sqm；WAN eth1 DHCP；CAKE qdisc 已挂载；无真实线路性能数据'
 testRecipe: 'tests/recipes/sqm-25.12.md'
 aliases: ['openwrt sqm', 'openwrt cake', 'sqm 设置', 'bufferbloat']
 symptoms: ['下载时游戏卡', '视频会议卡', '延迟飙升', '上传时网页变慢']
@@ -25,13 +25,13 @@ import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="真实 WAN 路由器（待测）" tested={false} evidence="E1" />
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
 <TestRecord
-  status="planned"
-  environment="待真实 WAN 路由器；PVE 虚拟网卡只能验证配置，不能代表吞吐/延迟"
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；sqm-scripts 1.7.2 + luci-app-sqm；WAN eth1 DHCP；CAKE qdisc 已挂载；无真实线路性能数据"
   recipe="tests/recipes/sqm-25.12.md"
-  result="E1：包名、配置项和测量方法已整理；尚未在真实线路做前后对比"
+  result="E2 partial：SQM 在 eth1 以 100/20 Mbit + piece_of_cake.qos 启动，tc 显示 cake 20Mbit；关闭后恢复 fq_codel；没有真实线路吞吐/延迟数据"
 />
 
 ## 完成后你能确认什么
@@ -46,7 +46,7 @@ import PageSources from '@components/PageSources.astro';
 - OpenWrt 25.12.6，`apk` 包管理器；`sqm-scripts 1.7.2`，LuCI 可选 `luci-app-sqm`。
 - 路由器是**主路由/NAT 网关**，WAN 流量经过它；如果是 AP/旁路只转发部分流量，SQM 可能看不到主要流量。
 - CAKE 需要 CPU；千兆以上线路先看 CPU 单核占用，别把“降延迟”变成“降吞吐”。
-- 本页是 E1：命令和参数需要按你的线路/固件核对后才能算 E2；吞吐/延迟结论必须真实 WAN，标 E3。
+- 本页是 E2 partial：安装、CAKE 挂载/关闭已实测；吞吐/延迟结论必须基于真实 WAN，标 E3。
 
 ## 先判断是不是 bufferbloat
 
@@ -227,10 +227,20 @@ uci commit sqm
 
 或恢复改动前的 `/etc/config/sqm` 备份。
 
-## E1 状态与来源
+## E2 实测记录（2026-10-20）
 
-- 本页是 E1：包名、配置项、验证方法已按 OpenWrt 25.12 资料整理；没有在真实 WAN 上执行，也没有吞吐/延迟数字。
-- 下一步按 `tests/recipes/sqm-25.12.md` 在真实主路由上做空载/负载对比，记录线路、CPU、qdisc 和前后数据，再升级 E2；只有真实线路的前后数据才能支撑 E3。
-- 虚拟网卡/VM 里跑 CAKE 只能验证命令和 qdisc 是否挂上，不能代表家庭宽带；不要用 VM 数字写“有效”。
+- 环境：OpenWrt 25.12.6 x86 VM 200；WAN `eth1` DHCP `192.168.50.158/24`；`sqm-scripts 1.7.2-r1`、`luci-app-sqm`。
+- 配置：`eth1`、download `100000 Kbps`、upload `20000 Kbps`、`piece_of_cake.qos`、`cake`。
+- 启动：`SQM: ... started on eth1 successfully`；`tc -s qdisc show dev eth1` 显示 `qdisc cake ... bandwidth 20Mbit`。
+- 关闭：`SQM: Stopping SQM on eth1`；qdisc 恢复为 `fq_codel`。
+- **不能**用这组 VM 数字声称“降低延迟/提升体验”；没有真实线路、负载延迟或吞吐对比。
+- 未测：真实宽带 bufferbloat 前后对比、CPU 单核占用、PPPoE/VLAN 开销、Wi-Fi 瓶颈。
+- 配方：`tests/recipes/sqm-25.12.md`。
+
+## E2 状态与来源
+
+- 本页是 E2 partial：安装、CAKE 挂载/关闭和恢复已实测；真实线路性能仍为 E3 范围。
+- 虚拟网卡/VM 只能证明命令和 qdisc 是否挂上，不能代表家庭宽带；不要用 VM 数字写“有效”。
+- 真实环境请记录线路、CPU、qdisc、空载/负载延迟和吞吐，再决定是否保留 SQM。
 
 <PageSources />

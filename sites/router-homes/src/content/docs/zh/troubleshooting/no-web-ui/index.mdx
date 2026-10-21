@@ -2,10 +2,10 @@
 title: 进不去后台：IP、网口、DHCP 与本地控制台恢复
 description: 从 LAN 口、客户端地址、真实管理 IP 到 uhttpd/SSH/防火墙逐层排查，保留控制台和 failsafe 恢复路径。
 pageType: troubleshoot
-tested: false
+tested: true
 testedVersions: ['25.12.6']
-evidenceLevel: E1
-testEnvironment: '待 OpenWrt 25.12.6 设备复现；命令为只读/低风险'
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；uhttpd 停止/恢复、HTTP 80 验证、SSH 保留'
 testRecipe: 'tests/recipes/troubleshooting-no-web-ui.md'
 aliases: ['openwrt 进不去后台', 'luci 打不开', '192.168.1.1 进不去', 'openwrt 失联']
 symptoms: ['打不开 192.168.1.1', '登录页超时', '改 LAN 后失联', 'DHCP 没地址']
@@ -25,13 +25,13 @@ import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import PageSources from '@components/PageSources.astro';
 
-<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="待复现设备" tested={false} evidence="E1" />
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
 <TestRecord
-  status="planned"
-  environment="待 OpenWrt 25.12.6 设备复现；命令为只读/低风险"
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；uhttpd 停止/恢复、HTTP 80 验证、SSH 保留"
   recipe="tests/recipes/troubleshooting-no-web-ui.md"
-  result="E1：分层排查、控制台/failsafe 恢复边界已整理；未在本次环境复现"
+  result="E2 partial：停 uhttpd 后 HTTP 80 拒绝、SSH 仍可用；start 后 HTTP 200；未测防火墙/端口改动/failsafe"
 />
 
 ## 完成后你能确认什么
@@ -225,10 +225,18 @@ uci show dhcp
 - 防火墙把 LAN 管理口挡了；
 - uhttpd 没装/被卸载，却一直重启网络。
 
-## E1 状态与来源
+## E2 实测记录（2026-10-20）
 
-- 本页是 E1：分层排查和控制台/failsafe 边界按公开资料整理；没有在本次环境复现。
-- 下一步按 `tests/recipes/troubleshooting-no-web-ui.md` 在真实设备上模拟“改错 LAN/停 uhttpd/静态客户端”三种情况，记录恢复步骤，再升级 E2。
-- 不要把本页写成“万能恢复命令”；不同设备/固件的控制台和 failsafe 操作不同，先查设备文档。
+- 环境：OpenWrt 25.12.6 x86 VM 200；LAN `192.168.1.2`；从 PVE 主机 curl 验证 HTTP。
+- `/etc/init.d/uhttpd stop` 后：curl `http://192.168.1.2/` 返回 `http=000`（连接失败）；SSH 仍可用。
+- `/etc/init.d/uhttpd start` 后：HTTP 返回 `200`。
+- 未测：防火墙 drop、uhttpd 端口改动、LuCI 包缺失、串口/failsafe 实际按键流程。
+- 配方：`tests/recipes/troubleshooting-no-web-ui.md`。
+
+## E2 状态与来源
+
+- 本页是 E2 partial：uhttpd 停止/恢复和 SSH 保留已实测；防火墙、端口和 failsafe 仍按文档步骤。
+- 先判断是链路、地址、uhttpd、还是防火墙；不要用恢复出厂代替分层排查。
+- 不同设备/固件的控制台和 failsafe 操作不同，先查设备文档。
 
 <PageSources />
