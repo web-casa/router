@@ -57,7 +57,7 @@ echo "screendump /tmp/vm200.ppm" | qm monitor 200
 - 截图是 E2/E1 的辅助证据，不替代 TestRecord；不要因为有一张图就把未验证内容标成 E3。
 - 临时 VM、bridge、密码文件和 SSH 隧道用完即删；截图资产可以保留。
 
-## 终端 cast（asciinema，017 试点）
+## 终端 cast（asciinema，017/015 试点）
 
 - 组件：`src/components/TerminalCast.astro`；播放器 `asciinema-player 3.17`；录制 CLI `asciinema 2.4`。
 - 文件：`public/casts/<page>.cast`；通过 `<TerminalCast src="/casts/<page>.cast" title="..." caption="..." />` 引用。
@@ -65,5 +65,5 @@ echo "screendump /tmp/vm200.ppm" | qm monitor 200
 - 录制用 `asciinema rec --idle-time-limit 2 --cols 100 --rows 30 --title ...`；裁掉长等待，单份控制在几十 KB。
 - 录制前确认终端不会打印密码、Token、MAC、公网 IP、订阅链接；录完检查 `.cast` JSON 再提交。
 - 双语页面分别写 `title`/`caption`；cast 本身保持命令语言中立。
-- 当前试点：`017-plugin-install.cast`（sqm-scripts → luci-app-sqm → 菜单出现 → 移除/重装）。
+- 当前试点：`017-plugin-install.cast`（sqm-scripts → luci-app-sqm → 菜单出现 → 移除/重装）、`015-triage.cast`（DNS 停止 → WAN 断开 → 单终端默认路由删除）。
 - cast 内容不会被 Pagefind 索引；搜索/双语/无 JS 可读性依赖页面代码块。

@@ -1,0 +1,178 @@
+---
+title: 无法上网或间歇断流：全网、单终端、单应用分层排查
+description: 用“WAN、DNS、LAN/DHCP、终端路由、应用代理”五层定位，区分全网故障、单个设备故障和单个应用故障。
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；WAN 192.168.50.191/24；LAN 192.168.1.1；netns 客户端 192.168.1.175'
+testRecipe: 'tests/recipes/no-internet-triage-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt 无法上网', 'openwrt 间歇断流', '只有一台设备没网', 'dns 解析失败']
+symptoms: ['所有设备都没网', '只有一台设备没网', '能 ping IP 不能开网页', '网络时断时续']
+sources:
+  - label: OpenWrt network troubleshooting
+    url: https://openwrt.org/docs/guide-user/network/troubleshooting
+  - label: OpenWrt DHCP and DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt failsafe
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；WAN 192.168.50.191/24；LAN 192.168.1.1；netns 客户端 192.168.1.175"
+  recipe="tests/recipes/no-internet-triage-25.12.md"
+  result="E2 partial：DNS 停止时公网 IP 可 ping、DNS 失败，恢复后正常；ifdown WAN 时客户端网关通、公网失败，恢复后正常；删除客户端默认路由只影响该终端；间歇断流/物理 Wi-Fi/应用代理未测"
+  date="2026-10-20"
+/>
+
+## 先定义“没网”是哪一种
+
+| 现象 | 更像哪一层 | 先做什么 |
+|---|---|---|
+| 所有设备都打不开网页 | WAN/上游/DNS/NAT | 从路由器本机测 WAN 和 DNS |
+| 只有一台设备没网 | 该终端的 IP/网关/DNS/Wi-Fi/VPN | 对比同网段另一台设备 |
+| 只有某个 App 不行 | App 的 DNS/代理/QUIC/IPv6 | 换浏览器/关闭代理/测 DNS |
+| 时断时续 | 链路、DHCP 租约、Wi-Fi、上游 | 记录时间线，不要只 ping 一次 |
+| 能 ping IP，不能开网页 | DNS 或代理 | `nslookup` + 换 DNS 测试 |
+
+## 五层排查
+
+### 1. WAN / 上游
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+ping -c 3 192.168.50.1
+ping -c 3 1.1.1.1
+```
+
+- WAN 没有地址：看 DHCP/PPPoE（007）；
+- 网关不通：查网线/上游/光猫；
+- 网关通但公网 IP 不通：查上游/NAT/防火墙；
+- 只丢部分包：别急着改配置，先记录时间和链路状态。
+
+### 2. DNS
+
+```sh
+nslookup openwrt.org 127.0.0.1
+nslookup openwrt.org 192.168.50.1
+cat /tmp/resolv.conf.d/resolv.conf.auto
+logread | grep -i dnsmasq | tail -20
+```
+
+本实验把 dnsmasq 停掉后：
+
+- 路由器 `ping 1.1.1.1` 仍然通；
+- `nslookup openwrt.org 127.0.0.1` 失败；
+- 客户端 `ping 1.1.1.1` 仍然通，但 DNS 失败；
+- 重新启动 dnsmasq 后恢复。
+
+这就是典型“IP 通、域名不通”。
+
+### 3. LAN / DHCP / 终端地址
+
+```sh
+ip -4 addr show br-lan
+cat /tmp/dhcp.leases
+ip neigh
+```
+
+客户端侧：
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.1.1
+```
+
+客户端网关不对、IP 冲突、仍是旧网段，都会表现成“只有这台设备没网”。
+
+### 4. 防火墙 / NAT / 转发
+
+```sh
+uci show firewall
+nft list ruleset 2>/dev/null | head -80
+logread | grep -i firewall | tail -20
+```
+
+WAN 有地址、DNS 正常，但 LAN 客户端公网不通时，查：
+
+- LAN/WAN zone 是否配对；
+- WAN masquerade 是否开启；
+- LAN→WAN forward 是否允许；
+- 是否有自定义规则挡了 DNS/转发。
+
+### 5. 单终端 / 单应用
+
+单终端：
+
+- 删除默认路由测试：`ip route del default`，此时网关仍通、公网失败，说明问题在这台终端的路由；
+- 恢复：`ip route add default via 192.168.1.1`；
+- 检查 Wi-Fi、VPN、代理、私有 DNS、IPv6 优先级。
+
+单应用：
+
+- 换浏览器/关闭代理；
+- 用 `nslookup`/`curl -v` 对比；
+- 应用自带 DoH/QUIC/代理时，可能绕过路由器 DNS；
+- 不要用“重装 App”代替分层排查。
+
+## 录屏演示（015 实验）
+
+<TerminalCast
+  src="/casts/015-triage.cast"
+  title="015 实验：DNS、WAN、单终端路由分层"
+  caption="真实 OpenWrt 25.12.6 VM + netns 客户端：先停 DNS（IP 通/DNS 失败），再 ifdown WAN（网关通/公网失败），最后删除客户端默认路由（仅该终端失败）。命令以正文代码块为准。"
+/>
+
+## 间歇断流怎么记
+
+不要只写“偶尔断”。记录：
+
+- 时间、持续多久、是否自动恢复；
+- 影响全部设备还是单个；
+- 有线/ Wi-Fi、2.4G/5G；
+- WAN 地址/租约是否变化；
+- `logread` 中 link/DHCP/DNS/firewall 的时间点；
+- 是否在下载/上传/漫游/休眠时发生。
+
+没有时间线的“间歇”很难定位，也无法验证修复。
+
+## 恢复顺序
+
+1. 先恢复 WAN/DNS 服务，不急着恢复出厂；
+2. 单终端问题先改该终端，不动路由器；
+3. 单应用问题先关代理/私有 DNS；
+4. 需要重启时，记录重启前状态；
+5. 最后才考虑恢复出厂，并先备份配置。
+
+## E2 实测记录（2026-10-20）
+
+- 环境：OpenWrt 25.12.6 x86 VM 200；WAN DHCP `192.168.50.191/24`；LAN `192.168.1.1/24`；netns 客户端 `192.168.1.175/24`。
+- DNS 停止：路由器公网 ping 正常；路由器/客户端 DNS 均失败；重启 dnsmasq 恢复。
+- WAN `ifdown`：WAN 地址消失；客户端能 ping 网关，不能 ping `1.1.1.1`；`ifup wan` 恢复。
+- 客户端删除默认路由：能 ping 网关，公网不可达；恢复默认路由后正常。
+- 未测：真实 Wi-Fi、物理断流、上游抖动、应用代理/DoH/QUIC、IPv6 优先级。
+- cast：`public/casts/015-triage.cast`；配方：`tests/recipes/no-internet-triage-25.12.md`。
+
+## 来源与复核
+
+- 本页是 E2 partial：三类受控故障已实测；间歇/物理/应用层未覆盖。
+- 没有第二评审人；结论只限本次 VM/netns 环境。
+- 不要用一个 ping 或一次网页打不开就断言“运营商问题”。
+
+<PageSources />

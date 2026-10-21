@@ -108,6 +108,11 @@ const meta = {
           translations: { 'zh-CN': '插件装不上' },
           slug: 'troubleshooting/plugin-install',
         },
+        {
+          label: 'No internet',
+          translations: { 'zh-CN': '无法上网' },
+          slug: 'troubleshooting/no-internet',
+        },
       ],
     },
   ],

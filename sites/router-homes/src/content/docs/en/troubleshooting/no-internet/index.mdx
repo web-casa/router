@@ -1,0 +1,178 @@
+---
+title: "No internet or intermittent drops: all devices, one client, one app"
+description: Use five layers (WAN, DNS, LAN/DHCP, client route, app proxy) to tell a whole-network failure from a single-device or single-app failure.
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; WAN 192.168.50.191/24; LAN 192.168.1.1; netns client 192.168.1.175'
+testRecipe: 'tests/recipes/no-internet-triage-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt no internet', 'openwrt intermittent drops', 'only one device has no internet', 'dns resolution fails']
+symptoms: ['all devices offline', 'only one device offline', 'ping IP works but web fails', 'network drops intermittently']
+sources:
+  - label: OpenWrt network troubleshooting
+    url: https://openwrt.org/docs/guide-user/network/troubleshooting
+  - label: OpenWrt DHCP and DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt failsafe
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; WAN 192.168.50.191/24; LAN 192.168.1.1; netns client 192.168.1.175"
+  recipe="tests/recipes/no-internet-triage-25.12.md"
+  result="E2 partial: with DNS stopped, public IP ping worked but DNS failed; after restart it recovered. With WAN ifdown, the client gateway worked but public IP failed; ifup recovered. Removing the client default route broke only that terminal. Intermittent/physical Wi-Fi/app proxy not tested."
+  date="2026-10-20"
+/>
+
+## Define which “no internet” this is
+
+| Symptom | More likely layer | First step |
+|---|---|---|
+| All devices cannot browse | WAN/upstream/DNS/NAT | test WAN/DNS from the router |
+| Only one device is offline | that client's IP/gateway/DNS/Wi-Fi/VPN | compare another client on the same LAN |
+| Only one app fails | app DNS/proxy/QUIC/IPv6 | try another browser, disable proxy, test DNS |
+| Intermittent | link, DHCP lease, Wi-Fi, upstream | record a timeline; one ping is not enough |
+| Ping IP works, web fails | DNS or proxy | `nslookup` + alternate DNS |
+
+## Five layers
+
+### 1. WAN / upstream
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+ping -c 3 192.168.50.1
+ping -c 3 1.1.1.1
+```
+
+- No WAN address: check DHCP/PPPoE (see 007);
+- Gateway unreachable: cable/upstream/ONT;
+- Gateway reachable but public IP fails: upstream/NAT/firewall;
+- Partial loss: record time/link state before changing config.
+
+### 2. DNS
+
+```sh
+nslookup openwrt.org 127.0.0.1
+nslookup openwrt.org 192.168.50.1
+cat /tmp/resolv.conf.d/resolv.conf.auto
+logread | grep -i dnsmasq | tail -20
+```
+
+With dnsmasq stopped in this lab:
+
+- router `ping 1.1.1.1` still worked;
+- `nslookup openwrt.org 127.0.0.1` failed;
+- client `ping 1.1.1.1` worked, DNS failed;
+- restarting dnsmasq recovered.
+
+That is the classic “IP works, names fail” pattern.
+
+### 3. LAN / DHCP / client address
+
+```sh
+ip -4 addr show br-lan
+cat /tmp/dhcp.leases
+ip neigh
+```
+
+On the client:
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.1.1
+```
+
+Wrong gateway, IP conflict, or an old subnet all look like “only this device is offline”.
+
+### 4. Firewall / NAT / forwarding
+
+```sh
+uci show firewall
+nft list ruleset 2>/dev/null | head -80
+logread | grep -i firewall | tail -20
+```
+
+If WAN has an address and DNS is fine but LAN clients cannot reach the internet, check:
+
+- LAN/WAN zones;
+- WAN masquerade;
+- LAN→WAN forward;
+- custom rules blocking DNS/forwarding.
+
+### 5. One client / one app
+
+One client:
+
+- remove its default route: `ip route del default`; if the gateway still works but public IP fails, the issue is that client's route;
+- restore: `ip route add default via 192.168.1.1`;
+- check Wi-Fi, VPN, proxy, private DNS, IPv6 preference.
+
+One app:
+
+- try another browser / disable proxy;
+- compare with `nslookup`/`curl -v`;
+- app-level DoH/QUIC/proxy can bypass the router DNS;
+- do not “reinstall the app” instead of layering the diagnosis.
+
+## Recorded demo (015 lab)
+
+<TerminalCast
+  src="/casts/015-triage.cast"
+  title="015 lab: DNS, WAN and one-client route"
+  caption="Real OpenWrt 25.12.6 VM + netns client: stop DNS (IP works/DNS fails), ifdown WAN (gateway works/public fails), then remove the client default route (only that client fails). Code blocks are authoritative."
+/>
+
+## Recording intermittent drops
+
+Do not write “sometimes drops”. Record:
+
+- time, duration, whether it self-recovers;
+- all devices or one;
+- wired vs Wi-Fi, 2.4/5 GHz;
+- whether the WAN address/lease changed;
+- link/DHCP/DNS/firewall timestamps in `logread`;
+- whether it happens during download/upload/roaming/sleep.
+
+Without a timeline, “intermittent” is hard to fix or verify.
+
+## Recovery order
+
+1. Restore WAN/DNS service first; do not factory-reset;
+2. For one client, change that client, not the router;
+3. For one app, disable proxy/private DNS first;
+4. If rebooting, record the state before reboot;
+5. Factory reset is the last resort; back up first.
+
+## E2 lab run (2026-10-20)
+
+- Environment: OpenWrt 25.12.6 x86 VM 200; WAN DHCP `192.168.50.191/24`; LAN `192.168.1.1/24`; netns client `192.168.1.175/24`.
+- DNS stopped: router public ping worked; router/client DNS failed; dnsmasq restart recovered.
+- WAN `ifdown`: WAN address disappeared; client pinged the gateway but not `1.1.1.1`; `ifup wan` recovered.
+- Client default route removed: gateway worked, public IP unreachable; restoring the route recovered.
+- Not tested: real Wi-Fi, physical link flaps, upstream jitter, app proxy/DoH/QUIC, IPv6 preference.
+- Cast: `public/casts/015-triage.cast`; recipe: `tests/recipes/no-internet-triage-25.12.md`.
+
+## Sources and review
+
+- This is E2 partial: three controlled failures were tested; intermittent/physical/app layers were not.
+- No independent reviewer; conclusions are limited to this VM/netns environment.
+- Do not blame the ISP from one ping or one failed page load.
+
+<PageSources />

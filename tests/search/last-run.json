@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-21T03:49:49.913Z",
-  "base": "http://127.0.0.1:36301",
+  "generatedAt": "2026-10-21T05:06:58.487Z",
+  "base": "http://127.0.0.1:38333",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -56,6 +56,11 @@
             "excerpt": ""
           },
           {
+            "url": "/zh/troubleshooting/no-internet/",
+            "title": "无法上网或间歇断流：全网、单终端、单应用分层排查",
+            "excerpt": ""
+          },
+          {
             "url": "/zh/network/lan-address/",
             "title": "修改 LAN 地址并重新进入后台：新旧网段、DHCP 与恢复",
             "excerpt": ""
@@ -63,11 +68,6 @@
           {
             "url": "/zh/software/openclash/",
             "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
-            "excerpt": ""
-          },
-          {
-            "url": "/zh/installation/proxmox/",
-            "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
             "excerpt": ""
           }
         ]
@@ -647,13 +647,13 @@
             "excerpt": ""
           },
           {
-            "url": "/en/software/openclash/",
-            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
+            "url": "/en/troubleshooting/no-internet/",
+            "title": "No internet or intermittent drops: all devices, one client, one app",
             "excerpt": ""
           },
           {
-            "url": "/en/installation/proxmox/",
-            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "url": "/en/software/openclash/",
+            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
             "excerpt": ""
           }
         ]
@@ -915,7 +915,7 @@
         "expectedUrls": [
           "/en/getting-started/which-openwrt/"
         ],
-        "rank": 2,
+        "rank": 3,
         "results": [
           {
             "url": "/en/getting-started/firmware-download/",
@@ -923,13 +923,13 @@
             "excerpt": ""
           },
           {
-            "url": "/en/getting-started/which-openwrt/",
-            "title": "Which OpenWrt is this: official, ImmortalWrt, iStoreOS or vendor firmware?",
+            "url": "/en/software/package-sources/",
+            "title": "Package feeds and China mirrors: keep apk and opkg separate",
             "excerpt": ""
           },
           {
-            "url": "/en/software/package-sources/",
-            "title": "Package feeds and China mirrors: keep apk and opkg separate",
+            "url": "/en/getting-started/which-openwrt/",
+            "title": "Which OpenWrt is this: official, ImmortalWrt, iStoreOS or vendor firmware?",
             "excerpt": ""
           },
           {
