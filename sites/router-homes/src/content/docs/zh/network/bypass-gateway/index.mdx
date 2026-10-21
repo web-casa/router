@@ -1,0 +1,233 @@
+---
+title: 旁路网关：关 DHCP、指定网关/DNS 与客户端切换
+description: 把 OpenWrt 作为旁路网关时，先分清“单臂旁路”和“带 WAN 的二级网关”，再改 LAN、关 DHCP、设置客户端网关/DNS 并准备回滚。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: '带 WAN 的旁路网关 E2：LAN 192.168.1.2/24，DHCP 关闭，WAN 192.168.50.5/24；客户端静态 192.168.1.100；纯单臂旁路未测'
+testRecipe: 'tests/recipes/bypass-gateway-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt 旁路网关', 'openwrt 旁路由', '旁路由 dhcp', 'openwrt 网关指向']
+symptoms: ['旁路由改了没网', '客户端网关怎么设', '旁路由 DHCP 冲突']
+sources:
+  - label: OpenWrt network configuration
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP and DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt bridging/relay
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="带 WAN 的旁路网关 E2：LAN 192.168.1.2/24，DHCP 关闭，WAN 192.168.50.5/24；客户端静态 192.168.1.100；纯单臂旁路未测"
+  recipe="tests/recipes/bypass-gateway-25.12.md"
+  result="E2 partial：DHCP 关闭后客户端拿不到租约；静态客户端网关/DNS 指向 .2 时公网 ping、DNS 正常；DNS 切到 1.1.1.1 正常；改死网关 .250 公网失败，恢复 .2 正常"
+  date="2026-10-20"
+/>
+
+## 先选模式：单臂旁路 vs 带 WAN 的二级网关
+
+| 模式 | OpenWrt 接口 | 谁做 DHCP | 客户端网关/DNS | 本页验证 |
+|---|---|---|---|---|
+| 单臂旁路 | 只接 LAN，不接 WAN | 上游主路由 | 指向旁路 LAN IP | 未测（E1 步骤） |
+| 带 WAN 的二级网关 | LAN + WAN | 上游或旁路都可 | 指向旁路 LAN IP | **E2** |
+
+两者都能“让客户端走 OpenWrt”，但故障点不同：
+
+- 单臂旁路：没有 DHCP/NAT 时，必须保证主路由知道回程路由，或旁路自己做 NAT；
+- 带 WAN：OpenWrt 自己拨号/拿 DHCP，LAN 客户端由它 NAT，适合本页实验。
+
+不要混着写“旁路由已成功”，却没说是否有 WAN、谁做 DHCP。
+
+## 本实验拓扑
+
+```text
+上游 192.168.50.1
+      │
+  WAN eth1（DHCP 192.168.50.5/24）
+      │
+  OpenWrt VM 200
+      │
+  LAN br-lan 192.168.1.2/24
+      │  DHCP 关闭
+  客户端 192.168.1.100/24
+  gateway/DNS = 192.168.1.2
+```
+
+- LAN 里没有 .1，避免和上游/主路由冲突；
+- 客户端必须静态配 IP/网关/DNS；
+- 关闭 DHCP 后，客户端还发 DHCP 请求也不会有人应答，这是预期。
+
+## 配置步骤
+
+<Step where="router-shell" title="备份并确认 LAN/WAN 现状" expected="知道 LAN IP、WAN 协议和 DHCP 状态。" >
+
+```sh
+uci show network.lan
+uci show network.wan
+uci show dhcp.lan
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+保留控制台；改 LAN IP 后，旧地址会立即失效。
+
+</Step>
+
+<Step where="luci" title="改 LAN IP 并关闭 DHCP" expected="LAN 是 192.168.1.2/24，DHCP 不再发地址。" >
+
+**Network → Interfaces → LAN → Edit**：
+
+1. IPv4 address 改成 `192.168.1.2/24`；
+2. **DHCP Server → General → Ignore interface** 勾选；
+3. 保存并应用。
+
+CLI 等价：
+
+```sh
+uci set network.lan.ipaddr='192.168.1.2/24'
+uci set dhcp.lan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+改完用新地址 `192.168.1.2` 重新进 LuCI/SSH。
+
+</Step>
+
+<Step where="router-shell" title="保留 WAN 与 NAT（带 WAN 模式）" expected="WAN 有地址，LAN→WAN 能转发/NAT。" >
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+uci show firewall | grep -E 'zone|masquerade|forward'
+```
+
+本实验 WAN 为 `192.168.50.5/24`，网关 `192.168.50.1`；LAN 客户端通过 OpenWrt NAT 出公网。
+
+</Step>
+
+<Step where="client" title="客户端静态指向旁路" expected="客户端 gateway/DNS 都是 192.168.1.2，公网/DNS 正常。" >
+
+```sh
+# 示例：Linux
+ip addr add 192.168.1.100/24 dev eth0
+ip route add default via 192.168.1.2
+echo 'nameserver 192.168.1.2' > /etc/resolv.conf
+ping -c 2 192.168.1.2
+ping -c 2 1.1.1.1
+nslookup openwrt.org 192.168.1.2
+```
+
+Windows：IPv4 属性里手动填 IP、网关、DNS；不要同时保留旧 DHCP 地址。
+
+</Step>
+
+<Step where="client" title="验证 DHCP 确实关闭" expected="客户端发 DHCP 没有 offer；静态配置仍可用。" >
+
+```sh
+# Linux 示例
+udhcpc -i eth0 -f -q -n -t 3
+```
+
+本实验输出 `no lease, failing`；随后静态地址仍能 ping/解析。若还能拿到地址，说明还有第二个 DHCP 或 `ignore` 没生效。
+
+</Step>
+
+<Step where="client" title="切换 DNS / 网关做对照" expected="能区分 DNS 故障和网关故障。" >
+
+```sh
+# DNS 换成公共 DNS
+nslookup openwrt.org 1.1.1.1
+# 网关改成一个不存在的地址
+ip route replace default via 192.168.1.250
+ping -c 2 1.1.1.1
+# 恢复
+ip route replace default via 192.168.1.2
+```
+
+本实验：DNS 换 `1.1.1.1` 正常；网关改 `.250` 后公网 100% 丢包；恢复 `.2` 正常。
+
+</Step>
+
+## 单臂旁路（E1，未在本轮实测）
+
+只有 LAN、没有 WAN 时，典型配置：
+
+- 旁路 LAN：`192.168.1.2/24`，网关指向主路由 `192.168.1.1`；
+- 关闭旁路 DHCP；
+- 客户端网关/DNS 指向 `192.168.1.2`；
+- 旁路开启转发；主路由需有回程路由，或旁路对 LAN 做 NAT；
+- 主路由防火墙不能丢掉“源 IP 是客户端、目的公网”的转发。
+
+这部分没有主路由实验环境，**不标 E2**；按你的主路由型号和防火墙单独验证。
+
+## 常见失败
+
+### 改完 LAN 后进不去
+
+- 还用旧 IP；
+- 客户端没换到 `192.168.1.0/24`；
+- 旧 ARP 缓存：`ip neigh flush dev <iface>`；
+- 用控制台确认 `ip -4 addr show br-lan`。
+
+### 客户端拿不到地址
+
+- 旁路 DHCP 关了，这是预期；客户端要静态；
+- 如果还想 DHCP，必须只保留一个 DHCP（旁路或主路由），不要两个都开；
+- 检查 `dhcp.lan.ignore` 和第二个 DHCP。
+
+### 客户端有地址但没网
+
+- 网关/DNS 没指向旁路；
+- 旁路没有默认路由/上游；
+- 防火墙 forwarding/NAT；
+- 主路由不知道回程路由（单臂模式）；
+- 网段冲突/双 NAT。
+
+### DNS 不通
+
+- 客户端 DNS 还是旧网关；
+- 旁路 dnsmasq 没监听 LAN；
+- 上游 DNS 被挡；
+- 应用自带 DoH/私有 DNS。
+
+## 录屏演示（009 实验）
+
+<TerminalCast
+  src="/casts/009-bypass.cast"
+  title="009 实验：旁路网关、关 DHCP、静态网关/DNS"
+  caption="真实 OpenWrt 25.12.6 VM：LAN .2 + WAN DHCP，DHCP 关闭；客户端静态 .100，验证公网/DNS、DNS 切换、死网关失败与恢复。纯单臂旁路未在本 cast 中验证。"
+/>
+
+## E2 实测记录（2026-10-20）
+
+- 环境：OpenWrt 25.12.6 x86 VM 200；LAN `192.168.1.2/24`；DHCP `ignore=1`；WAN DHCP `192.168.50.5/24`；客户端 netns `192.168.1.100/24`。
+- DHCP 关闭：客户端 `udhcpc` 无 offer（`no lease, failing`）；静态地址可用。
+- 静态网关/DNS `.2`：ping 网关、ping `1.1.1.1`、`nslookup` 均正常。
+- DNS 改 `1.1.1.1` 正常；死网关 `.250` 公网失败；恢复 `.2` 正常。
+- 未测：纯单臂旁路、主路由回程路由、真实 Wi-Fi/Windows 客户端、IPv6/RA。
+- cast：`public/casts/009-bypass.cast`；配方：`tests/recipes/bypass-gateway-25.12.md`。
+
+## 来源与复核
+
+- 本页是 E2 partial：带 WAN 的旁路网关已实测；单臂旁路只有 E1 步骤。
+- 没有第二评审人；结论只限本次 VM/netns 环境。
+- 不要把“旁路网关”当成一个固定配置；先确认谁做 DHCP、谁做 NAT、回程路由是否存在。
+
+<PageSources />

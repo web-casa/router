@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-21T05:06:58.487Z",
-  "base": "http://127.0.0.1:38333",
+  "generatedAt": "2026-10-21T08:09:03.885Z",
+  "base": "http://127.0.0.1:41403",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -66,8 +66,8 @@
             "excerpt": ""
           },
           {
-            "url": "/zh/software/openclash/",
-            "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
+            "url": "/zh/network/bypass-gateway/",
+            "title": "旁路网关：关 DHCP、指定网关/DNS 与客户端切换",
             "excerpt": ""
           }
         ]
@@ -591,8 +591,13 @@
         "expectedUrls": [
           "/en/network/dns/"
         ],
-        "rank": 1,
+        "rank": 2,
         "results": [
+          {
+            "url": "/en/network/bypass-gateway/",
+            "title": "Bypass gateway: disable DHCP, set client gateway/DNS, and switch back",
+            "excerpt": ""
+          },
           {
             "url": "/en/network/dns/",
             "title": "Configure DNS and verify router, client and browser",
@@ -611,11 +616,6 @@
           {
             "url": "/en/installation/proxmox/",
             "title": "Install OpenWrt on a single-NIC Proxmox VE host",
-            "excerpt": ""
-          },
-          {
-            "url": "/en/network/wan-connectivity/",
-            "title": "Main-router connectivity: verify WAN DHCP and PPPoE separately",
             "excerpt": ""
           }
         ]
@@ -1053,6 +1053,11 @@
             "excerpt": ""
           },
           {
+            "url": "/en/network/bypass-gateway/",
+            "title": "Bypass gateway: disable DHCP, set client gateway/DNS, and switch back",
+            "excerpt": ""
+          },
+          {
             "url": "/en/network/lan-address/",
             "title": "Change the LAN address and get back in: old/new subnet, DHCP and recovery",
             "excerpt": ""
@@ -1180,6 +1185,11 @@
           {
             "url": "/en/software/adguard-home/",
             "title": "AdGuard Home: from web UI to client filtering",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/network/bypass-gateway/",
+            "title": "Bypass gateway: disable DHCP, set client gateway/DNS, and switch back",
             "excerpt": ""
           }
         ],

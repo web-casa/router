@@ -55,6 +55,11 @@ const meta = {
           translations: { 'zh-CN': '主路由联网' },
           slug: 'network/wan-connectivity',
         },
+        {
+          label: 'Bypass gateway',
+          translations: { 'zh-CN': '旁路网关' },
+          slug: 'network/bypass-gateway',
+        },
       ],
     },
     {

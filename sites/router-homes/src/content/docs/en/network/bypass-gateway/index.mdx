@@ -1,0 +1,233 @@
+---
+title: "Bypass gateway: disable DHCP, set client gateway/DNS, and switch back"
+description: Distinguish a one-arm bypass from a WAN-enabled second gateway, then change LAN, disable DHCP, point clients at the bypass and keep a rollback path.
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'WAN-enabled bypass E2: LAN 192.168.1.2/24, DHCP off, WAN 192.168.50.5/24; static client 192.168.1.100; pure one-arm bypass untested'
+testRecipe: 'tests/recipes/bypass-gateway-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt bypass gateway', 'openwrt bypass router', 'bypass router dhcp', 'openwrt gateway change']
+symptoms: ['bypass router breaks internet', 'how to set client gateway', 'bypass DHCP conflict']
+sources:
+  - label: OpenWrt network configuration
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP and DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt bridging/relay
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="WAN-enabled bypass E2: LAN 192.168.1.2/24, DHCP off, WAN 192.168.50.5/24; static client 192.168.1.100; pure one-arm bypass untested"
+  recipe="tests/recipes/bypass-gateway-25.12.md"
+  result="E2 partial: with DHCP off the client got no lease; static gateway/DNS .2 gave working public ping and DNS; DNS 1.1.1.1 worked; a dead gateway .250 broke public access and restoring .2 recovered."
+  date="2026-10-20"
+/>
+
+## Pick the mode: one-arm bypass vs WAN-enabled gateway
+
+| Mode | OpenWrt interfaces | Who serves DHCP | Client gateway/DNS | Tested here |
+|---|---|---|---|---|
+| One-arm bypass | LAN only, no WAN | upstream main router | bypass LAN IP | no (E1 steps) |
+| WAN-enabled gateway | LAN + WAN | upstream or bypass | bypass LAN IP | **E2** |
+
+Both can “send clients through OpenWrt”, but failure points differ:
+
+- one-arm bypass: without DHCP/NAT, the main router must know the return route, or the bypass must NAT;
+- WAN-enabled: OpenWrt gets its own WAN address and NATs LAN clients; this is the lab mode.
+
+Do not say “bypass works” without saying whether it has WAN and who does DHCP.
+
+## Lab topology
+
+```text
+Upstream 192.168.50.1
+      │
+  WAN eth1 (DHCP 192.168.50.5/24)
+      │
+  OpenWrt VM 200
+      │
+  LAN br-lan 192.168.1.2/24
+      │  DHCP disabled
+  Client 192.168.1.100/24
+  gateway/DNS = 192.168.1.2
+```
+
+- There is no `.1` on this LAN, avoiding the upstream/main-router conflict;
+- clients must be static;
+- with DHCP off, DHCP requests get no answer by design.
+
+## Configuration
+
+<Step where="router-shell" title="Back up and record LAN/WAN state" expected="You know the LAN IP, WAN protocol and DHCP state.">
+
+```sh
+uci show network.lan
+uci show network.wan
+uci show dhcp.lan
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+Keep console access; the old LAN IP dies immediately.
+
+</Step>
+
+<Step where="luci" title="Change LAN IP and disable DHCP" expected="LAN is 192.168.1.2/24 and DHCP no longer hands out addresses.">
+
+**Network → Interfaces → LAN → Edit**:
+
+1. IPv4 address: `192.168.1.2/24`;
+2. **DHCP Server → General → Ignore interface**;
+3. Save and apply.
+
+CLI equivalent:
+
+```sh
+uci set network.lan.ipaddr='192.168.1.2/24'
+uci set dhcp.lan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+Then reopen LuCI/SSH at `192.168.1.2`.
+
+</Step>
+
+<Step where="router-shell" title="Keep WAN and NAT (WAN-enabled mode)" expected="WAN has an address and LAN→WAN forwarding/NAT works.">
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+uci show firewall | grep -E 'zone|masquerade|forward'
+```
+
+This lab used WAN `192.168.50.5/24`, gateway `192.168.50.1`; LAN clients NAT through OpenWrt.
+
+</Step>
+
+<Step where="client" title="Point the client at the bypass" expected="Client gateway/DNS are 192.168.1.2; public IP and DNS work.">
+
+```sh
+# Linux example
+ip addr add 192.168.1.100/24 dev eth0
+ip route add default via 192.168.1.2
+echo 'nameserver 192.168.1.2' > /etc/resolv.conf
+ping -c 2 192.168.1.2
+ping -c 2 1.1.1.1
+nslookup openwrt.org 192.168.1.2
+```
+
+Windows: set IP, gateway and DNS manually; do not keep the old DHCP address.
+
+</Step>
+
+<Step where="client" title="Confirm DHCP is really off" expected="DHCP gets no offer; the static configuration still works.">
+
+```sh
+# Linux example
+udhcpc -i eth0 -f -q -n -t 3
+```
+
+This lab printed `no lease, failing`; the static address still pinged/resolved. If you still get a lease, a second DHCP server exists or `ignore` did not apply.
+
+</Step>
+
+<Step where="client" title="Switch DNS/gateway as a control" expected="Separate DNS failure from gateway failure.">
+
+```sh
+# public DNS
+nslookup openwrt.org 1.1.1.1
+# dead gateway
+ip route replace default via 192.168.1.250
+ping -c 2 1.1.1.1
+# restore
+ip route replace default via 192.168.1.2
+```
+
+This lab: public DNS worked; `.250` gave 100% loss; restoring `.2` recovered.
+
+</Step>
+
+## One-arm bypass (E1, not tested here)
+
+LAN-only, no WAN:
+
+- bypass LAN `192.168.1.2/24`, gateway to the main router `192.168.1.1`;
+- disable bypass DHCP;
+- client gateway/DNS `.2`;
+- enable forwarding; the main router needs a return route, or the bypass NATs LAN traffic;
+- the main router firewall must allow client→internet forwarding.
+
+No main-router lab was available, so this part is **E1**, not E2; verify against your router/firewall.
+
+## Common failures
+
+### Cannot reach the bypass after changing LAN
+
+- still using the old IP;
+- client is not on `192.168.1.0/24`;
+- stale ARP: `ip neigh flush dev <iface>`;
+- use the console: `ip -4 addr show br-lan`.
+
+### Client gets no address
+
+- bypass DHCP is off; that is expected; configure static;
+- if you want DHCP, keep exactly one server (bypass or main router);
+- check `dhcp.lan.ignore` and a second DHCP.
+
+### Client has an address but no internet
+
+- gateway/DNS not pointing at the bypass;
+- bypass has no default route/upstream;
+- firewall forwarding/NAT;
+- main router lacks a return route (one-arm);
+- subnet conflict/double NAT.
+
+### DNS fails
+
+- client still uses the old gateway for DNS;
+- bypass dnsmasq not listening on LAN;
+- upstream DNS blocked;
+- app-level DoH/private DNS.
+
+## Recorded demo (009 lab)
+
+<TerminalCast
+  src="/casts/009-bypass.cast"
+  title="009 lab: bypass gateway, DHCP off, static gateway/DNS"
+  caption="Real OpenWrt 25.12.6 VM: LAN .2 + WAN DHCP, DHCP disabled; static client .100 verifies public IP/DNS, DNS switch, dead-gateway failure and recovery. Pure one-arm bypass is not in this cast."
+/>
+
+## E2 lab run (2026-10-20)
+
+- Environment: OpenWrt 25.12.6 x86 VM 200; LAN `192.168.1.2/24`; `DHCP ignore=1`; WAN DHCP `192.168.50.5/24`; netns client `192.168.1.100/24`.
+- DHCP off: `udhcpc` got no offer (`no lease, failing`); static address worked.
+- Static gateway/DNS `.2`: gateway ping, `1.1.1.1`, and `nslookup` worked.
+- DNS `1.1.1.1` worked; dead gateway `.250` broke public access; restoring `.2` recovered.
+- Not tested: pure one-arm bypass, main-router return route, real Wi-Fi/Windows clients, IPv6/RA.
+- Cast: `public/casts/009-bypass.cast`; recipe: `tests/recipes/bypass-gateway-25.12.md`.
+
+## Sources and review
+
+- This is E2 partial: the WAN-enabled bypass was tested; the one-arm path is E1 steps only.
+- No independent reviewer; conclusions are limited to this VM/netns environment.
+- “Bypass gateway” is not one fixed config; confirm who serves DHCP, who NATs, and whether the return route exists.
+
+<PageSources />
