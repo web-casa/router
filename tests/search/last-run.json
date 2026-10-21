@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-21T12:14:23.067Z",
-  "base": "http://127.0.0.1:42909",
+  "generatedAt": "2026-10-21T12:41:33.560Z",
+  "base": "http://127.0.0.1:42975",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -99,13 +99,13 @@
             "excerpt": ""
           },
           {
-            "url": "/zh/network/lan-address/",
-            "title": "修改 LAN 地址并重新进入后台：新旧网段、DHCP 与恢复",
+            "url": "/zh/network/wan-connectivity/",
+            "title": "主路由联网：WAN DHCP 与 PPPoE 分别怎么验证",
             "excerpt": ""
           },
           {
-            "url": "/zh/network/wan-connectivity/",
-            "title": "主路由联网：WAN DHCP 与 PPPoE 分别怎么验证",
+            "url": "/zh/network/lan-address/",
+            "title": "修改 LAN 地址并重新进入后台：新旧网段、DHCP 与恢复",
             "excerpt": ""
           }
         ]
@@ -386,6 +386,11 @@
             "url": "/zh/software/openclash/",
             "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
             "excerpt": ""
+          },
+          {
+            "url": "/zh/recovery/firmware-upgrade/",
+            "title": "固件升级：配置保留、插件重建与 DNS/管理入口验证",
+            "excerpt": ""
           }
         ]
       },
@@ -478,11 +483,16 @@
         "expectedUrls": [
           "/zh/getting-started/which-openwrt/"
         ],
-        "rank": 2,
+        "rank": 3,
         "results": [
           {
             "url": "/zh/recovery/backup-restore/",
             "title": "备份与恢复：配置、插件和管理入口分别验证",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/recovery/firmware-upgrade/",
+            "title": "固件升级：配置保留、插件重建与 DNS/管理入口验证",
             "excerpt": ""
           },
           {
@@ -594,6 +604,11 @@
             "url": "/zh/getting-started/luci-first-login/",
             "title": "首次登录 LuCI：默认地址、密码与中文界面",
             "excerpt": ""
+          },
+          {
+            "url": "/zh/recovery/firmware-upgrade/",
+            "title": "固件升级：配置保留、插件重建与 DNS/管理入口验证",
+            "excerpt": ""
           }
         ]
       },
@@ -619,13 +634,13 @@
             "excerpt": ""
           },
           {
-            "url": "/en/software/openclash/",
-            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
             "excerpt": ""
           },
           {
-            "url": "/en/software/adguard-home/",
-            "title": "AdGuard Home: from web UI to client filtering",
+            "url": "/en/software/openclash/",
+            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
             "excerpt": ""
           },
           {
@@ -667,8 +682,8 @@
             "excerpt": ""
           },
           {
-            "url": "/en/software/openclash/",
-            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
+            "url": "/en/network/ap-mode/",
+            "title": "Wired/wireless AP under an existing router: DHCP off, new LAN IP, LAN port",
             "excerpt": ""
           }
         ]
@@ -851,6 +866,11 @@
             "excerpt": ""
           },
           {
+            "url": "/en/recovery/firmware-upgrade/",
+            "title": "Firmware upgrade: keep config, rebuild packages, verify DNS/management",
+            "excerpt": ""
+          },
+          {
             "url": "/en/recovery/backup-restore/",
             "title": "Backup and restore: verify config, packages and management separately",
             "excerpt": ""
@@ -1004,6 +1024,11 @@
             "excerpt": ""
           },
           {
+            "url": "/en/recovery/firmware-upgrade/",
+            "title": "Firmware upgrade: keep config, rebuild packages, verify DNS/management",
+            "excerpt": ""
+          },
+          {
             "url": "/en/installation/proxmox/",
             "title": "Install OpenWrt on a single-NIC Proxmox VE host",
             "excerpt": ""
@@ -1108,6 +1133,11 @@
           {
             "url": "/en/troubleshooting/no-web-ui/",
             "title": "Cannot reach LuCI: IP, port, DHCP and console recovery",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/recovery/firmware-upgrade/",
+            "title": "Firmware upgrade: keep config, rebuild packages, verify DNS/management",
             "excerpt": ""
           }
         ]

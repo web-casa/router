@@ -49,6 +49,8 @@ await mustExist(path.join(dist, 'en/software/package-sources/index.html'), '/en/
 await mustExist(path.join(dist, 'zh/software/package-sources/index.html'), '/zh/software/package-sources/');
 await mustExist(path.join(dist, 'en/recovery/backup-restore/index.html'), '/en/recovery/backup-restore/');
 await mustExist(path.join(dist, 'zh/recovery/backup-restore/index.html'), '/zh/recovery/backup-restore/');
+await mustExist(path.join(dist, 'en/recovery/firmware-upgrade/index.html'), '/en/recovery/firmware-upgrade/');
+await mustExist(path.join(dist, 'zh/recovery/firmware-upgrade/index.html'), '/zh/recovery/firmware-upgrade/');
 await mustExist(path.join(dist, 'en/troubleshooting/no-web-ui/index.html'), '/en/troubleshooting/no-web-ui/');
 await mustExist(path.join(dist, 'zh/troubleshooting/no-web-ui/index.html'), '/zh/troubleshooting/no-web-ui/');
 await mustExist(path.join(dist, 'en/troubleshooting/plugin-install/index.html'), '/en/troubleshooting/plugin-install/');

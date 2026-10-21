@@ -1,0 +1,198 @@
+---
+title: 固件升级：配置保留、插件重建与 DNS/管理入口验证
+description: 升级前备份配置和包列表，升级后分别验证 LAN/HTTP/SSH、DNS、包是否丢失；区分 sysupgrade、保留配置和恢复配置。
+pageType: recovery
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；同版本 sysupgrade；配置保留；包 239→182；SQM/OpenClash 丢失；DNS/HTTP 正常'
+testRecipe: 'tests/recipes/firmware-upgrade-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt 升级', 'sysupgrade 保留配置', 'openwrt 升级后插件没了', 'openwrt 固件升级']
+symptoms: ['升级后没网', '升级后插件消失', '升级后 DNS 不解析', 'sysupgrade 失败']
+sources:
+  - label: OpenWrt sysupgrade
+    url: https://openwrt.org/docs/guide-user/installation/generic.backup
+  - label: OpenWrt backup and restore
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+  - label: OpenWrt attended sysupgrade
+    url: https://openwrt.org/docs/guide-user/installation/attended.sysupgrade
+  - label: OpenWrt package manager
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；同版本 sysupgrade；配置保留；包 239→182；SQM/OpenClash 丢失；DNS/HTTP 正常"
+  recipe="tests/recipes/firmware-upgrade-25.12.md"
+  result="E2 partial：同版本 sysupgrade 后 LAN/DHCP 配置保留、HTTP/SSH/DNS 正常；包从 239 降到 182，SQM/OpenClash 丢失；未做跨版本升级，SQM 重装未完成，快照已回滚"
+  date="2026-10-20"
+/>
+
+## 升级不是“换个固件文件”
+
+一次升级至少要分开看四件事：
+
+1. **固件**是否刷成功、能启动；
+2. **配置**是否保留/恢复；
+3. **包/插件**是否还在，需不需要重装；
+4. **管理入口/DNS/WAN**是否恢复。
+
+配置保留不等于插件保留；插件配置还在，也不等于程序还在。
+
+## 升级前
+
+<Step where="router-shell" title="记录版本、target、包列表和备份" expected="升级失败时能回滚，升级后知道少了什么。" >
+
+```sh
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+apk list --installed > /tmp/packages-$(date +%F).txt
+wc -l /tmp/packages-$(date +%F).txt
+sysupgrade -b /tmp/pre-upgrade-$(date +%F).tar.gz
+sha256sum /tmp/pre-upgrade-$(date +%F).tar.gz
+```
+
+同时把配置归档复制到设备外；VM 还要做 PVE 快照/备份。不要只留 `/tmp`。
+
+</Step>
+
+<Step where="router-shell" title="核对镜像和校验和" expected="镜像对应正确的 release/target/arch，校验通过。" >
+
+```sh
+wget -O /tmp/openwrt.img.gz <official-image-url>
+sha256sum /tmp/openwrt.img.gz
+# 与官方 sha256sums 中对应行比较
+gzip -dkf /tmp/openwrt.img.gz
+ls -lh /tmp/openwrt.img
+```
+
+本实验用 25.12.6 x86/64 combined ext4 镜像；`.img.gz` 的 SHA-256 与官方一致，解压后再 `sysupgrade`。
+
+</Step>
+
+<Step where="router-shell" title="保留控制台和回滚路径" expected="升级中断/失联时还能进控制台或回滚。" >
+
+- 物理机：串口/HDMI、failsafe 按键、旧固件；
+- PVE：升级前快照，确认可以 `qm rollback`；
+- 记录 LAN IP、DHCP、WAN、DNS、管理端口；
+- 升级期间不要断电/拔盘。
+
+</Step>
+
+## 升级命令
+
+默认（保留配置）：
+
+```sh
+sysupgrade -v /tmp/openwrt.img
+```
+
+常见选项：
+
+- `-n`：不保留配置（干净重装）；
+- `-f <backup.tar.gz>`：升级时恢复配置；
+- `-c`/`-o`：尽量保留 `/etc`/根目录变更，边界更复杂；
+- 不要用 `-F` 强行忽略兼容性，除非你明确知道后果。
+
+升级会关闭 SSH/网页会话，这是正常现象；等待设备重启，不要因为“连接失败”就立刻断电。
+
+## 升级后验证
+
+<Step where="client" title="管理入口" expected="LAN IP、HTTP、SSH 至少各验证一次。" >
+
+```sh
+ping -c 2 192.168.1.2
+curl -sSI --max-time 5 http://192.168.1.2/ | head -3
+ssh root@192.168.1.2 'cat /etc/openwrt_release'
+```
+
+本实验升级后 LAN 仍是 `192.168.1.2/24`，HTTP 200、SSH 正常。
+
+</Step>
+
+<Step where="router-shell" title="配置与 DNS/WAN" expected="配置保留，DNS/WAN 真正可用。" >
+
+```sh
+uci show network.lan.ipaddr
+uci show dhcp.lan
+ip route
+nslookup openwrt.org 127.0.0.1
+logread | grep -Ei 'dnsmasq|netifd|dhcp' | tail -30
+```
+
+本实验升级后 DNS 正常、HTTP 正常；WAN 配置也保留。仍要重新验证客户端 DHCP 租约和真实上网，而不是只看路由器本机。
+
+</Step>
+
+<Step where="router-shell" title="包与插件" expected="知道哪些包丢了，按列表重装。" >
+
+```sh
+apk list --installed | wc -l
+for p in sqm-scripts luci-app-sqm luci-app-openclash; do
+  apk info -e "$p" && echo "$p installed" || echo "$p MISSING"
+done
+```
+
+本实验升级前 239 个包，升级后 182 个；`sqm-scripts`、`luci-app-sqm`、`luci-app-openclash` 都不在了。配置可能还在，但程序需要重装。
+
+重装时逐个来：
+
+```sh
+apk update
+apk add sqm-scripts luci-app-sqm
+# 确认 LuCI 菜单/服务，再装下一个
+```
+
+不要一次把所有插件装回去；先恢复管理/DNS/基础联网。
+
+</Step>
+
+## 插件重建的顺序
+
+1. 基础联网：network/dhcp/firewall；
+2. DNS：dnsmasq，必要时 AGH；
+3. 管理：luci/uhttpd；
+4. 代理/整形：OpenClash、SQM；
+5. 最后才是规则/订阅/性能调优。
+
+每装一个包，检查：
+
+- 包是否安装；
+- LuCI 菜单/控制器是否存在；
+- 服务是否启动；
+- DNS/默认路由是否被改；
+- 停用后基础联网是否恢复。
+
+## 回滚
+
+- 物理机：保留旧固件/恢复模式；
+- PVE：升级前快照/`vzdump`，失败时整机回滚；
+- 配置：`sysupgrade -r` 恢复归档；
+- 不要用“再刷一次”代替定位失败原因。
+
+本实验在快照 `pre-019` 下完成，测试后已回滚到升级前状态；页面记录的是升级过程的实际结果。
+
+## E2 实测记录（2026-10-20）
+
+- 环境：OpenWrt 25.12.6 x86 VM 200；升级前后同为 25.12.6（同版本重刷，不是跨版本升级）。
+- 升级前：239 个包；`sqm-scripts`、`luci-app-sqm`、`luci-app-openclash` 已安装；LAN `.2`、DHCP ignore。
+- `sysupgrade -v /tmp/openwrt.img` 后：设备重启；LAN `.2`、DHCP ignore 保留；HTTP 200、SSH 正常；DNS 解析正常。
+- 包：239 → 182；SQM/OpenClash 全部丢失；配置不一定丢失，但程序需要重装。
+- 未完成：跨版本升级、SQM/OpenClash 重装验证、真实 Wi-Fi/PPPoE、断电中断恢复。
+- 配方：`tests/recipes/firmware-upgrade-25.12.md`。
+
+## 来源与复核
+
+- 本页是 E2 partial：同版本 sysupgrade 的配置保留、管理/DNS 和包丢失已实测；跨版本和插件重建未完成。
+- 不要用同版本结果推断跨大版本升级；先看 release notes、备份、在 VM 试。
+- 没有第二评审人；结论只限本次 VM 环境。
+
+<PageSources />

@@ -113,6 +113,11 @@ const meta = {
           translations: { 'zh-CN': '备份与恢复' },
           slug: 'recovery/backup-restore',
         },
+        {
+          label: 'Firmware upgrade',
+          translations: { 'zh-CN': '固件升级' },
+          slug: 'recovery/firmware-upgrade',
+        },
       ],
     },
     {
