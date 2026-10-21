@@ -103,6 +103,11 @@ const meta = {
           translations: { 'zh-CN': '进不去后台' },
           slug: 'troubleshooting/no-web-ui',
         },
+        {
+          label: 'Plugin install',
+          translations: { 'zh-CN': '插件装不上' },
+          slug: 'troubleshooting/plugin-install',
+        },
       ],
     },
   ],

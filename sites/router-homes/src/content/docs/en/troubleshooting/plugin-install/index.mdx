@@ -1,0 +1,200 @@
+---
+title: "Package will not install: download, architecture, dependencies, LuCI and postinst"
+description: Work through apk feeds, package format, architecture, dependencies, LuCI menu files and postinst logs instead of blaming the firmware.
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; apk; sqm-scripts 1.7.2 / luci-app-sqm'
+testRecipe: 'tests/recipes/plugin-install-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt package will not install', 'apk install failed', 'luci app not showing', 'apk dependency conflict']
+symptoms: ['apk add fails', 'no LuCI menu', 'dependency not satisfied', 'postinst error']
+sources:
+  - label: OpenWrt apk package manager
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: OpenWrt opkg to apk cheat sheet
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: OpenWrt LuCI
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt package format
+    url: https://openwrt.org/docs/guide-user/additional-software/package-format
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; apk; sqm-scripts 1.7.2 / luci-app-sqm"
+  recipe="tests/recipes/plugin-install-25.12.md"
+  result="E2 partial: sqm-scripts installed but no LuCI menu; luci-app-sqm added /usr/share/luci/menu.d/luci-app-sqm.json; remove removed the menu and reinstall restored it; architecture/postinst failures were not destructively reproduced"
+  date="2026-10-20"
+/>
+
+## Outcome
+
+- Tell whether the package is missing from the feed or exists but fails to install;
+- Identify architecture, ABI, dependency, LuCI frontend or postinst failure;
+- Understand why the main program installed but LuCI has no menu;
+- Recover without reflashing the firmware.
+
+## Layer 0: record the environment
+
+<Step where="router-shell" title="Record firmware, architecture, package manager and feeds" expected="You know whether to use apk or opkg, and the release/target/arch.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+command -v apk
+command -v opkg
+cat /etc/apk/repositories.d/distfeeds.list 2>/dev/null
+```
+
+25.12 uses `apk`; 24.10 uses `opkg`. Do not rename `.ipk` to `.apk`, and do not force another architecture.
+
+</Step>
+
+## Layer 1: download and feeds
+
+<Step where="router-shell" title="Confirm the package exists in the feed" expected="apk search/update finds it, or you know it is absent.">
+
+```sh
+apk update
+apk search <package>
+apk info -e <package>
+```
+
+If `apk update` fails, check 404/signature/time/certificates first. If search finds nothing, the feed may be stale, the name may be wrong, or the package is not in this release/arch.
+
+</Step>
+
+<Step where="router-shell" title="Check format/checksum before installing" expected="The source is trustworthy and the format/arch matches.">
+
+- 25.12: `.apk`; 24.10: `.ipk`;
+- Prefer feeds over cloud-drive/forum “repacks”;
+- For local files, verify SHA-256/signature;
+- **Do not routinely use `--allow-untrusted`**; it bypasses trust checks and does not prove compatibility.
+
+</Step>
+
+## Layer 2: architecture and ABI
+
+<Step where="router-shell" title="Verify package architecture, not filename" expected="The package arch matches /etc/apk/arch; kmods also match the kernel.">
+
+```sh
+cat /etc/apk/arch
+apk info -a <package> | grep -E "arch|depends|provides" | head
+```
+
+- `x86_64`, `aarch64_cortex-a53`, etc. are not interchangeable;
+- kernel modules (kmod) must match the kernel version/ABI;
+- script-only packages may be `any`/`noarch` and cannot prove architecture rejection.
+
+> This lab downloaded an aarch64 `sqm-scripts`, but it is `sqm-scripts-any` (no architecture-specific binary), and local `--allow-untrusted` still replaced it. That **does not prove architecture checks passed**. A real rejection test needs an ELF-bearing package; this page does not mark it verified.
+
+</Step>
+
+## Layer 3: dependencies
+
+<Step where="router-shell" title="Read the dependency tree and install output" expected="Missing dependencies have concrete package names.">
+
+```sh
+apk add <package> 2>&1 | tail -20
+apk info -R <package> 2>/dev/null | head -20
+apk info -e <dependency>
+```
+
+Common cases:
+
+- main program installed, `luci-app-*` missing;
+- `kmod-*` does not match the kernel;
+- dependencies live in another feed/version;
+- official/ImmortalWrt/iStoreOS feeds are mixed.
+
+</Step>
+
+## Layer 4: LuCI menu
+
+<Step where="router-shell" title="Main program ≠ LuCI frontend" expected="After installing luci-app, menu/static files appear.">
+
+```sh
+apk info -L <luci-app-name> | head -20
+ls -l /usr/share/luci/menu.d/ 2>/dev/null | grep <name>
+```
+
+This lab:
+
+- `sqm-scripts` only: installed, but no LuCI menu;
+- add `luci-app-sqm`: `/usr/share/luci/menu.d/luci-app-sqm.json` and `/www/luci-static/resources/view/network/sqm.js` appeared;
+- remove `luci-app-sqm`: menu file disappeared; reinstall restored it.
+
+If the menu still does not show: clear browser cache, log out/in, check `luci-base`/language pack/rpcd; do not reflash first.
+
+</Step>
+
+## Layer 5: postinst / setup scripts
+
+<Step where="router-shell" title="Package installed but service/config did not" expected="You know whether postinst failed and what it changed.">
+
+```sh
+logread | tail -50
+apk info -L <package> | head -20
+ls /etc/uci-defaults/ 2>/dev/null | tail
+```
+
+- A failed postinst does not necessarily roll back the package;
+- check `/etc/uci-defaults`, `/etc/init.d/<service>`, `/etc/config/<service>`;
+- do not force-reinstall repeatedly just to rerun postinst; read the log/scripts first.
+
+</Step>
+
+## Layer 6: recovery
+
+<Step where="router-shell" title="Uninstall/restore feeds/reboot instead of reflashing" expected="Back to the previous state, or at least able to continue debugging.">
+
+```sh
+apk del <package>
+# if feeds were changed:
+cp /etc/apk/repositories.d/distfeeds.list.bak.YYYY-MM-DD /etc/apk/repositories.d/distfeeds.list
+apk update
+reboot
+```
+
+If the package breaks management, stop the service/restore config backups first; reflashing is the last resort.
+
+</Step>
+
+## Common failures
+
+| Symptom | More likely cause | Check first |
+|---|---|---|
+| `apk update` 404 | wrong release/target/arch/mirror path | feed files + `curl -I` |
+| Package not found | wrong name/feed/version | `apk search` |
+| Downloaded but will not install | arch/dependency/signature | `apk info -a`, install output |
+| Installed but no menu | only main program, no `luci-app-*` | `apk info -L` |
+| Menu exists but fails to open | LuCI/language/rpcd/cache | browser console, `logread` |
+| postinst error | script/permissions/dependency/config | `logread`, `/etc/uci-defaults` |
+| No internet after install | service changed DNS/firewall/interface | stop service, restore backups |
+
+## E2 lab run (2026-10-20)
+
+- Environment: OpenWrt 25.12.6 x86 VM 200; x86_64; apk; TUNA mirror for speed (the page does not require it).
+- `sqm-scripts 1.7.2-r1`: installed; no LuCI menu/controller.
+- `luci-app-sqm`: installed; `/usr/share/luci/menu.d/luci-app-sqm.json` appeared; `/www/luci-static/resources/view/network/sqm.js` exists.
+- `apk del luci-app-sqm`: menu file disappeared; reinstall restored it.
+- aarch64 `sqm-scripts`: package is `sqm-scripts-any` (noarch); local `--allow-untrusted` accepted it; **not an architecture-rejection test**.
+- Not reproduced destructively: postinst failure, kmod ABI mismatch, real architecture-specific rejection.
+
+## E2 status and sources
+
+- This is E2 partial: install/dependency/LuCI menu/remove-reinstall were tested; architecture rejection/postinst failure were not fully reproduced.
+- Recipe: `tests/recipes/plugin-install-25.12.md`.
+- Do not turn this into “every package installs”; verify release/target/arch per package.
+
+<PageSources />

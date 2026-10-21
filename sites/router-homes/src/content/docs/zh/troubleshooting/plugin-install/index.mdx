@@ -1,0 +1,200 @@
+---
+title: 插件装不上：下载、架构、依赖、LuCI 与 postinst 分层排查
+description: 从 apk 源、包格式、架构、依赖、LuCI 菜单到 postinst 日志逐层定位，避免把“装不上”都归因于固件。
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；apk；sqm-scripts 1.7.2 / luci-app-sqm'
+testRecipe: 'tests/recipes/plugin-install-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt 插件装不上', 'apk 安装失败', 'luci-app 不显示', 'apk 依赖冲突']
+symptoms: ['apk add 失败', 'LuCI 没有菜单', '依赖不满足', 'postinst 报错']
+sources:
+  - label: OpenWrt apk package manager
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: OpenWrt opkg to apk cheat sheet
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: OpenWrt LuCI
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt package format
+    url: https://openwrt.org/docs/guide-user/additional-software/package-format
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；apk；sqm-scripts 1.7.2 / luci-app-sqm"
+  recipe="tests/recipes/plugin-install-25.12.md"
+  result="E2 partial：sqm-scripts 安装成功但无 LuCI 菜单；luci-app-sqm 安装后 /usr/share/luci/menu.d/luci-app-sqm.json 出现；移除后菜单文件消失，重装恢复；架构/postinst 失败未做破坏性复现"
+  date="2026-10-20"
+/>
+
+## 完成后你能确认什么
+
+- 是“源里没有/下错包”，还是“包存在但装不上”；
+- 架构、ABI、依赖、LuCI 前端、postinst 哪一层失败；
+- 为什么装了主程序却没有 LuCI 菜单；
+- 失败后怎么卸载/恢复，不用重刷固件。
+
+## 第 0 层：先记录环境
+
+<Step where="router-shell" title="记录固件、架构、包管理器和源" expected="你知道自己该用 apk 还是 opkg，以及 release/target/arch。" >
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+command -v apk
+command -v opkg
+cat /etc/apk/repositories.d/distfeeds.list 2>/dev/null
+```
+
+25.12 用 `apk`；24.10 用 `opkg`；不要把 `.ipk` 改成 `.apk`，也不要把别的架构的包硬装。
+
+</Step>
+
+## 第 1 层：下载与源
+
+<Step where="router-shell" title="先确认源里有这个包" expected="apk search/update 能看到包，或明确知道源里没有。" >
+
+```sh
+apk update
+apk search <package>
+apk info -e <package>
+```
+
+`apk update` 失败先看 404/签名/时间/证书；`apk search` 找不到，可能是源没同步、包名不对、或该包不在这个 release/arch。
+
+</Step>
+
+<Step where="router-shell" title="包格式/校验再安装" expected="文件来源可信，格式和架构匹配。" >
+
+- 25.12：`.apk`；24.10：`.ipk`；
+- 优先从 feed 安装，不要用网盘/论坛“改好的包”；
+- 本地包至少核对 SHA-256/签名；
+- **不要习惯性用 `--allow-untrusted`**；它会绕过信任检查，不能证明包适配你的固件。
+
+</Step>
+
+## 第 2 层：架构与 ABI
+
+<Step where="router-shell" title="核对包架构，不要靠文件名" expected="包架构和 /etc/apk/arch 一致；kmod 还要匹配内核。" >
+
+```sh
+cat /etc/apk/arch
+apk info -a <package> | grep -E "arch|depends|provides" | head
+```
+
+- `x86_64`、`aarch64_cortex-a53` 等不能混；
+- 内核模块（kmod）还要匹配内核版本/ABI；
+- 纯脚本包可能是 `any`/`noarch`，不能拿它测试“错架构会被拒”。
+
+> 本次实验下载了 aarch64 的 `sqm-scripts`，但它是 `sqm-scripts-any`（无架构二进制），本地 `--allow-untrusted` 仍能替换，**不能证明架构检查通过**。架构拒绝测试需要选带 ELF 二进制的包；本页不把它标为已验证。
+
+</Step>
+
+## 第 3 层：依赖
+
+<Step where="router-shell" title="看依赖树和安装输出" expected="缺的依赖有明确包名，而不是只看到“失败”。" >
+
+```sh
+apk add <package> 2>&1 | tail -20
+apk info -R <package> 2>/dev/null | head -20
+apk info -e <dependency>
+```
+
+常见：
+
+- 主程序装了，但 `luci-app-*` 没装；
+- `kmod-*` 和内核不匹配；
+- 依赖包在另一个 feed/版本；
+- 混用了官方/ImmortalWrt/iStoreOS 的源。
+
+</Step>
+
+## 第 4 层：LuCI 菜单
+
+<Step where="router-shell" title="主程序 ≠ LuCI 前端" expected="装 luci-app 后菜单/静态资源文件出现。" >
+
+```sh
+apk info -L <luci-app-name> | head -20
+ls -l /usr/share/luci/menu.d/ 2>/dev/null | grep <name>
+```
+
+本次：
+
+- 只装 `sqm-scripts`：`apk info -e sqm-scripts` 有，但没有 LuCI 菜单；
+- 再装 `luci-app-sqm`：出现 `/usr/share/luci/menu.d/luci-app-sqm.json` 和 `/www/luci-static/resources/view/network/sqm.js`；
+- 移除 `luci-app-sqm`：菜单文件消失；重装恢复。
+
+如果菜单还不显示：清浏览器缓存、退出重登 LuCI、确认 `luci-base`/语言包/rpcd 正常；不要先重刷固件。
+
+</Step>
+
+## 第 5 层：postinst / 配置脚本
+
+<Step where="router-shell" title="包装上了但服务/配置没生效" expected="知道 postinst 是否报错，以及它改了什么。" >
+
+```sh
+logread | tail -50
+apk info -L <package> | head -20
+ls /etc/uci-defaults/ 2>/dev/null | tail
+```
+
+- postinst 失败不一定会回滚包安装；
+- 看 `/etc/uci-defaults`、`/etc/init.d/<service>`、`/etc/config/<service>`；
+- 不要为了“重跑 postinst”反复强制重装；先看日志和脚本。
+
+</Step>
+
+## 第 6 层：恢复
+
+<Step where="router-shell" title="卸载/恢复源/重启，而不是重刷" expected="回到安装前状态，或至少能继续排查。" >
+
+```sh
+apk del <package>
+# 如改过源：
+cp /etc/apk/repositories.d/distfeeds.list.bak.YYYY-MM-DD /etc/apk/repositories.d/distfeeds.list
+apk update
+reboot
+```
+
+如果包安装导致管理入口异常，先停用相关服务/恢复配置备份；重刷固件是最后手段。
+
+</Step>
+
+## 常见失败
+
+| 现象 | 更可能的原因 | 先查 |
+|---|---|---|
+| `apk update` 404 | release/target/arch/镜像路径错 | 源文件 + `curl -I` |
+| 包找不到 | 包名/feed/版本不对 | `apk search` |
+| 下载了但装不上 | 架构/依赖/签名 | `apk info -a`、安装输出 |
+| 装了没菜单 | 只装主程序，没装 `luci-app-*` | `apk info -L` |
+| 菜单有但打不开 | LuCI/语言包/rpcd/缓存 | 浏览器控制台、`logread` |
+| postinst 报错 | 脚本/权限/依赖/配置 | `logread`、`/etc/uci-defaults` |
+| 装完没网 | 服务改 DNS/防火墙/接口 | 停用服务、恢复备份 |
+
+## E2 实测记录（2026-10-20）
+
+- 环境：OpenWrt 25.12.6 x86 VM 200；x86_64；apk；TUNA 镜像源（实验加速，页面不要求）。
+- `sqm-scripts 1.7.2-r1`：安装成功；无 LuCI 菜单/控制器。
+- `luci-app-sqm`：安装成功；`/usr/share/luci/menu.d/luci-app-sqm.json` 出现；`/www/luci-static/resources/view/network/sqm.js` 存在。
+- `apk del luci-app-sqm`：菜单文件消失；重装恢复。
+- aarch64 `sqm-scripts`：包为 `sqm-scripts-any`（noarch），本地 `--allow-untrusted` 仍接受；**不能当作架构拒绝测试**。
+- 未做破坏性复现：postinst 失败、kmod ABI 不匹配、真实架构二进制拒绝。
+
+## E2 状态与来源
+
+- 本页是 E2 partial：安装/依赖/LuCI 菜单/卸载重装已实测；架构拒绝/postinst 失败未完整复现。
+- 复现配方：`tests/recipes/plugin-install-25.12.md`。
+- 不要把本页写成“所有插件都能装”；具体包仍要按 release/target/arch 核对。
+
+<PageSources />

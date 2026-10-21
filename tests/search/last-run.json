@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-20T17:53:12.365Z",
-  "base": "http://127.0.0.1:35173",
+  "generatedAt": "2026-10-21T03:27:55.144Z",
+  "base": "http://127.0.0.1:46137",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -337,8 +337,8 @@
             "excerpt": ""
           },
           {
-            "url": "/zh/software/openclash/",
-            "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
+            "url": "/zh/troubleshooting/plugin-install/",
+            "title": "插件装不上：下载、架构、依赖、LuCI 与 postinst 分层排查",
             "excerpt": ""
           }
         ]
@@ -829,6 +829,11 @@
             "url": "/en/software/sqm/",
             "title": "SQM and CAKE: stop lag under download and upload",
             "excerpt": ""
+          },
+          {
+            "url": "/en/troubleshooting/plugin-install/",
+            "title": "Package will not install: download, architecture, dependencies, LuCI and postinst",
+            "excerpt": ""
           }
         ]
       },
@@ -933,8 +938,8 @@
             "excerpt": ""
           },
           {
-            "url": "/en/installation/proxmox/",
-            "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "url": "/en/troubleshooting/plugin-install/",
+            "title": "Package will not install: download, architecture, dependencies, LuCI and postinst",
             "excerpt": ""
           }
         ]
@@ -994,6 +999,11 @@
           {
             "url": "/en/software/package-sources/",
             "title": "Package feeds and China mirrors: keep apk and opkg separate",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/troubleshooting/plugin-install/",
+            "title": "Package will not install: download, architecture, dependencies, LuCI and postinst",
             "excerpt": ""
           },
           {

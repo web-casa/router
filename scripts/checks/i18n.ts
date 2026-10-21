@@ -45,6 +45,8 @@ await mustExist(path.join(dist, 'en/software/package-sources/index.html'), '/en/
 await mustExist(path.join(dist, 'zh/software/package-sources/index.html'), '/zh/software/package-sources/');
 await mustExist(path.join(dist, 'en/troubleshooting/no-web-ui/index.html'), '/en/troubleshooting/no-web-ui/');
 await mustExist(path.join(dist, 'zh/troubleshooting/no-web-ui/index.html'), '/zh/troubleshooting/no-web-ui/');
+await mustExist(path.join(dist, 'en/troubleshooting/plugin-install/index.html'), '/en/troubleshooting/plugin-install/');
+await mustExist(path.join(dist, 'zh/troubleshooting/plugin-install/index.html'), '/zh/troubleshooting/plugin-install/');
 await mustNotExist(path.join(dist, 'en/only-en/index.html'), '/en/only-en/ unpaired fixture');
 await mustNotExist(path.join(dist, 'zh/only-en/index.html'), '/zh/only-en/ fallback');
 await mustExist(path.join(dist, '404.html'), '404 page');
