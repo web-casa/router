@@ -105,6 +105,17 @@ const meta = {
       ],
     },
     {
+      label: 'Upgrade & recovery',
+      translations: { 'zh-CN': '升级恢复' },
+      items: [
+        {
+          label: 'Backup and restore',
+          translations: { 'zh-CN': '备份与恢复' },
+          slug: 'recovery/backup-restore',
+        },
+      ],
+    },
+    {
       label: 'Troubleshooting',
       translations: { 'zh-CN': '故障排查' },
       items: [

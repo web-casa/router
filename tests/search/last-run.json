@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-21T11:13:28.571Z",
-  "base": "http://127.0.0.1:33215",
+  "generatedAt": "2026-10-21T12:14:23.067Z",
+  "base": "http://127.0.0.1:42909",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -30,6 +30,11 @@
           {
             "url": "/zh/software/adguard-home/",
             "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/recovery/backup-restore/",
+            "title": "备份与恢复：配置、插件和管理入口分别验证",
             "excerpt": ""
           }
         ]
@@ -66,8 +71,8 @@
             "excerpt": ""
           },
           {
-            "url": "/zh/software/openclash/",
-            "title": "OpenClash 入门：兼容性、DNS 冲突与停用恢复",
+            "url": "/zh/network/bypass-gateway/",
+            "title": "旁路网关：关 DHCP、指定网关/DNS 与客户端切换",
             "excerpt": ""
           }
         ]
@@ -119,6 +124,11 @@
           {
             "url": "/zh/installation/proxmox/",
             "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/recovery/backup-restore/",
+            "title": "备份与恢复：配置、插件和管理入口分别验证",
             "excerpt": ""
           }
         ]
@@ -468,8 +478,13 @@
         "expectedUrls": [
           "/zh/getting-started/which-openwrt/"
         ],
-        "rank": 1,
+        "rank": 2,
         "results": [
+          {
+            "url": "/zh/recovery/backup-restore/",
+            "title": "备份与恢复：配置、插件和管理入口分别验证",
+            "excerpt": ""
+          },
           {
             "url": "/zh/getting-started/which-openwrt/",
             "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
@@ -642,13 +657,13 @@
             "excerpt": ""
           },
           {
-            "url": "/en/network/lan-address/",
-            "title": "Change the LAN address and get back in: old/new subnet, DHCP and recovery",
+            "url": "/en/troubleshooting/no-internet/",
+            "title": "No internet or intermittent drops: all devices, one client, one app",
             "excerpt": ""
           },
           {
-            "url": "/en/troubleshooting/no-internet/",
-            "title": "No internet or intermittent drops: all devices, one client, one app",
+            "url": "/en/network/lan-address/",
+            "title": "Change the LAN address and get back in: old/new subnet, DHCP and recovery",
             "excerpt": ""
           },
           {
@@ -700,6 +715,11 @@
           {
             "url": "/en/installation/proxmox/",
             "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/recovery/backup-restore/",
+            "title": "Backup and restore: verify config, packages and management separately",
             "excerpt": ""
           }
         ]
@@ -831,6 +851,11 @@
             "excerpt": ""
           },
           {
+            "url": "/en/recovery/backup-restore/",
+            "title": "Backup and restore: verify config, packages and management separately",
+            "excerpt": ""
+          },
+          {
             "url": "/en/software/package-sources/",
             "title": "Package feeds and China mirrors: keep apk and opkg separate",
             "excerpt": ""
@@ -938,8 +963,8 @@
             "excerpt": ""
           },
           {
-            "url": "/en/troubleshooting/plugin-install/",
-            "title": "Package will not install: download, architecture, dependencies, LuCI and postinst",
+            "url": "/en/recovery/backup-restore/",
+            "title": "Backup and restore: verify config, packages and management separately",
             "excerpt": ""
           }
         ]

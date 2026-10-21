@@ -47,6 +47,8 @@ await mustExist(path.join(dist, 'en/software/openclash/index.html'), '/en/softwa
 await mustExist(path.join(dist, 'zh/software/openclash/index.html'), '/zh/software/openclash/');
 await mustExist(path.join(dist, 'en/software/package-sources/index.html'), '/en/software/package-sources/');
 await mustExist(path.join(dist, 'zh/software/package-sources/index.html'), '/zh/software/package-sources/');
+await mustExist(path.join(dist, 'en/recovery/backup-restore/index.html'), '/en/recovery/backup-restore/');
+await mustExist(path.join(dist, 'zh/recovery/backup-restore/index.html'), '/zh/recovery/backup-restore/');
 await mustExist(path.join(dist, 'en/troubleshooting/no-web-ui/index.html'), '/en/troubleshooting/no-web-ui/');
 await mustExist(path.join(dist, 'zh/troubleshooting/no-web-ui/index.html'), '/zh/troubleshooting/no-web-ui/');
 await mustExist(path.join(dist, 'en/troubleshooting/plugin-install/index.html'), '/en/troubleshooting/plugin-install/');

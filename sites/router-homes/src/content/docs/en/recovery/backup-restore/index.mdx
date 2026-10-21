@@ -1,0 +1,205 @@
+---
+title: "Backup and restore: verify config, packages and management separately"
+description: Use sysupgrade -b/-r to back up and restore OpenWrt config, distinguish the config archive from packages and full images, and verify LAN/HTTP/SSH/DHCP after restore.
+pageType: recovery
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; sysupgrade -b 4.2MB/59 entries; sysupgrade -r restore; LAN/HTTP/SSH checked'
+testRecipe: 'tests/recipes/backup-restore-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt backup', 'openwrt restore config', 'sysupgrade backup', 'openwrt restore after reinstall']
+symptoms: ['config lost after reflash', 'how to restore backup', 'sysupgrade -b fails', 'cannot access after restore']
+sources:
+  - label: OpenWrt backup and restore
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+  - label: OpenWrt sysupgrade
+    url: https://openwrt.org/docs/guide-user/installation/sysupgrade.owut
+  - label: OpenWrt package manager
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: Proxmox VE backup
+    url: https://pve.proxmox.com/pve-docs/chapter-vzdump.html
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; sysupgrade -b 4.2MB/59 entries; sysupgrade -r restore; LAN/HTTP/SSH checked"
+  recipe="tests/recipes/backup-restore-25.12.md"
+  result="E2 partial: sysupgrade -b produced a 4.2MB/59-entry config archive; after adding a test marker, sysupgrade -r removed it and LAN 192.168.1.2, HTTP 200 and SSH still worked; full image/cross-version/package reinstall untested"
+  date="2026-10-20"
+/>
+
+## Three different “backups”
+
+| Type | Contains | Does not contain | Typical use |
+|---|---|---|---|
+| Config archive `sysupgrade -b` | `/etc/config` and files in `sysupgrade.conf` | firmware, installed packages, whole disk | restore settings after reflash/upgrade |
+| Package list | names, versions, feeds | package binaries | reinstall checklist |
+| Full image/VM backup | whole disk/VM | nothing (larger) | whole-machine rollback/disk replacement |
+
+**A config backup is not a firmware backup.** Restoring config will not reinstall packages you removed.
+
+## Before backup
+
+<Step where="router-shell" title="Record release, target and package list" expected="You know which release/target/arch the backup came from.">
+
+```sh
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+apk list --installed > /tmp/packages-$(date +%F).txt
+wc -l /tmp/packages-$(date +%F).txt
+sysupgrade -l
+```
+
+This lab: `25.12.6`, `x86/64`, 239 installed packages; `sysupgrade -b` archived 59 entries.
+
+</Step>
+
+<Step where="router-shell" title="Create the config archive" expected="A verifiable .tar.gz copied off the device.">
+
+```sh
+sysupgrade -b /tmp/backup-$(date +%F).tar.gz
+ls -lh /tmp/backup-*.tar.gz
+tar -tzf /tmp/backup-$(date +%F).tar.gz | head
+sha256sum /tmp/backup-$(date +%F).tar.gz
+```
+
+This lab: 4.2MB, 59 entries, including `etc/config/network`, `dhcp`, `firewall`, `openclash`, `sqm`.
+
+> The archive may contain Wi-Fi passwords, PPPoE credentials, DDNS/proxy config. Do not upload it to a public cloud drive or repository; treat it as sensitive.
+
+</Step>
+
+<Step where="client" title="Copy the archive off the device" expected="A backup still exists after the device is bricked/reflashed.">
+
+```sh
+# pull from the router to the admin machine
+scp root@192.168.1.2:/tmp/backup-2026-10-20.tar.gz ./
+sha256sum backup-2026-10-20.tar.gz
+```
+
+Do not leave it only in `/tmp`: reboot loses it, reflash definitely does.
+
+</Step>
+
+## Three restore paths
+
+### 1. Same-version restore while running (this lab)
+
+```sh
+sysupgrade -r /tmp/backup-2026-10-20.tar.gz
+```
+
+`-r` restores config and exits; it does not flash firmware. Then restart the relevant services or reboot so network/DHCP/DNS reload.
+
+This lab wrote `network.lan.e2_marker='before-restore'`; after `sysupgrade -r` the marker disappeared, LAN was still `192.168.1.2/24`, HTTP 200 and SSH worked.
+
+### 2. Restore during reflash/upgrade
+
+```sh
+sysupgrade -f /tmp/backup-2026-10-20.tar.gz <firmware.img>
+```
+
+`-f` restores config during an upgrade; do not treat the backup as firmware, and do not blindly restore across different releases/targets.
+
+### 3. Whole VM/image rollback
+
+PVE uses `vzdump`/snapshots to restore the whole VM disk and config; that rolls back firmware + packages + config, but is larger and may overwrite new data. Config archives and whole-machine backups are not substitutes.
+
+## Verify after restore
+
+<Step where="client" title="Management entry" expected="Check LAN IP, HTTP, SSH and DHCP at least once.">
+
+```sh
+ping -c 2 192.168.1.2
+curl -sSI --max-time 5 http://192.168.1.2/ | head -3
+ssh root@192.168.1.2 'uci show network.lan | grep ipaddr'
+```
+
+- HTTP 200 does not prove DHCP works;
+- SSH access does not prove LuCI config is correct;
+- clients must renew and receive an address from the restored pool.
+
+</Step>
+
+<Step where="router-shell" title="Network/DHCP/DNS" expected="The restored config actually takes effect, not just files extracted.">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+ubus call network.interface.lan status
+logread | grep -Ei 'dnsmasq|dhcp|netifd' | tail -30
+```
+
+Restart if needed:
+
+```sh
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+</Step>
+
+<Step where="router-shell" title="Packages" expected="You know which packages must be reinstalled; config restore is not package restore.">
+
+```sh
+apk list --installed | wc -l
+apk list --installed | grep -E 'openclash|sqm|adguard|luci-app' || true
+```
+
+A config archive does not contain binaries. After reflash, reinstall from the package list/feeds. OpenClash/SQM/AGH config may still exist, but the programs/kernel modules must be reinstalled and verified.
+
+</Step>
+
+## Common failures
+
+### Still old config after restore
+
+- services/device were not restarted after `sysupgrade -r`;
+- you restored a different archive;
+- a later UCI command overwrote it;
+- the archive does not contain that file (check `sysupgrade -l`/`tar -tzf`).
+
+### Cannot access after restore
+
+- backup came from a different LAN subnet;
+- DHCP/firewall did not reload;
+- the archive contains old passwords/SSH settings;
+- use the console: `ip -4 addr show br-lan`; do not factory-reset immediately.
+
+### Packages did not come back
+
+- config backups do not contain package files;
+- feed/version mismatch;
+- reinstall `luci-app-*` and kernel modules;
+- “config exists” does not mean “program is installed”.
+
+### Cross-version restore
+
+- release/target/arch mismatch;
+- options renamed/removed in the new release;
+- test in a VM first;
+- keep the old firmware and a whole-machine backup for rollback.
+
+## E2 lab run (2026-10-20)
+
+- Environment: OpenWrt 25.12.6 x86 VM 200; LAN `192.168.1.2/24`; `apk`; 239 installed packages.
+- `sysupgrade -b /tmp/backup-e2.tar.gz`: 4.2MB, 59 entries; `tar -tzf` showed `etc/config/network`, `dhcp`, `firewall`, `openclash`, `sqm`.
+- Wrote `network.lan.e2_marker='before-restore'`; after `sysupgrade -r` the marker was gone, LAN still `.2`, HTTP 200, SSH worked.
+- Not tested: whole PVE backup restore, cross-version restore, package reinstall, real-device power loss/brick.
+- Recipe: `tests/recipes/backup-restore-25.12.md`.
+
+## Sources and review
+
+- This is E2 partial: same-version config backup/restore and management entry were tested; whole-machine/cross-version/package rebuild were not.
+- Config archives contain sensitive data; do not commit or share them.
+- No independent reviewer; conclusions are limited to this VM environment.
+
+<PageSources />
