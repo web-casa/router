@@ -13,6 +13,7 @@
     "@astrojs/starlight": "catalog:",
     "@fleet/docs-kit": "workspace:*",
     "@pagefind/default-ui": "^1.5.2",
+    "asciinema-player": "^3.17.0",
     "astro": "catalog:"
   },
   "devDependencies": {

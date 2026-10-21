@@ -1,0 +1,95 @@
+---
+import 'asciinema-player/dist/bundle/asciinema-player.css';
+
+interface Props {
+  src: string;
+  title: string;
+  caption?: string;
+}
+
+const { src, title, caption } = Astro.props;
+---
+
+<figure class="terminal-cast">
+  <div class="terminal-cast-head">
+    <span class="terminal-cast-title">{title}</span>
+    <a href={src} download class="terminal-cast-download">下载 cast</a>
+  </div>
+  <div
+    class="terminal-cast-player"
+    data-cast-src={src}
+    data-cast-title={title}
+    aria-label={title}
+  ></div>
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
+
+<script>
+  import { create } from 'asciinema-player';
+
+  for (const el of document.querySelectorAll<HTMLElement>('[data-cast-src]')) {
+    if (el.dataset.castReady === 'true') continue;
+    el.dataset.castReady = 'true';
+    create(el.dataset.castSrc || '', el, {
+      autoPlay: false,
+      preload: true,
+      fit: 'width',
+      controls: true,
+      terminalFontSize: 'small',
+      theme: 'asciinema',
+    });
+  }
+</script>
+
+<style>
+  .terminal-cast {
+    margin: 1.5rem 0;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #121314;
+  }
+
+  .terminal-cast-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--sl-color-gray-5);
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+
+  .terminal-cast-title {
+    font-weight: 600;
+  }
+
+  .terminal-cast-download {
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .terminal-cast-download:hover {
+    color: var(--sl-color-white);
+    text-decoration: underline;
+  }
+
+  .terminal-cast-player {
+    min-height: 8rem;
+  }
+
+  .terminal-cast figcaption {
+    padding: 0.65rem 0.85rem;
+    border-top: 1px solid var(--sl-color-gray-5);
+    color: var(--sl-color-gray-2);
+    background: var(--sl-color-gray-6);
+    font-size: var(--sl-text-sm);
+    line-height: 1.5;
+  }
+
+  .terminal-cast :global(.ap-player) {
+    border-radius: 0;
+  }
+</style>

@@ -22,6 +22,7 @@ sources:
 ---
 
 import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
 import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import PageSources from '@components/PageSources.astro';
@@ -137,6 +138,14 @@ This lab:
 If the menu still does not show: clear browser cache, log out/in, check `luci-base`/language pack/rpcd; do not reflash first.
 
 </Step>
+
+## Recorded demo (017 lab)
+
+<TerminalCast
+  src="/casts/017-plugin-install.cast"
+  title="017 lab: sqm-scripts → luci-app-sqm"
+  caption="Real OpenWrt 25.12.6 VM session: install sqm-scripts (no LuCI menu), add luci-app-sqm (menu file appears), remove it (menu disappears), reinstall (restored). The player is a supplement; the code blocks in this page are authoritative."
+/>
 
 ## Layer 5: postinst / setup scripts
 

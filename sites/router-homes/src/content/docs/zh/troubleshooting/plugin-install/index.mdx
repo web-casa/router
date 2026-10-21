@@ -22,6 +22,7 @@ sources:
 ---
 
 import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
 import Step from '@components/Step.astro';
 import TestRecord from '@components/TestRecord.astro';
 import PageSources from '@components/PageSources.astro';
@@ -137,6 +138,14 @@ ls -l /usr/share/luci/menu.d/ 2>/dev/null | grep <name>
 如果菜单还不显示：清浏览器缓存、退出重登 LuCI、确认 `luci-base`/语言包/rpcd 正常；不要先重刷固件。
 
 </Step>
+
+## 录屏演示（017 实验）
+
+<TerminalCast
+  src="/casts/017-plugin-install.cast"
+  title="017 实验：sqm-scripts → luci-app-sqm"
+  caption="真实 OpenWrt 25.12.6 VM 的命令记录：先装 sqm-scripts（无 LuCI 菜单），再装 luci-app-sqm（菜单文件出现），移除后消失，重装恢复。播放器只是补充，命令和边界以正文代码块为准。"
+/>
 
 ## 第 5 层：postinst / 配置脚本
 
