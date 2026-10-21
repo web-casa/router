@@ -29,14 +29,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200; WAN 192.168.50.191/24; LAN 192.168.1.1; netns client 192.168.1.175"
-  recipe="tests/recipes/no-internet-triage-25.12.md"
-  result="E2 partial: with DNS stopped, public IP ping worked but DNS failed; after restart it recovered. With WAN ifdown, the client gateway worked but public IP failed; ifup recovered. Removing the client default route broke only that terminal. Intermittent/physical Wi-Fi/app proxy not tested."
-  date="2026-10-20"
-/>
-
 ## Define which “no internet” this is
 
 | Symptom | More likely layer | First step |
@@ -174,5 +166,13 @@ Without a timeline, “intermittent” is hard to fix or verify.
 - This is E2 partial: three controlled failures were tested; intermittent/physical/app layers were not.
 - No independent reviewer; conclusions are limited to this VM/netns environment.
 - Do not blame the ISP from one ping or one failed page load.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; WAN 192.168.50.191/24; LAN 192.168.1.1; netns client 192.168.1.175"
+  recipe="tests/recipes/no-internet-triage-25.12.md"
+  result="E2 partial: with DNS stopped, public IP ping worked but DNS failed; after restart it recovered. With WAN ifdown, the client gateway worked but public IP failed; ifup recovered. Removing the client default route broke only that terminal. Intermittent/physical Wi-Fi/app proxy not tested."
+  date="2026-10-20"
+/>
 
 <PageSources />

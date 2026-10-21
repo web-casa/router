@@ -31,14 +31,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="Proxmox VE" version="9.2.2" packageManager="—" device="单网口 x86 主机" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="Proxmox VE 9.2.2，单 Realtek RTL8111；OpenWrt 25.12.6 VM 200；netns DHCP 客户端"
-  recipe="tests/recipes/pve-single-nic-25.12.md"
-  result="WAN DHCP 192.168.50.77；LAN 192.168.1.1；客户端 DHCP 192.168.1.191；DNS/HTTP 通过；qm stop 200 后宿主机仍可 SSH"
-  date="2026-10-20"
-/>
-
 ## 完成后你能确认什么
 
 你能在**只有一块物理网卡**的 PVE 上选对拓扑：
@@ -276,5 +268,13 @@ qm terminal 200
 - 本页已在 PVE 9.2.2 单网口环境完成 E2 实验，不是纯 E1 草稿；但未做独立复核，也未在真实物理 LAN 上验证。
 - 复现配方：`tests/recipes/pve-single-nic-25.12.md`。步骤、镜像 SHA-256、`qm config 200` 和客户端结果已记录。
 - 单网口不等于双网口：不要在本页基础上直接写“WAN/LAN 物理分离”；需要第二块网卡或 VLAN 交换机时另写一篇。
+
+<TestRecord
+  status="partial"
+  environment="Proxmox VE 9.2.2，单 Realtek RTL8111；OpenWrt 25.12.6 VM 200；netns DHCP 客户端"
+  recipe="tests/recipes/pve-single-nic-25.12.md"
+  result="WAN DHCP 192.168.50.77；LAN 192.168.1.1；客户端 DHCP 192.168.1.191；DNS/HTTP 通过；qm stop 200 后宿主机仍可 SSH"
+  date="2026-10-20"
+/>
 
 <PageSources />

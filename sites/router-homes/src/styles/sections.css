@@ -1,0 +1,187 @@
+/* Section scaffolding shared by the home page and the download page. */
+
+.rh-home .rh-section {
+  padding-block: clamp(4rem, 9vw, 7.5rem) 0;
+}
+
+.rh-home .rh-section:last-child {
+  padding-bottom: clamp(3rem, 6vw, 5rem);
+}
+
+.rh-home .rh-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1.1rem;
+  font-family: var(--__sl-font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--sl-color-gray-3);
+}
+
+.rh-home .rh-kicker span {
+  color: var(--sl-color-accent);
+}
+
+.rh-home .rh-kicker span::after {
+  content: '';
+  display: inline-block;
+  width: 1.75rem;
+  height: 1px;
+  margin-inline-start: 0.75rem;
+  vertical-align: middle;
+  background: var(--rh-line-strong);
+}
+
+.rh-home h2 {
+  margin: 0;
+  max-width: 22ch;
+  font-size: clamp(2rem, 1.2rem + 2.6vw, 3.4rem);
+  font-weight: 640;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+  color: var(--sl-color-white);
+  text-wrap: balance;
+}
+
+.rh-home:lang(zh-CN) h2 {
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  max-width: 16em;
+}
+
+.rh-home .rh-lede {
+  margin: 1.25rem 0 0;
+  max-width: 36rem;
+  font-size: 1.075rem;
+  line-height: 1.65;
+  color: var(--sl-color-gray-2);
+  text-wrap: pretty;
+}
+
+.rh-home .rh-section-head {
+  margin-bottom: clamp(2rem, 4vw, 3rem);
+}
+
+.rh-home .rh-close::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset-inline-end: -7rem;
+  bottom: -9rem;
+  width: 26rem;
+  height: 26rem;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle, transparent 0 2.6rem, var(--rh-line-strong) 2.6rem calc(2.6rem + 1px));
+  -webkit-mask-image: radial-gradient(circle, #000 20%, transparent 70%);
+  mask-image: radial-gradient(circle, #000 20%, transparent 70%);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.rh-home .rh-close > * {
+  position: relative;
+  z-index: 1;
+}
+
+.rh-home .rh-close h2 {
+  max-width: 18ch;
+}
+
+.rh-home .rh-close-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.75rem;
+  margin-top: 2rem;
+}
+
+.rh-home .rh-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 3rem;
+  padding-inline: 1.3rem;
+  border-radius: 999px;
+  background: var(--sl-color-accent);
+  color: var(--sl-color-text-invert);
+  font-weight: 580;
+  text-decoration: none;
+  box-shadow: 0 1px 0 hsla(0, 0%, 100%, 0.35) inset, 0 10px 30px -12px hsla(36, 96%, 50%, 0.7);
+  transition: transform 0.35s var(--rh-ease-out), box-shadow 0.35s var(--rh-ease-out);
+}
+
+.rh-home .rh-pill svg {
+  width: 1rem;
+  height: 1rem;
+  transition: transform 0.45s var(--rh-ease-spring);
+}
+
+.rh-home .rh-pill:hover {
+  transform: translateY(-2px);
+}
+
+.rh-home .rh-pill:hover svg {
+  transform: translateX(4px);
+}
+
+.rh-home .rh-pill:active {
+  transform: scale(0.97);
+}
+
+.rh-home .rh-text-link {
+  color: var(--sl-color-white);
+  font-weight: 520;
+  text-decoration: none;
+  background: linear-gradient(currentColor, currentColor) 0 100% / 100% 1px no-repeat;
+  padding-bottom: 0.15rem;
+  transition: color 0.2s, background-size 0.4s var(--rh-ease-out);
+}
+
+.rh-home .rh-text-link:hover {
+  color: var(--sl-color-accent);
+  background-size: 30% 1px;
+}
+
+.rh-home .rh-close {
+  position: relative;
+  margin-top: clamp(4rem, 9vw, 7.5rem);
+  padding: clamp(2.5rem, 6vw, 4.5rem) clamp(1.5rem, 5vw, 4rem) clamp(3rem, 6vw, 4.75rem);
+  border: 1px solid var(--rh-line-strong);
+  border-radius: calc(var(--rh-radius-lg) * 1.5);
+  background:
+    radial-gradient(36rem 20rem at 100% 0%, hsla(36, 96%, 60%, 0.14), transparent 70%),
+    var(--rh-surface);
+  overflow: hidden;
+}
+
+/* CJK headings break between phrases, not mid-word. */
+.rh-home .rh-phrase {
+  display: inline-block;
+}
+
+/* Scroll-linked reveals: pure CSS where supported, static elsewhere. The
+   timeline sits in its own block so the minifier can't fold it into the
+   animation shorthand, which browsers reject. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .rh-home .rh-reveal {
+      animation: rh-reveal linear both;
+    }
+  }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .rh-home > * .rh-reveal,
+    .rh-home > .rh-reveal {
+      animation-timeline: view();
+      animation-range: entry 0% entry 55%;
+    }
+  }
+}
+@keyframes rh-reveal {
+  from { opacity: 0; transform: translateY(36px); }
+  to { opacity: 1; transform: none; }
+}

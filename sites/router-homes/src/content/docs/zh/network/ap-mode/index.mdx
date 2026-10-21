@@ -29,14 +29,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="有线 AP E2：AP LAN 192.168.1.2/24，DHCP 关闭；上游 DHCP 192.168.1.1；客户端 192.168.1.136；无 WAN/无 Wi-Fi"
-  recipe="tests/recipes/ap-mode-25.12.md"
-  result="E2 partial：AP LAN 改为 .2、DHCP ignore=1；客户端从上游 .1 拿到 192.168.1.136/24，网关 .1；AP .2 可管理，客户端可 ping AP/上游；本 AP-only 实验没有公网，未验证上游互联网与 Wi-Fi"
-  date="2026-10-20"
-/>
-
 ## AP 模式的关键
 
 AP（接入点）不是“再开一个路由器”：
@@ -208,5 +200,13 @@ udhcpc -i eth0 -f -q -n -t 5
 - 本页是 E2 partial：有线 AP/L2/DHCP 已实测；无线和真实上游互联网未测。
 - 没有第二评审人；结论只限本次 VM/netns 环境。
 - AP 模式最重要的是“只接 LAN + 关 DHCP + LAN IP 在池外”，不是某个固定界面。
+
+<TestRecord
+  status="partial"
+  environment="有线 AP E2：AP LAN 192.168.1.2/24，DHCP 关闭；上游 DHCP 192.168.1.1；客户端 192.168.1.136；无 WAN/无 Wi-Fi"
+  recipe="tests/recipes/ap-mode-25.12.md"
+  result="E2 partial：AP LAN 改为 .2、DHCP ignore=1；客户端从上游 .1 拿到 192.168.1.136/24，网关 .1；AP .2 可管理，客户端可 ping AP/上游；本 AP-only 实验没有公网，未验证上游互联网与 Wi-Fi"
+  date="2026-10-20"
+/>
 
 <PageSources />

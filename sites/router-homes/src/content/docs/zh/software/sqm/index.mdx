@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200；sqm-scripts 1.7.2 + luci-app-sqm；WAN eth1 DHCP；CAKE qdisc 已挂载；无真实线路性能数据"
-  recipe="tests/recipes/sqm-25.12.md"
-  result="E2 partial：SQM 在 eth1 以 100/20 Mbit + piece_of_cake.qos 启动，tc 显示 cake 20Mbit；关闭后恢复 fq_codel；没有真实线路吞吐/延迟数据"
-/>
-
 ## 完成后你能确认什么
 
 - 你的“下载/上传时变卡”是不是 bufferbloat，而不是 Wi-Fi、光猫或运营商拥塞；
@@ -242,5 +235,12 @@ uci commit sqm
 - 本页是 E2 partial：安装、CAKE 挂载/关闭和恢复已实测；真实线路性能仍为 E3 范围。
 - 虚拟网卡/VM 只能证明命令和 qdisc 是否挂上，不能代表家庭宽带；不要用 VM 数字写“有效”。
 - 真实环境请记录线路、CPU、qdisc、空载/负载延迟和吞吐，再决定是否保留 SQM。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；sqm-scripts 1.7.2 + luci-app-sqm；WAN eth1 DHCP；CAKE qdisc 已挂载；无真实线路性能数据"
+  recipe="tests/recipes/sqm-25.12.md"
+  result="E2 partial：SQM 在 eth1 以 100/20 Mbit + piece_of_cake.qos 启动，tc 显示 cake 20Mbit；关闭后恢复 fq_codel；没有真实线路吞吐/延迟数据"
+/>
 
 <PageSources />

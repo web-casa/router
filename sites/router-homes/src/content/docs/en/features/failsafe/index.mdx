@@ -1,0 +1,57 @@
+---
+title: "Failsafe mode and sysupgrade: OpenWrt’s built-in ways back"
+description: "Failsafe boots OpenWrt with a minimal configuration on 192.168.1.1 so you can repair it; sysupgrade keeps your settings unless told otherwise. How each works."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt failsafe", "openwrt recovery mode", "sysupgrade keep settings"]
+sources:
+  - label: "OpenWrt failsafe and factory reset"
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+  - label: "sysupgrade source (OpenWrt 25.12)"
+    url: https://github.com/openwrt/openwrt/blob/openwrt-25.12/package/base-files/files/sbin/sysupgrade
+  - label: "OpenWrt backup and restore"
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="failsafe" />
+
+## In one sentence
+
+Failsafe mode boots OpenWrt with a minimal, known configuration on `192.168.1.1`, so you can fix a broken setup. sysupgrade replaces the firmware and keeps your configuration unless you tell it not to.
+
+## Failsafe mode
+
+- **How to enter:** during boot there is a 2–4 second window. Press almost any button on the device then, or press `f` and Enter on a serial console.
+- **What you get:** the router comes up on `192.168.1.1/24` with DHCP and wireless off and only essential services running. Give your computer a static address on that subnet, then connect over SSH.
+- **What you can do:** run `mount_root` to mount the overlay and repair files, or reset all settings with `firstboot && reboot`.
+- Failsafe needs a SquashFS image.
+
+## sysupgrade
+
+- It keeps the configuration by default. `-n` flashes without keeping it.
+- `sysupgrade -b <file>` writes a `.tar.gz` backup of the files listed in `sysupgrade.conf`. `-r <file>` restores one, and `-l` lists what would be saved.
+
+## See it on your router
+
+This command only reads:
+
+```sh
+sysupgrade -l | head
+```
+
+## Watch out
+
+- A factory reset erases every setting, so make a backup first.
+- Failsafe gives no DHCP. Without a static IP on your computer it looks as if the router is dead.
+
+## Related guides
+
+- [Can't reach LuCI](/en/troubleshooting/no-web-ui/)
+- [Backup and restore](/en/recovery/backup-restore/)
+- [Firmware upgrade](/en/recovery/firmware-upgrade/)
+
+<PageSources />

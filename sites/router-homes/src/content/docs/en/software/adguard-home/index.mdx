@@ -33,14 +33,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 201 / 1GB" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="PVE 9.2.2 single NIC; OpenWrt 25.12.6 VM 201; AGH 0.107.79; vmbr2 192.168.2.0/24"
-  recipe="tests/recipes/agh-25.12-vm201.md"
-  result="AGH 53 + web 3000; dnsmasq 5353; DHCP option 6 → 192.168.2.1; client blocked.example=0.0.0.0, openwrt.org resolves; fstab/rules/service survived reboot"
-  date="2026-10-20"
-/>
-
 ## Outcome
 
 - AdGuard Home owns OpenWrt port `53`; the web UI is on `3000`.
@@ -301,5 +293,13 @@ Check the fstab UUID, target and enabled flag; mount manually, then restart AGH.
 - This is an E2 lab record; it has not been independently reviewed or tested on a physical LAN.
 - Recipe: `tests/recipes/agh-25.12-vm201.md`; environment notes: `docs/agh-e2-run.md`.
 - Update `testedVersions` when the package/version changes; do not copy init scripts across firmware versions.
+
+<TestRecord
+  status="partial"
+  environment="PVE 9.2.2 single NIC; OpenWrt 25.12.6 VM 201; AGH 0.107.79; vmbr2 192.168.2.0/24"
+  recipe="tests/recipes/agh-25.12-vm201.md"
+  result="AGH 53 + web 3000; dnsmasq 5353; DHCP option 6 → 192.168.2.1; client blocked.example=0.0.0.0, openwrt.org resolves; fstab/rules/service survived reboot"
+  date="2026-10-20"
+/>
 
 <PageSources />

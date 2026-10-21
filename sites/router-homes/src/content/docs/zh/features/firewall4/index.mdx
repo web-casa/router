@@ -1,0 +1,50 @@
+---
+title: "firewall4：OpenWrt 基于 nftables 的防火墙与区域"
+description: "从 22.03 起，OpenWrt 的防火墙是基于 nftables 的 firewall4，配置仍沿用基于区域的 UCI 写法。怎么查看，以及哪些老做法不再适用。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt firewall4", "openwrt fw4", "openwrt nftables 防火墙"]
+sources:
+  - label: "OpenWrt 22.03.0 发布公告"
+    url: https://forum.openwrt.org/t/openwrt-22-03-0-first-stable-release/136252
+  - label: "OpenWrt 防火墙配置"
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="firewall4" />
+
+## 一句话
+
+从 22.03 起，OpenWrt 默认的防火墙是 firewall4（fw4）。它生成 nftables 规则而不是 iptables，`/etc/config/firewall` 里仍沿用旧版 fw3 的 UCI 写法。
+
+## 以区域为单位，而不是规则列表
+
+- 接口被归入区域，通常是 `lan` 和 `wan`，策略和转发都在区域之间设置。
+- 默认配置下，LAN 和 WAN 是两个区域，LAN 的流量转发到 WAN；从 WAN 进入内网的连接，除非你加规则，否则不会被转发。
+- 新增的接口，比如访客网络或 WireGuard 隧道，通常要单独建一个区域，或者加入现有区域。
+
+## 在你的路由器上看一眼
+
+```sh
+uci show firewall | grep '=zone'
+fw4 print
+```
+
+`fw4 print` 会打印 fw4 将要加载的表、链和规则结构，但不会应用。修改配置后用 `fw4 reload` 生效。
+
+## 注意
+
+- 基于 `iptables -A …` 命令的教程不适用于 fw4，请改用 UCI 写规则。
+- 新接口放错区域，是隧道或访客网络“能连上但没网”的常见原因。
+
+## 相关操作页
+
+- [WireGuard 服务端](/zh/remote-access/wireguard-server/)
+- [访客 Wi-Fi](/zh/wireless-vlan/guest-wifi/)
+- [旁路网关](/zh/network/bypass-gateway/)
+
+<PageSources />

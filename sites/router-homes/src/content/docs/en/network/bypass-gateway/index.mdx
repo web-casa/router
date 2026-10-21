@@ -29,14 +29,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="WAN-enabled bypass E2: LAN 192.168.1.2/24, DHCP off, WAN 192.168.50.5/24; static client 192.168.1.100; pure one-arm bypass untested"
-  recipe="tests/recipes/bypass-gateway-25.12.md"
-  result="E2 partial: with DHCP off the client got no lease; static gateway/DNS .2 gave working public ping and DNS; DNS 1.1.1.1 worked; a dead gateway .250 broke public access and restoring .2 recovered."
-  date="2026-10-20"
-/>
-
 ## Pick the mode: one-arm bypass vs WAN-enabled gateway
 
 | Mode | OpenWrt interfaces | Who serves DHCP | Client gateway/DNS | Tested here |
@@ -229,5 +221,13 @@ No main-router lab was available, so this part is **E1**, not E2; verify against
 - This is E2 partial: the WAN-enabled bypass was tested; the one-arm path is E1 steps only.
 - No independent reviewer; conclusions are limited to this VM/netns environment.
 - “Bypass gateway” is not one fixed config; confirm who serves DHCP, who NATs, and whether the return route exists.
+
+<TestRecord
+  status="partial"
+  environment="WAN-enabled bypass E2: LAN 192.168.1.2/24, DHCP off, WAN 192.168.50.5/24; static client 192.168.1.100; pure one-arm bypass untested"
+  recipe="tests/recipes/bypass-gateway-25.12.md"
+  result="E2 partial: with DHCP off the client got no lease; static gateway/DNS .2 gave working public ping and DNS; DNS 1.1.1.1 worked; a dead gateway .250 broke public access and restoring .2 recovered."
+  date="2026-10-20"
+/>
 
 <PageSources />

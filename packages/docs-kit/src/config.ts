@@ -26,6 +26,7 @@ export function createDocsConfig(meta: SiteMeta, options: CreateDocsConfigOption
         lastUpdated: true,
         pagination: true,
         ...(meta.components ? { components: meta.components } : {}),
+        ...(meta.starlight ?? {}),
       }),
     ],
     vite: {

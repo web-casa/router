@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="—" device="device pending" tested={false} evidence="E1" />
 
-<TestRecord
-  status="planned"
-  environment="Specific device pending; read-only checklist, no flashing"
-  recipe="tests/recipes/firmware-download-check.md"
-  result="E1: model/revision, target/profile, image types, checksums and recovery path documented; not executed on a device"
-/>
-
 ## Outcome
 
 - Know the exact model and hardware revision, not a “looks the same” model.
@@ -203,5 +196,12 @@ Use the vendor process; do not bypass signatures/locks just to install OpenWrt. 
 - This is E1: fields, image types and recovery are based on public documentation; no device download/flash was performed.
 - Model/revision come from the label and vendor page; do not generalize x86 VM experience to routers.
 - Recipe: `tests/recipes/firmware-download-check.md`; flashing steps are out of scope.
+
+<TestRecord
+  status="planned"
+  environment="Specific device pending; read-only checklist, no flashing"
+  recipe="tests/recipes/firmware-download-check.md"
+  result="E1: model/revision, target/profile, image types, checksums and recovery path documented; not executed on a device"
+/>
 
 <PageSources />

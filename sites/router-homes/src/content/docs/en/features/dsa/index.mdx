@@ -1,0 +1,53 @@
+---
+title: "DSA in OpenWrt: switch ports as Linux interfaces, VLANs on br-lan"
+description: "On DSA targets each switch port is its own interface (lan1–lan4) in the br-lan bridge, with VLANs set as bridge-vlan sections. How to tell DSA from swconfig."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt dsa", "openwrt swconfig vs dsa", "openwrt bridge-vlan"]
+sources:
+  - label: "OpenWrt DSA"
+    url: https://openwrt.org/docs/guide-user/network/dsa/start
+  - label: "DSA mini tutorial"
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+  - label: "OpenWrt 21.02.0 release announcement"
+    url: https://forum.openwrt.org/t/openwrt-21-02-0-first-stable-release/105395
+  - label: "OpenWrt 22.03.0 release announcement"
+    url: https://forum.openwrt.org/t/openwrt-22-03-0-first-stable-release/136252
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="dsa" />
+
+## In one sentence
+
+DSA (Distributed Switch Architecture) is the Linux kernel subsystem for network switches. On DSA devices each front port appears as its own interface, such as `lan1`–`lan4`, and those ports are bridged into `br-lan`.
+
+## Where it came from
+
+- DSA first appeared in 21.02, replacing the older swconfig on some targets.
+- 22.03 converted more of them, for example all of bcm53xx and lantiq xrx200.
+- Sysupgrade cannot migrate a swconfig configuration to DSA. If your device switched over, set the network up again.
+
+## VLANs on DSA
+
+VLANs are `config bridge-vlan` sections in `/etc/config/network`. Interfaces then sit on the bridge with a VLAN suffix, as in `br-lan.1`. Each port is tagged or untagged per VLAN.
+
+## See it on your router
+
+```sh
+ip -br link
+uci show network | grep -E 'bridge-vlan|=device'
+```
+
+If you see `config switch` and `switch_vlan` sections instead, the device still uses swconfig, and DSA guides do not apply to it.
+
+## Related guides
+
+- [DSA VLAN](/en/wireless-vlan/dsa-vlan/)
+- [Guest Wi-Fi](/en/wireless-vlan/guest-wifi/)
+- [Wired/wireless AP](/en/network/ap-mode/)
+
+<PageSources />

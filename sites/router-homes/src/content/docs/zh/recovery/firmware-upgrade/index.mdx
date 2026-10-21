@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200；同版本 sysupgrade；配置保留；包 239→182；SQM/OpenClash 丢失；DNS/HTTP 正常"
-  recipe="tests/recipes/firmware-upgrade-25.12.md"
-  result="E2 partial：同版本 sysupgrade 后 LAN/DHCP 配置保留、HTTP/SSH/DNS 正常；包从 239 降到 182，SQM/OpenClash 丢失；未做跨版本升级，SQM 重装未完成，快照已回滚"
-  date="2026-10-20"
-/>
-
 ## 升级不是“换个固件文件”
 
 一次升级至少要分开看四件事：
@@ -194,5 +186,13 @@ apk add sqm-scripts luci-app-sqm
 - 本页是 E2 partial：同版本 sysupgrade 的配置保留、管理/DNS 和包丢失已实测；跨版本和插件重建未完成。
 - 不要用同版本结果推断跨大版本升级；先看 release notes、备份、在 VM 试。
 - 没有第二评审人；结论只限本次 VM 环境。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；同版本 sysupgrade；配置保留；包 239→182；SQM/OpenClash 丢失；DNS/HTTP 正常"
+  recipe="tests/recipes/firmware-upgrade-25.12.md"
+  result="E2 partial：同版本 sysupgrade 后 LAN/DHCP 配置保留、HTTP/SSH/DNS 正常；包从 239 降到 182，SQM/OpenClash 丢失；未做跨版本升级，SQM 重装未完成，快照已回滚"
+  date="2026-10-20"
+/>
 
 <PageSources />

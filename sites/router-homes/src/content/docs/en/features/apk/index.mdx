@@ -1,0 +1,65 @@
+---
+title: "apk in OpenWrt 25.12: the package manager that replaced opkg"
+description: "Since 25.12, OpenWrt installs software with apk instead of opkg. Command equivalents, file locations and the one command not to run."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt apk", "apk vs opkg", "openwrt opkg replaced"]
+sources:
+  - label: "OpenWrt apk"
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: "opkg to apk cheatsheet"
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: "OpenWrt 25.12.0 release announcement"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="apk" />
+
+## In one sentence
+
+Starting with 25.12, OpenWrt installs and removes software with apk (Alpine Package Keeper, version 3). 24.10 and earlier still use opkg.
+
+## Why it changed
+
+The 25.12.0 announcement explains that OpenWrt's fork of opkg is no longer maintained. Few package names changed, but every command did.
+
+## Command map
+
+| Task | apk (25.12) | opkg (24.10) |
+|---|---|---|
+| Refresh the package index | `apk update` | `opkg update` |
+| Install | `apk add <pkg>` | `opkg install <pkg>` |
+| Remove | `apk del <pkg>` | `opkg remove <pkg>` |
+| List installed | `apk list --installed` | `opkg list-installed` |
+| List upgradable | `apk list --upgradeable` | `opkg list-upgradable` |
+| Which package owns a file | `apk info --who-owns <file>` | `opkg search <file>` |
+
+## What else is different
+
+- Package files use the `.apk` extension, and the package index is `packages.adb`.
+- Repositories are listed under `/etc/apk/repositories.d/`.
+- Packages you build yourself are unsigned, so installing them needs `--allow-untrusted`.
+
+## Watch out
+
+- **Don't use `apk upgrade` to upgrade the system.** The OpenWrt wiki warns against it. Upgrade firmware with an attended sysupgrade client instead: the LuCI app is installed by default on 25.12.
+- Don't paste opkg commands into 25.12, or apk commands into 24.10. Check which one you have first.
+
+## See it on your router
+
+```sh
+apk list --installed | head
+ls /etc/apk/repositories.d/
+```
+
+## Related guides
+
+- [apk vs opkg](/en/software/apk-vs-opkg/)
+- [Package sources](/en/software/package-sources/)
+- [Package will not install](/en/troubleshooting/plugin-install/)
+
+<PageSources />

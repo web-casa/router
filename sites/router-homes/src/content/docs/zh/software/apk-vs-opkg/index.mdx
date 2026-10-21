@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200；apk 官方/TUNA 源 11220 包；安装 SQM；24.10 opkg 未在本次环境执行"
-  recipe="tests/recipes/apk-vs-opkg.md"
-  result="E2 partial：25.12 apk 的 update/search/install 与镜像切换已实测；25.12 sysupgrade 后包从 239 降到 182；24.10 opkg 命令/包格式仅按官方资料整理，未执行"
-  date="2026-10-20"
-/>
-
 ## 一句话
 
 - **25.12+**：`apk`，包是 `.apk`；
@@ -173,5 +165,13 @@ opkg list-installed | grep sqm-scripts
 - 本页是 E2 partial：25.12 apk 实测；24.10 opkg 仅为官方等价命令，未在本次环境执行。
 - 不要把“命令对照”写成“迁移已验证”；真实迁移要先备份、在 VM 试。
 - 没有第二评审人；结论只限本次 25.12 x86 环境。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；apk 官方/TUNA 源 11220 包；安装 SQM；24.10 opkg 未在本次环境执行"
+  recipe="tests/recipes/apk-vs-opkg.md"
+  result="E2 partial：25.12 apk 的 update/search/install 与镜像切换已实测；25.12 sysupgrade 后包从 239 降到 182；24.10 opkg 命令/包格式仅按官方资料整理，未执行"
+  date="2026-10-20"
+/>
 
 <PageSources />

@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="无线 + DSA 设备（未实测）" tested={false} evidence="E1" />
 
-<TestRecord
-  status="planned"
-  environment="基于 OpenWrt 25.12 Wi-Fi/VLAN/firewall 文档整理；无真实无线/交换机验证"
-  recipe="tests/recipes/guest-wifi-25.12.md"
-  result="E1：独立 SSID/网段/DHCP/firewall zone、隔离和 VLAN 方案已整理；未在真实无线/交换机验证"
-/>
-
 > **状态**：E1 文档页。访客隔离涉及 Wi-Fi、VLAN、DHCP 和 firewall 四层；没有真实无线硬件时不能写“已隔离”。
 
 ## 目标
@@ -188,5 +181,12 @@ bridge vlan show
 - 本页只做文档整理，未在真实无线/DSA 硬件验证；不写“访客隔离已生效”。
 - 真实 E2 需要：支持多 SSID 的 AP、可配置 VLAN 的交换机/DSA 设备、两个客户端、控制台和回滚配置。
 - 测试通过后记录设备型号、VLAN/SSID、firewall zone、DHCP 和隔离结果。
+
+<TestRecord
+  status="planned"
+  environment="基于 OpenWrt 25.12 Wi-Fi/VLAN/firewall 文档整理；无真实无线/交换机验证"
+  recipe="tests/recipes/guest-wifi-25.12.md"
+  result="E1：独立 SSID/网段/DHCP/firewall zone、隔离和 VLAN 方案已整理；未在真实无线/交换机验证"
+/>
 
 <PageSources />

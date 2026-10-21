@@ -1,0 +1,52 @@
+---
+title: "OpenWrt 上的 SQM 与 CAKE：带宽跑满时也压住延迟"
+description: "SQM 把流量整形到略低于线路速率，让队列保持很短；配合 CAKE 可以对抗缓冲膨胀。附 OpenWrt 官方指南推荐的设置。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt sqm", "openwrt cake", "缓冲膨胀 openwrt"]
+sources:
+  - label: "OpenWrt SQM 指南"
+    url: https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm
+  - label: "Linux 4.19（kernelnewbies）"
+    url: https://kernelnewbies.org/Linux_4.19
+  - label: "CAKE（bufferbloat.net）"
+    url: https://www.bufferbloat.net/projects/codel/wiki/Cake/
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="sqm" />
+
+## 一句话
+
+SQM（Smart Queue Management，智能队列管理）把流量整形到略低于线路速率，让队列排在可以管理的路由器上，而不是光猫里；配合 CAKE 队列算法，带宽跑满时延迟也能保持很低。这个问题叫缓冲膨胀（bufferbloat）。
+
+## OpenWrt 指南的推荐做法
+
+1. 安装 `luci-app-sqm`；不用 LuCI 的话装 `sqm-scripts`。
+2. 实测真实的下载和上传速度，把两者都设为实测值的 **90%**。
+3. 选择 `cake`，脚本用 `piece_of_cake.qos`。
+4. 在满载状态下重新测试并微调。`fq_codel` 配 `simple.qos` 是更轻量、功能较少的替代方案。
+
+CAKE 从 Linux 4.19 起进入内核。
+
+## 在你的路由器上看一眼
+
+安装 SQM 之后：
+
+```sh
+cat /etc/config/sqm
+```
+
+## 注意
+
+- 整形会占用 CPU，高速线路上小路由器可能跟不上；改动前后都要对比速度和延迟。
+- 速率按实测值填，不要按运营商宣传的套餐速率填。
+
+## 相关操作页
+
+- [SQM / CAKE](/zh/software/sqm/)
+
+<PageSources />

@@ -1,0 +1,15 @@
+---
+import type { HeroData } from './data';
+
+interface Props { hero: HeroData }
+const { hero } = Astro.props;
+---
+
+<dl class="rh-stats">
+  {hero.stats.map(([value, label], i) => (
+    <div class="rh-stat rh-in" style={`--i:${7 + i}`}>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  ))}
+</dl>

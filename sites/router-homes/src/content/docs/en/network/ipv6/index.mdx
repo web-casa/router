@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200; LAN ULA fd2f:385b:7d0a::/48; RA/SLAAC client got /64; no upstream GUA/PD"
-  recipe="tests/recipes/ipv6-25.12.md"
-  result="E2 partial: LAN had ULA fd2f:385b:7d0a::1/60 and an RA/SLAAC client got fd2f:385b:7d0a:0:.../64 and pinged the router; no upstream GUA/PD, WAN IPv6 untested"
-  date="2026-10-20"
-/>
-
 ## Five address/mechanism terms
 
 | Name | Example/role | Common mistake |
@@ -211,5 +203,13 @@ nft list ruleset 2>/dev/null | head -80
 - This is E2 partial: LAN ULA/RA/SLAAC were tested; WAN GUA/PD and a real ISP were not.
 - No independent reviewer; conclusions are limited to this VM/netns environment.
 - Do not turn “LAN has a ULA” into “IPv6 internet works”; ULA is internal only.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; LAN ULA fd2f:385b:7d0a::/48; RA/SLAAC client got /64; no upstream GUA/PD"
+  recipe="tests/recipes/ipv6-25.12.md"
+  result="E2 partial: LAN had ULA fd2f:385b:7d0a::1/60 and an RA/SLAAC client got fd2f:385b:7d0a:0:.../64 and pinged the router; no upstream GUA/PD, WAN IPv6 untested"
+  date="2026-10-20"
+/>
 
 <PageSources />

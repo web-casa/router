@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="—" device="待核对设备" tested={false} evidence="E1" />
 
-<TestRecord
-  status="planned"
-  environment="待具体设备；只读核对流程，不执行刷机"
-  recipe="tests/recipes/firmware-download-check.md"
-  result="E1：型号/修订、target/profile、镜像类型、校验和恢复入口已整理；未在具体设备上执行"
-/>
-
 ## 完成后你能确认什么
 
 - 设备的确切型号和硬件修订，而不是“看起来一样”的型号；
@@ -203,5 +196,12 @@ certutil -hashfile openwrt-*.img.gz SHA256
 - 本页是 E1：核对字段、镜像类型和恢复入口按公开资料整理；没有在具体设备上执行下载/刷机。
 - 设备型号/revision 以标签和厂商页面为准；不能把 x86 虚拟机经验套到路由器。
 - 复现配方：`tests/recipes/firmware-download-check.md`；刷机步骤不在本页范围。
+
+<TestRecord
+  status="planned"
+  environment="待具体设备；只读核对流程，不执行刷机"
+  recipe="tests/recipes/firmware-download-check.md"
+  result="E1：型号/修订、target/profile、镜像类型、校验和恢复入口已整理；未在具体设备上执行"
+/>
 
 <PageSources />

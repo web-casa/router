@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200；uhttpd 停止/恢复、HTTP 80 验证、SSH 保留"
-  recipe="tests/recipes/troubleshooting-no-web-ui.md"
-  result="E2 partial：停 uhttpd 后 HTTP 80 拒绝、SSH 仍可用；start 后 HTTP 200；未测防火墙/端口改动/failsafe"
-/>
-
 ## 完成后你能确认什么
 
 - 先分清是**物理链路、客户端地址、管理 IP、HTTP 服务、SSH/防火墙**哪一层；
@@ -238,5 +231,12 @@ uci show dhcp
 - 本页是 E2 partial：uhttpd 停止/恢复和 SSH 保留已实测；防火墙、端口和 failsafe 仍按文档步骤。
 - 先判断是链路、地址、uhttpd、还是防火墙；不要用恢复出厂代替分层排查。
 - 不同设备/固件的控制台和 failsafe 操作不同，先查设备文档。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；uhttpd 停止/恢复、HTTP 80 验证、SSH 保留"
+  recipe="tests/recipes/troubleshooting-no-web-ui.md"
+  result="E2 partial：停 uhttpd 后 HTTP 80 拒绝、SSH 仍可用；start 后 HTTP 200；未测防火墙/端口改动/failsafe"
+/>
 
 <PageSources />

@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE netns 客户端" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="PVE netns 客户端；wg0 10.10.0.2/24 → 192.168.1.2:51820；allowed-ips 10.10.0.0/24；握手/ping/HTTP 成功；未测 Windows/手机/DNS/全局"
-  recipe="tests/recipes/wireguard-client-25.12.md"
-  result="E2 partial：客户端 10.10.0.2/24 与服务端 10.10.0.1/24 握手成功；ping 隧道 4/4；HTTP 200；未测 Windows/手机、DNS through tunnel、全局路由和真实漫游"
-  date="2026-10-20"
-/>
-
 ## 客户端需要什么
 
 - 客户端自己的私钥（只留客户端）；
@@ -173,5 +165,13 @@ curl -sSI --max-time 5 http://10.10.0.1/ | head -3
 - 本页是 E2 partial：Linux netns 客户端与 LAN 侧隧道已实测；移动端/DNS/全局/公网未测。
 - 私钥只留客户端；服务端只拿公钥。
 - 没有第二评审人；结论只限本次 VM/netns 环境。
+
+<TestRecord
+  status="partial"
+  environment="PVE netns 客户端；wg0 10.10.0.2/24 → 192.168.1.2:51820；allowed-ips 10.10.0.0/24；握手/ping/HTTP 成功；未测 Windows/手机/DNS/全局"
+  recipe="tests/recipes/wireguard-client-25.12.md"
+  result="E2 partial：客户端 10.10.0.2/24 与服务端 10.10.0.1/24 握手成功；ping 隧道 4/4；HTTP 200；未测 Windows/手机、DNS through tunnel、全局路由和真实漫游"
+  date="2026-10-20"
+/>
 
 <PageSources />

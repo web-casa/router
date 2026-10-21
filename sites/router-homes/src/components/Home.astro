@@ -1,0 +1,811 @@
+---
+// Home page body: page promise, topic index, symptom entry, evidence ladder.
+// Everything is generated from the sidebar and the content collection, so the
+// counts and links stay true as pages are added.
+import { getCollection } from 'astro:content';
+import meta from '../../site.meta';
+import FeatureGrid from './features/FeatureGrid.astro';
+import Icon from './Icon.astro';
+import '../styles/sections.css';
+
+interface Props {
+  /** Pass explicitly when rendered outside a content page (route data isn't ready yet). */
+  locale?: string;
+}
+const locale = Astro.props.locale ?? (Astro.locals as any).starlightRoute?.locale ?? 'en';
+const isEn = locale === 'en';
+const lang = isEn ? 'en' : 'zh-CN';
+
+const docs = (await getCollection('docs')).filter((d) => d.id.startsWith(`${locale}/`));
+const bySlug = new Map(docs.map((d) => [d.id.slice(locale.length + 1).replace(/\/index$/, ''), d]));
+
+type Item = { label?: string; translations?: Record<string, string>; slug?: string; items?: Item[] };
+const label = (item: Item) => (isEn ? item.label : item.translations?.[lang] ?? item.label) ?? '';
+// Solar icon per sidebar group, keyed by its English label.
+const groupIcons: Record<string, string> = {
+  'Getting Started': 'flag',
+  Network: 'global',
+  'Wireless & VLAN': 'wi-fi-router',
+  'Remote access': 'key-minimalistic',
+  Installation: 'server-square',
+  Software: 'box-minimalistic',
+  'Upgrade & recovery': 'restart',
+  Troubleshooting: 'bug',
+};
+const groups = (meta.sidebar as Item[]).map((g, i) => ({
+  index: String(i + 1).padStart(2, '0'),
+  key: g.label ?? '',
+  label: label(g),
+  icon: groupIcons[g.label ?? ''] ?? 'widget-5',
+  pages: (g.items ?? []).map((p) => {
+    const doc = bySlug.get(p.slug ?? '');
+    return { label: label(p), href: `/${locale}/${p.slug}/`, level: doc?.data.evidenceLevel, desc: doc?.data.description };
+  }),
+}));
+const troubleshooting = groups.find((g) => g.key === 'Troubleshooting') ?? groups.at(-1)!;
+// Features get their own bento section; keep them out of the topic index.
+const topics = groups
+  .filter((g) => g !== troubleshooting && g.key !== 'OpenWrt features')
+  .map((g, i) => ({ ...g, index: String(i + 1).padStart(2, '0') }));
+// Asymmetric 12-column rhythm for the topic grid.
+const spans = [5, 7, 4, 4, 4, 7, 5];
+
+const symptoms = troubleshooting.pages.map((p) => {
+  const doc = bySlug.get(p.href.slice(locale.length + 2, -1));
+  const title = String(doc?.data.title ?? p.label);
+  const [head, ...rest] = title.split(/[:：]\s*/);
+  return { href: p.href, head, rest: rest.join(': '), symptoms: (doc?.data.symptoms ?? []).slice(0, 3) };
+});
+
+const pages = docs.filter((d) => d.data.template !== 'splash' && !d.id.includes('/features/'));
+const levels = (['E1', 'E2', 'E3'] as const).map((level) => ({
+  level,
+  count: pages.filter((d) => d.data.evidenceLevel === level).length,
+}));
+
+const t = isEn
+  ? {
+      specKicker: 'Before step one',
+      specTitle: 'Every guide opens with the same five facts.',
+      specBody:
+        'Most broken home networks start with a command copied from the wrong firmware. So each page says what it was written against, where each command runs, and how you get back if it goes wrong.',
+      spec: [
+        ['Firmware', 'OpenWrt 25.12.6', '24.10 differences called out inline'],
+        ['Device', 'x86 VM on PVE 9.2', 'hardware revision when it matters'],
+        ['Package manager', 'apk', 'opkg commands kept separate'],
+        ['Runs in', 'Router shell · LuCI · Computer', 'marked on every step'],
+        ['Way back', 'backup.tar.gz + failsafe', 'written before the change, not after'],
+      ],
+      plate: 'env · network/dns',
+      topicsKicker: 'Guides',
+      topicsTitle: 'Start from the job in front of you.',
+      pages: (n: number) => `${n} ${n === 1 ? 'page' : 'pages'}`,
+      troubleKicker: 'Something broken right now?',
+      troubleTitle: 'Start from the symptom.',
+      troubleBody: 'Each triage page works layer by layer and keeps the console route open, so a reset is the last resort.',
+      evidenceKicker: 'Evidence levels',
+      evidenceTitle: 'We label how sure we are.',
+      evidenceBody:
+        'A page only says “tested” when a fixed recipe has been run. Real-hardware claims such as throughput and coverage wait for E3.',
+      ladder: {
+        E1: ['Read from official docs', 'Specs and documentation, not yet run in our lab.'],
+        E2: ['Reproduced in a lab VM', 'A fixed recipe run step by step on OpenWrt x86 under PVE.'],
+        E3: ['Measured on real hardware', 'Physical routers and real networks. None published yet.'],
+      } as Record<string, [string, string]>,
+      closeKicker: 'One habit',
+      closeTitle: 'Make a backup before you change anything.',
+      closeBody: 'It takes a minute in LuCI or one sysupgrade command, and it is the difference between a rollback and a reinstall.',
+      closeCta: 'Backup and restore',
+      closeAlt: 'Firmware upgrade',
+    }
+  : {
+      specKicker: '动手之前',
+      specTitle: '每篇操作页，|先写清五件事。',
+      specBody:
+        '家里的网络出问题，很多是从一条抄错固件版本的命令开始的。所以每页都先说明：按什么环境写的、每条命令在哪里执行、改坏了怎么回来。',
+      spec: [
+        ['固件', 'OpenWrt 25.12.6', '与 24.10 的差异就地标注'],
+        ['设备', 'PVE 9.2 上的 x86 VM', '需要时写明硬件修订版'],
+        ['包管理器', 'apk', 'opkg 命令单独列出，不混用'],
+        ['执行位置', '路由器 Shell · LuCI · 电脑', '每一步都标注'],
+        ['恢复路径', 'backup.tar.gz + failsafe', '改动之前先写好'],
+      ],
+      plate: 'env · network/dns',
+      topicsKicker: '文档',
+      topicsTitle: '从你手上的|那件事开始。',
+      pages: (n: number) => `${n} 篇`,
+      troubleKicker: '现在就出问题了？',
+      troubleTitle: '从症状开始查。',
+      troubleBody: '排查页逐层定位，并始终保留控制台入口，恢复出厂放在最后。',
+      evidenceKicker: '证据等级',
+      evidenceTitle: '我们把|“有多确定”|写出来。',
+      evidenceBody: '只有按固定配方跑过，页面才会写“已实测”。吞吐、覆盖这类真实硬件结论，要等到 E3。',
+      ladder: {
+        E1: ['依据官方文档', '官方规格与文档，尚未在本站实验环境执行。'],
+        E2: ['实验 VM 复现', '在 PVE 上的 OpenWrt x86 中按固定配方逐步复现。'],
+        E3: ['真实设备实测', '实体路由器与真实网络。目前尚未发布。'],
+      } as Record<string, [string, string]>,
+      closeKicker: '一个习惯',
+      closeTitle: '改任何东西之前，|先备份。',
+      closeBody: '在 LuCI 里点一下，或者一条 sysupgrade 命令，一分钟的事。它决定了出错后是回滚，还是重装。',
+      closeCta: '备份与恢复',
+      closeAlt: '固件升级',
+    };
+
+// Headings may mark preferred break points with '|'; each phrase becomes an
+// inline-block so CJK lines break between phrases rather than mid-word.
+const phrases = (text: string) => text.split('|');
+
+const specIcons = ['cpu-bolt', 'wi-fi-router', 'box', 'code-square', 'restart-circle'];
+
+const arrow =
+  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
+---
+
+<div class="rh-home not-content">
+  <!-- 01 · features -->
+  <FeatureGrid locale={locale} index="01" />
+
+  <!-- 02 · the page promise -->
+  <section class="rh-section rh-spec" aria-labelledby="rh-spec-title">
+    <div class="rh-spec-copy rh-reveal">
+      <p class="rh-kicker"><span>02</span>{t.specKicker}</p>
+      <h2 id="rh-spec-title">{phrases(t.specTitle).map((p) => <span class="rh-phrase">{p}</span>)}</h2>
+      <p class="rh-lede">{t.specBody}</p>
+    </div>
+    <div class="rh-plate rh-reveal" aria-label={t.plate}>
+      <div class="rh-plate-head" aria-hidden="true">
+        <span class="rh-led" data-state="on"></span>
+        <span>{t.plate}</span>
+        <span class="rh-plate-screws"><i></i><i></i></span>
+      </div>
+      <dl>
+        {t.spec.map(([k, v, note], i) => (
+          <div class="rh-plate-row" style={`--i:${i}`}>
+            <dt><Icon name={specIcons[i]} />{k}</dt>
+            <dd>
+              <span class="v">{v}</span>
+              <span class="n">{note}</span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  </section>
+
+  <!-- 03 · topic index -->
+  <section class="rh-section" aria-labelledby="rh-topics-title">
+    <div class="rh-section-head rh-reveal">
+      <p class="rh-kicker"><span>03</span>{t.topicsKicker}</p>
+      <h2 id="rh-topics-title">{phrases(t.topicsTitle).map((p) => <span class="rh-phrase">{p}</span>)}</h2>
+    </div>
+    <div class="rh-topics">
+      {topics.map((g, i) => (
+        <article class="rh-topic rh-spot rh-reveal" style={`--span:${spans[i] ?? 4}`}>
+          <header>
+            <span class="rh-topic-icon"><Icon name={g.icon} /></span>
+            <span class="rh-topic-index">{g.index}</span>
+            <h3>{g.label}</h3>
+            <span class="rh-topic-count">{t.pages(g.pages.length)}</span>
+          </header>
+          <ul>
+            {g.pages.map((p) => (
+              <li>
+                <a href={p.href} title={p.desc}>
+                  <span>{p.label}</span>
+                  {p.level && <span class="rh-chip" data-level={p.level}>{p.level}</span>}
+                  <Fragment set:html={arrow} />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <!-- 04 · symptom entry -->
+  <section class="rh-section rh-trouble" aria-labelledby="rh-trouble-title">
+    <div class="rh-section-head rh-reveal">
+      <p class="rh-kicker"><span>04</span>{t.troubleKicker}</p>
+      <h2 id="rh-trouble-title">{phrases(t.troubleTitle).map((p) => <span class="rh-phrase">{p}</span>)}</h2>
+      <p class="rh-lede">{t.troubleBody}</p>
+    </div>
+    <div class="rh-term rh-reveal">
+      <div class="rh-term-bar" aria-hidden="true">
+        <i></i><i></i><i></i>
+        <span>root@OpenWrt:~# logread -e error</span>
+      </div>
+      <ol>
+        {symptoms.map((s) => (
+          <li>
+            <a href={s.href}>
+              <span class="rh-term-log" aria-hidden="true">
+                {s.symptoms.map((line) => <span>{line}</span>)}
+              </span>
+              <span class="rh-term-title">
+                <span class="p" aria-hidden="true">→</span>
+                <span class="h">{s.head}</span>
+                <Fragment set:html={arrow} />
+              </span>
+              {s.rest && <span class="rh-term-rest">{s.rest}</span>}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <!-- 05 · evidence ladder -->
+  <section class="rh-section rh-evidence" aria-labelledby="rh-evidence-title">
+    <div class="rh-section-head rh-reveal">
+      <p class="rh-kicker"><span>05</span>{t.evidenceKicker}</p>
+      <h2 id="rh-evidence-title">{phrases(t.evidenceTitle).map((p) => <span class="rh-phrase">{p}</span>)}</h2>
+      <p class="rh-lede">{t.evidenceBody}</p>
+    </div>
+    <ol class="rh-ladder">
+      {levels.map(({ level, count }, i) => (
+        <li class="rh-rung rh-reveal" data-level={level} data-empty={count === 0 ? '' : undefined} style={`--h:${i + 1}`}>
+          <div class="rh-bars" aria-hidden="true">
+            {[0, 1, 2].map((b) => <i class:list={{ on: b <= i }} />)}
+          </div>
+          <div class="rh-rung-body">
+            <p class="rh-rung-level">
+              <span>{level}</span>
+              <span class="rh-rung-count">{count}</span>
+            </p>
+            <h3>{t.ladder[level][0]}</h3>
+            <p>{t.ladder[level][1]}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <!-- 06 · closing -->
+  <section class="rh-section rh-close rh-reveal" aria-labelledby="rh-close-title">
+    <p class="rh-kicker"><span>06</span>{t.closeKicker}</p>
+    <h2 id="rh-close-title">{phrases(t.closeTitle).map((p) => <span class="rh-phrase">{p}</span>)}</h2>
+    <p class="rh-lede">{t.closeBody}</p>
+    <div class="rh-close-actions">
+      <a class="rh-pill" href={`/${locale}/recovery/backup-restore/`}><span>{t.closeCta}</span><Fragment set:html={arrow} /></a>
+      <a class="rh-text-link" href={`/${locale}/recovery/firmware-upgrade/`}>{t.closeAlt}</a>
+    </div>
+  </section>
+</div>
+
+<script>
+  // Cursor-following highlight on topic cards (fine pointers only).
+  if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    for (const card of document.querySelectorAll<HTMLElement>('.rh-spot')) {
+      card.addEventListener('pointermove', (e) => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', `${e.clientX - r.left}px`);
+        card.style.setProperty('--my', `${e.clientY - r.top}px`);
+      });
+    }
+  }
+</script>
+
+<style>
+  .rh-home {
+    --gap: clamp(1rem, 2vw, 1.5rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .rh-phrase {
+    display: inline-block;
+  }
+
+  /* 01 · spec plate */
+  .rh-spec {
+    display: grid;
+    gap: 2.5rem;
+  }
+  .rh-plate {
+    position: relative;
+    border: 1px solid var(--rh-line-strong);
+    border-radius: var(--rh-radius-lg);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--rh-surface-2) 70%, transparent), var(--rh-surface)),
+      var(--rh-surface);
+    box-shadow: var(--rh-shadow);
+    overflow: hidden;
+  }
+  .rh-plate-head {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.85rem 1.15rem;
+    border-bottom: 1px solid var(--rh-line);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    color: var(--sl-color-gray-3);
+  }
+  .rh-plate-screws {
+    display: inline-flex;
+    gap: 0.4rem;
+    margin-inline-start: auto;
+  }
+  .rh-plate-screws i {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    border: 1px solid var(--rh-line-strong);
+    background: linear-gradient(135deg, transparent 45%, var(--rh-line-strong) 45% 55%, transparent 55%);
+  }
+  .rh-plate dl {
+    margin: 0;
+  }
+  .rh-plate-row {
+    display: grid;
+    grid-template-columns: 9rem minmax(0, 1fr);
+    gap: 1rem;
+    padding: 1rem 1.15rem;
+    border-bottom: 1px solid var(--rh-line);
+    transition: background-color 0.25s;
+  }
+  .rh-plate-row:last-child {
+    border-bottom: 0;
+  }
+  .rh-plate-row:hover {
+    background: color-mix(in srgb, var(--sl-color-accent) 6%, transparent);
+  }
+  .rh-plate-row dt {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    padding-top: 0.15rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sl-color-gray-3);
+  }
+  .rh-plate-row dt :global(.i) {
+    width: 1rem;
+    height: 1rem;
+    margin-top: -0.1rem;
+    color: var(--sl-color-accent);
+  }
+  .rh-plate-row dd {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin: 0;
+    min-width: 0;
+  }
+  .rh-plate-row .v {
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: var(--sl-color-white);
+  }
+  .rh-plate-row .n {
+    font-size: 0.86rem;
+    color: var(--sl-color-gray-3);
+  }
+  .rh-plate-row:last-child .v {
+    color: var(--sl-color-accent);
+  }
+
+  @media (min-width: 60rem) {
+    .rh-spec {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+      gap: 5rem;
+      align-items: center;
+    }
+  }
+
+  /* 02 · topics */
+  .rh-topics {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--gap);
+  }
+  @media (min-width: 46rem) {
+    .rh-topics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 64rem) {
+    .rh-topics {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+    .rh-topic {
+      grid-column: span var(--span);
+    }
+  }
+
+  .rh-topic {
+    --mx: 50%;
+    --my: 0%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.4rem 1.4rem 1rem;
+    border: 1px solid var(--rh-line);
+    border-radius: var(--rh-radius-lg);
+    background: var(--rh-surface);
+    transition: border-color 0.3s, transform 0.5s var(--rh-ease-out);
+  }
+  .rh-topic::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    padding: 1px;
+    border-radius: inherit;
+    background: radial-gradient(22rem circle at var(--mx) var(--my), var(--sl-color-accent), transparent 60%);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.35s;
+    pointer-events: none;
+  }
+  .rh-topic::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(18rem circle at var(--mx) var(--my), hsla(36, 96%, 60%, 0.06), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.35s;
+    pointer-events: none;
+  }
+  .rh-topic:hover::before,
+  .rh-topic:hover::after,
+  .rh-topic:focus-within::before {
+    opacity: 1;
+  }
+  .rh-topic header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .rh-topic-icon {
+    display: grid;
+    place-items: center;
+    align-self: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.7rem;
+    background: color-mix(in srgb, var(--sl-color-accent) 12%, transparent);
+    color: var(--sl-color-accent);
+    transition: transform 0.45s var(--rh-ease-spring), background-color 0.3s;
+  }
+  .rh-topic-icon :global(.i) {
+    width: 1.3rem;
+    height: 1.3rem;
+  }
+  .rh-topic:hover .rh-topic-icon {
+    transform: rotate(-6deg) scale(1.06);
+    background: color-mix(in srgb, var(--sl-color-accent) 20%, transparent);
+  }
+  .rh-topic-index {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.72rem;
+    color: var(--sl-color-accent);
+  }
+  .rh-topic h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 630;
+    letter-spacing: -0.03em;
+    color: var(--sl-color-white);
+  }
+  .rh-topic-count {
+    margin-inline-start: auto;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.72rem;
+    color: var(--sl-color-gray-3);
+    white-space: nowrap;
+  }
+  .rh-topic ul {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rh-topic li + li {
+    border-top: 1px solid var(--rh-line);
+  }
+  .rh-topic a {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.7rem 0;
+    color: var(--sl-color-gray-1);
+    text-decoration: none;
+    font-weight: 480;
+    transition: color 0.2s, padding 0.4s var(--rh-ease-out);
+  }
+  .rh-topic a > span:first-child {
+    margin-inline-end: auto;
+  }
+  .rh-topic a :global(svg) {
+    flex: none;
+    width: 0.9rem;
+    height: 0.9rem;
+    color: var(--sl-color-gray-4);
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: opacity 0.25s, transform 0.4s var(--rh-ease-out), color 0.2s;
+  }
+  .rh-topic a:hover {
+    color: var(--sl-color-white);
+    padding-inline-start: 0.35rem;
+  }
+  .rh-topic a:hover :global(svg) {
+    opacity: 1;
+    transform: none;
+    color: var(--sl-color-accent);
+  }
+
+  .rh-chip {
+    flex: none;
+    padding: 0.05rem 0.4rem;
+    border-radius: 0.3rem;
+    border: 1px solid var(--rh-line);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--sl-color-gray-3);
+  }
+  .rh-chip[data-level='E2'] {
+    border-color: color-mix(in srgb, var(--sl-color-accent) 40%, transparent);
+    color: var(--sl-color-accent);
+  }
+  .rh-chip[data-level='E3'] {
+    border-color: color-mix(in srgb, var(--rh-ok) 40%, transparent);
+    color: var(--rh-ok);
+  }
+
+  /* 03 · terminal */
+  .rh-trouble {
+    display: grid;
+    gap: 0;
+  }
+  @media (min-width: 64rem) {
+    .rh-trouble {
+      grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+      gap: 4rem;
+      align-items: start;
+    }
+    .rh-trouble .rh-section-head {
+      position: sticky;
+      top: calc(var(--sl-nav-height) + 3rem);
+    }
+  }
+  .rh-term {
+    border: 1px solid var(--rh-line-strong);
+    border-radius: var(--rh-radius-lg);
+    background: var(--rh-code-bg);
+    box-shadow: var(--rh-shadow);
+    overflow: hidden;
+  }
+  .rh-term-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--rh-line);
+    background: var(--rh-code-bar);
+  }
+  .rh-term-bar i {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: var(--rh-line-strong);
+  }
+  .rh-term-bar span {
+    margin-inline-start: 0.6rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.74rem;
+    color: var(--sl-color-gray-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .rh-term ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rh-term li + li {
+    border-top: 1px dashed var(--rh-line);
+  }
+  .rh-term a {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 1.35rem 1.25rem;
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 0.25s;
+  }
+  .rh-term a:hover {
+    background: color-mix(in srgb, var(--sl-color-accent) 5%, transparent);
+  }
+  .rh-term-log {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.76rem;
+    color: var(--sl-color-gray-3);
+  }
+  .rh-term-log span::before {
+    content: '# ';
+    color: var(--sl-color-gray-4);
+  }
+  .rh-term-title {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    font-size: clamp(1.3rem, 1rem + 1vw, 1.75rem);
+    font-weight: 620;
+    letter-spacing: -0.035em;
+    color: var(--sl-color-white);
+  }
+  .rh-term-title .p {
+    font-family: var(--__sl-font-mono);
+    font-weight: 400;
+    color: var(--sl-color-accent);
+    transition: transform 0.4s var(--rh-ease-out);
+  }
+  .rh-term-title :global(svg) {
+    width: 1.1rem;
+    height: 1.1rem;
+    color: var(--sl-color-accent);
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: opacity 0.25s, transform 0.45s var(--rh-ease-spring);
+  }
+  .rh-term a:hover .rh-term-title :global(svg) {
+    opacity: 1;
+    transform: none;
+  }
+  .rh-term a:hover .p {
+    transform: translateX(3px);
+  }
+  .rh-term-rest {
+    max-width: 40rem;
+    font-size: 0.92rem;
+    color: var(--sl-color-gray-3);
+  }
+
+  /* 04 · ladder — signal bars, one per evidence level */
+  .rh-ladder {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rh-line);
+  }
+  @media (min-width: 52rem) {
+    .rh-ladder {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .rh-rung + .rh-rung {
+      border-inline-start: 1px solid var(--rh-line);
+    }
+  }
+  .rh-rung {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 2rem 1.5rem 2rem 0;
+    border-bottom: 1px solid var(--rh-line);
+  }
+  @media (min-width: 52rem) {
+    .rh-rung + .rh-rung {
+      padding-inline-start: 1.5rem;
+    }
+  }
+  .rh-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 3rem;
+    flex: none;
+  }
+  .rh-bars i {
+    width: 0.6rem;
+    border-radius: 2px;
+    background: var(--rh-line-strong);
+  }
+  .rh-bars i:nth-child(1) { height: 35%; }
+  .rh-bars i:nth-child(2) { height: 65%; }
+  .rh-bars i:nth-child(3) { height: 100%; }
+  .rh-bars i.on {
+    background: var(--sl-color-accent);
+  }
+  .rh-rung[data-level='E3'] .rh-bars i.on {
+    background: var(--rh-ok);
+  }
+  .rh-rung[data-empty] .rh-bars i.on {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--rh-ok);
+  }
+  .rh-rung-level {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin: 0 0 0.4rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.8rem;
+    color: var(--sl-color-gray-3);
+  }
+  .rh-rung-count {
+    font-family: var(--__sl-font);
+    font-size: clamp(2.4rem, 1.8rem + 1.6vw, 3.5rem);
+    font-weight: 600;
+    letter-spacing: -0.05em;
+    line-height: 1;
+    color: var(--sl-color-white);
+    font-variant-numeric: tabular-nums;
+  }
+  .rh-rung[data-empty] .rh-rung-count {
+    color: var(--sl-color-gray-4);
+  }
+  .rh-rung h3 {
+    margin: 0 0 0.35rem;
+    font-size: 1.05rem;
+    font-weight: 620;
+    letter-spacing: -0.02em;
+    color: var(--sl-color-white);
+  }
+  .rh-rung p:last-child {
+    margin: 0;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    color: var(--sl-color-gray-3);
+  }
+
+  /* 05 · close */
+
+  /* Scroll-linked reveals: pure CSS where supported, static elsewhere. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .rh-plate-row {
+        animation: rh-row linear both;
+      }
+      .rh-bars i.on {
+        transform-origin: bottom;
+        animation: rh-bar linear both;
+      }
+    }
+  }
+  /* Timelines live in separate blocks: the minifier would otherwise fold them
+     into the animation shorthand, which browsers reject. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .rh-plate-row {
+        animation-timeline: view();
+        animation-range: entry calc(10% + var(--i) * 6%) entry calc(60% + var(--i) * 6%);
+      }
+      .rh-bars i.on {
+        animation-timeline: view();
+        animation-range: entry 20% cover 35%;
+      }
+    }
+  }
+  @keyframes rh-row {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes rh-bar {
+    from { transform: scaleY(0.1); }
+    to { transform: none; }
+  }
+</style>

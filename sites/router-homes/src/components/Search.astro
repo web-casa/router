@@ -1,6 +1,7 @@
 ---
 // Override Starlight Search to expand Pagefind terms that its zh-cn tokenizer drops (e.g. 镜像).
 import project from 'virtual:starlight/project-context';
+import Icon from './Icon.astro';
 
 const t = (Astro.locals as any).t as ((key: string) => string) & { all: () => Record<string, string> };
 
@@ -24,7 +25,7 @@ if (project.trailingSlash === 'never') dataAttributes['data-strip-trailing-slash
 		aria-label={t('search.label')}
 		aria-keyshortcuts="Control+K"
 	>
-		<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+		<Icon name="magnifer" class="rh-search-icon" />
 		<span class="sl-hidden md:sl-block" aria-hidden="true">{t('search.label')}</span>
 		<kbd class="sl-hidden md:sl-flex" style="display: none;">
 			<kbd>{t('search.ctrlKey')}</kbd><kbd>K</kbd>
@@ -218,6 +219,12 @@ if (project.trailingSlash === 'never') dataAttributes['data-strip-trailing-slash
 			button[data-open-modal] > :last-child {
 				margin-inline-start: auto;
 			}
+		}
+
+		button[data-open-modal] :global(.rh-search-icon) {
+			width: 1.25rem;
+			height: 1.25rem;
+			color: var(--sl-color-accent);
 		}
 
 		button > kbd {

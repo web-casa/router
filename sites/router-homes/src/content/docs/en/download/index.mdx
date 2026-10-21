@@ -1,0 +1,37 @@
+---
+title: Download OpenWrt
+description: Pick the right OpenWrt 25.12.6 image the first time. Work out what you have, match the exact hardware, verify the file; x86 image picker and common supported devices.
+template: splash
+pageType: overview
+evidenceLevel: E1
+heroVariant: download
+aliases: ['openwrt download', 'openwrt firmware download', 'which openwrt image', 'openwrt supported devices']
+hero:
+  title: Download OpenWrt, <em>right the first time</em>
+  tagline: Find out what you have, match the exact hardware, then verify the file. Three checks, no guessing.
+  actions:
+    - text: Open the firmware selector
+      link: https://firmware-selector.openwrt.org/
+      variant: primary
+    - text: x86 and virtual machines
+      link: '#x86'
+      variant: minimal
+sources:
+  - label: OpenWrt Firmware Selector
+    url: https://firmware-selector.openwrt.org/
+  - label: OpenWrt 25.12.6 downloads (targets)
+    url: https://downloads.openwrt.org/releases/25.12.6/targets/
+  - label: OpenWrt 25.12.6 service release
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: OpenWrt 25.12.0 release announcement
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: OpenWrt on x86
+    url: https://openwrt.org/docs/guide-user/installation/openwrt_x86
+---
+
+import DownloadGuide from '@components/download/DownloadGuide.astro';
+import PageSources from '@components/PageSources.astro';
+
+<DownloadGuide />
+
+<PageSources />

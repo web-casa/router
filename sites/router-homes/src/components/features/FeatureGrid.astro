@@ -1,0 +1,256 @@
+---
+// Home-page bento of the nine OpenWrt feature cards. Each card is one link.
+import Icon from '../Icon.astro';
+import FeatureVisual from './FeatureVisual.astro';
+import { features } from './features';
+
+interface Props {
+  locale: string;
+  index: string;
+}
+const { locale, index } = Astro.props;
+const isEn = locale === 'en';
+const t = isEn
+  ? { kicker: 'Features', title: 'OpenWrt, feature by feature.', all: 'Everything new in 25.12' }
+  : { kicker: '特性', title: 'OpenWrt 的九个关键特性', all: '查看 25.12 全部变化' };
+const arrow =
+  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
+---
+
+<section class="rh-section rh-features" aria-labelledby="rh-features-title">
+  <div class="rh-features-head rh-reveal">
+    <div>
+      <p class="rh-kicker"><span>{index}</span>{t.kicker}</p>
+      <h2 id="rh-features-title">{t.title}</h2>
+    </div>
+    <a class="rh-features-all" href={`/${locale}/features/openwrt-25-12/`}>{t.all}<Fragment set:html={arrow} /></a>
+  </div>
+
+  <ul class="rh-fgrid">
+    {features.map((f, i) => {
+      const copy = isEn ? f.en : f.zh;
+      return (
+        <li class="rh-reveal" style={`--span:${f.span};--rows:${f.rows ?? 1}`}>
+          <a class:list={['rh-fcard', 'rh-spot', { 'rh-fcard-hero': i === 0 }]} href={`/${locale}/features/${f.slug}/`}>
+            <div class="rh-fcard-visual">
+              <FeatureVisual slug={f.slug} isEn={isEn} />
+            </div>
+            <div class="rh-fcard-text">
+              <h3>
+                <Icon name={f.icon} />
+                <span>{copy.title}</span>
+              </h3>
+              <p>{copy.desc}</p>
+            </div>
+            <span class="rh-fcard-go" aria-hidden="true"><Fragment set:html={arrow} /></span>
+          </a>
+        </li>
+      );
+    })}
+  </ul>
+</section>
+
+<style>
+  .rh-features-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.25rem 2rem;
+    margin-bottom: clamp(2rem, 4vw, 3rem);
+  }
+  .rh-features-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.2rem;
+    color: var(--sl-color-white);
+    font-weight: 540;
+    text-decoration: none;
+    background: linear-gradient(currentColor, currentColor) 0 100% / 100% 1px no-repeat;
+    transition: color 0.2s, background-size 0.4s var(--rh-ease-out);
+  }
+  .rh-features-all :global(svg) {
+    width: 1rem;
+    height: 1rem;
+    transition: transform 0.45s var(--rh-ease-spring);
+  }
+  .rh-features-all:hover {
+    color: var(--sl-color-accent);
+    background-size: 30% 1px;
+  }
+  .rh-features-all:hover :global(svg) {
+    transform: translateX(4px);
+  }
+
+  .rh-fgrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--gap, 1.25rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (min-width: 46rem) {
+    .rh-fgrid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .rh-fgrid li:first-child {
+      grid-column: 1 / -1;
+    }
+  }
+  @media (min-width: 64rem) {
+    .rh-fgrid {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+    .rh-fgrid li,
+    .rh-fgrid li:first-child {
+      grid-column: span var(--span);
+      grid-row: span var(--rows);
+    }
+  }
+  .rh-fgrid li {
+    display: flex;
+    min-width: 0;
+  }
+
+  .rh-fcard {
+    --mx: 50%;
+    --my: 0%;
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 19rem;
+    padding: 1.5rem 1.6rem 1.6rem;
+    border: 1px solid var(--rh-line);
+    border-radius: 1.4rem;
+    background:
+      radial-gradient(80% 60% at 50% 35%, color-mix(in srgb, var(--sl-color-accent) 6%, transparent), transparent 70%),
+      var(--rh-surface);
+    color: inherit;
+    text-decoration: none;
+    overflow: hidden;
+    transition: transform 0.5s var(--rh-ease-out), border-color 0.3s, box-shadow 0.5s var(--rh-ease-out);
+  }
+  .rh-fcard::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    z-index: 2;
+    padding: 1px;
+    border-radius: inherit;
+    background: radial-gradient(22rem circle at var(--mx) var(--my), var(--sl-color-accent), transparent 60%);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.35s;
+    pointer-events: none;
+  }
+  .rh-fcard:hover,
+  .rh-fcard:focus-visible {
+    transform: translateY(-4px);
+    box-shadow: 0 28px 50px -30px hsla(30, 40%, 2%, 0.7);
+  }
+  .rh-fcard:hover::before,
+  .rh-fcard:focus-visible::before {
+    opacity: 1;
+  }
+  .rh-fcard-hero {
+    min-height: 26rem;
+    background:
+      radial-gradient(70% 70% at 50% 40%, color-mix(in srgb, var(--sl-color-accent) 16%, transparent), transparent 75%),
+      linear-gradient(160deg, var(--sl-color-accent-low), var(--rh-surface) 70%);
+    border-color: color-mix(in srgb, var(--sl-color-accent) 30%, var(--rh-line));
+  }
+  :root[data-theme='light'] .rh-fcard-hero {
+    background:
+      radial-gradient(70% 70% at 50% 40%, hsla(32, 90%, 60%, 0.16), transparent 75%),
+      linear-gradient(160deg, hsl(36, 85%, 93%), var(--rh-surface) 70%);
+  }
+
+  .rh-fcard-visual {
+    flex: 1;
+    display: grid;
+    place-items: center;
+    padding-block: 1rem 1.5rem;
+  }
+  .rh-fcard-text h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 630;
+    letter-spacing: -0.02em;
+    color: var(--sl-color-white);
+  }
+  .rh-fcard-hero .rh-fcard-text h3 {
+    font-size: 1.35rem;
+  }
+  .rh-fcard-text h3 :global(.i) {
+    flex: none;
+    width: 1.35rem;
+    height: 1.35rem;
+    color: var(--sl-color-accent);
+  }
+  .rh-fcard-text p {
+    /* Reserve two lines so titles line up across a row. */
+    min-height: calc(2 * 1.55em);
+    margin: 0.45rem 0 0;
+    max-width: 36rem;
+    font-size: 0.93rem;
+    line-height: 1.55;
+    color: var(--sl-color-gray-3);
+    text-wrap: pretty;
+  }
+  .rh-fcard-go {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    border: 1px solid var(--rh-line-strong);
+    color: var(--sl-color-gray-3);
+    opacity: 0;
+    transform: translate(-6px, 6px);
+    transition: opacity 0.3s, transform 0.45s var(--rh-ease-spring), background-color 0.3s, color 0.3s;
+  }
+  .rh-fcard-go :global(svg) {
+    width: 1rem;
+    height: 1rem;
+    transform: rotate(-45deg);
+  }
+  .rh-fcard:hover .rh-fcard-go,
+  .rh-fcard:focus-visible .rh-fcard-go {
+    opacity: 1;
+    transform: none;
+    background: var(--sl-color-accent);
+    border-color: var(--sl-color-accent);
+    color: var(--sl-color-text-invert);
+  }
+  @media (max-width: 45.99rem) {
+    .rh-fcard {
+      min-height: 15.5rem;
+    }
+    .rh-fcard-hero {
+      min-height: 21rem;
+    }
+    .rh-fcard-visual {
+      padding-block: 0.5rem 1rem;
+    }
+  }
+  @media (hover: none) {
+    .rh-fcard-go {
+      opacity: 1;
+      transform: none;
+    }
+  }
+</style>

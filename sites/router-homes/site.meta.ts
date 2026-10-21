@@ -6,14 +6,52 @@ if (!base) throw new Error('router-homes missing from fleet.config.json');
 
 const meta = {
   ...base,
-  customCss: ['./src/styles/theme.css'],
-  components: { Search: './src/components/Search.astro' },
+  customCss: ['@fontsource-variable/geist', '@fontsource-variable/geist-mono', './src/styles/theme.css'],
+  components: {
+    Search: './src/components/Search.astro',
+    Hero: './src/components/Hero.astro',
+    SiteTitle: './src/components/SiteTitle.astro',
+    Footer: './src/components/Footer.astro',
+    SocialIcons: './src/components/HeaderLinks.astro',
+  },
+  starlight: {
+    expressiveCode: {
+      themes: ['vitesse-dark', 'vitesse-light'],
+      styleOverrides: {
+        borderRadius: '0.75rem',
+        borderColor: 'var(--rh-line)',
+        codeFontFamily: 'var(--__sl-font-mono)',
+        codeFontSize: '0.85rem',
+        codeLineHeight: '1.7',
+        uiFontFamily: 'var(--__sl-font)',
+        codeBackground: 'var(--rh-code-bg)',
+        frames: {
+          editorBackground: 'var(--rh-code-bg)',
+          terminalBackground: 'var(--rh-code-bg)',
+          editorTabBarBackground: 'var(--rh-code-bar)',
+          editorActiveTabBackground: 'var(--rh-code-bg)',
+          editorActiveTabIndicatorTopColor: 'var(--sl-color-accent)',
+          terminalTitlebarBackground: 'var(--rh-code-bar)',
+          terminalTitlebarBorderBottomColor: 'var(--rh-line)',
+          terminalTitlebarDotsForeground: 'var(--rh-line-strong)',
+          terminalTitlebarDotsOpacity: '1',
+          frameBoxShadowCssValue: 'none',
+          inlineButtonBorder: 'var(--rh-line-strong)',
+        },
+      },
+    },
+  },
   // Starlight resolves sidebar translations by BCP-47 lang (zh-CN), not the locale key (zh).
   sidebar: [
     {
       label: 'Getting Started',
       translations: { 'zh-CN': '开始' },
       items: [
+        {
+          label: 'Download OpenWrt',
+          translations: { 'zh-CN': '下载 OpenWrt' },
+          slug: 'download',
+        },
         {
           label: 'Overview',
           translations: { 'zh-CN': '概览' },
@@ -39,6 +77,21 @@ const meta = {
           translations: { 'zh-CN': 'x86 镜像选择' },
           slug: 'getting-started/x86-image',
         },
+      ],
+    },
+    {
+      label: 'OpenWrt features',
+      translations: { 'zh-CN': 'OpenWrt 特性' },
+      items: [
+        { label: 'OpenWrt 25.12', translations: { 'zh-CN': 'OpenWrt 25.12' }, slug: 'features/openwrt-25-12' },
+        { label: 'apk package manager', translations: { 'zh-CN': 'apk 包管理器' }, slug: 'features/apk' },
+        { label: 'Kernel & toolchain', translations: { 'zh-CN': '内核与工具链' }, slug: 'features/kernel-toolchain' },
+        { label: 'UCI configuration', translations: { 'zh-CN': 'UCI 统一配置' }, slug: 'features/uci' },
+        { label: 'firewall4 / nftables', translations: { 'zh-CN': 'firewall4 防火墙' }, slug: 'features/firewall4' },
+        { label: 'DSA switch ports', translations: { 'zh-CN': 'DSA 交换机端口' }, slug: 'features/dsa' },
+        { label: 'WireGuard', translations: { 'zh-CN': 'WireGuard' }, slug: 'features/wireguard' },
+        { label: 'SQM / CAKE', translations: { 'zh-CN': 'SQM / CAKE' }, slug: 'features/sqm' },
+        { label: 'Failsafe & sysupgrade', translations: { 'zh-CN': 'Failsafe 与升级' }, slug: 'features/failsafe' },
       ],
     },
     {

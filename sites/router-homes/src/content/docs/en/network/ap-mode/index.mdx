@@ -29,14 +29,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="Wired AP E2: AP LAN 192.168.1.2/24, DHCP off; upstream DHCP 192.168.1.1; client 192.168.1.136; no WAN/Wi-Fi"
-  recipe="tests/recipes/ap-mode-25.12.md"
-  result="E2 partial: AP LAN changed to .2 and DHCP ignore=1; the client leased 192.168.1.136/24 from upstream .1 with gateway .1; AP .2 was reachable and the client could ping AP/upstream; this AP-only lab had no internet; upstream internet and Wi-Fi were not tested."
-  date="2026-10-20"
-/>
-
 ## What AP mode really means
 
 An AP is not “another router”:
@@ -208,5 +200,13 @@ Disconnect the AP, restore the main router, then change one item at a time.
 - This is E2 partial: wired AP/L2/DHCP were tested; wireless and real upstream internet were not.
 - No independent reviewer; conclusions are limited to this VM/netns environment.
 - AP mode is “LAN-only + DHCP off + LAN IP outside the pool”, not a specific UI.
+
+<TestRecord
+  status="partial"
+  environment="Wired AP E2: AP LAN 192.168.1.2/24, DHCP off; upstream DHCP 192.168.1.1; client 192.168.1.136; no WAN/Wi-Fi"
+  recipe="tests/recipes/ap-mode-25.12.md"
+  result="E2 partial: AP LAN changed to .2 and DHCP ignore=1; the client leased 192.168.1.136/24 from upstream .1 with gateway .1; AP .2 was reachable and the client could ping AP/upstream; this AP-only lab had no internet; upstream internet and Wi-Fi were not tested."
+  date="2026-10-20"
+/>
 
 <PageSources />

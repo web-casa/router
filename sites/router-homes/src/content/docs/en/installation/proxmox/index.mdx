@@ -31,14 +31,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="Proxmox VE" version="9.2.2" packageManager="—" device="single-NIC x86 host" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="Proxmox VE 9.2.2, single Realtek RTL8111; OpenWrt 25.12.6 VM 200; netns DHCP client"
-  recipe="tests/recipes/pve-single-nic-25.12.md"
-  result="WAN DHCP 192.168.50.77; LAN 192.168.1.1; client DHCP 192.168.1.191; DNS/HTTP passed; host SSH still works after qm stop 200"
-  date="2026-10-20"
-/>
-
 ## Outcome
 
 You can choose the right topology on a PVE host with **one physical NIC**:
@@ -276,5 +268,13 @@ That is the recovery gate: after `qm stop 200`, open `https://192.168.50.2:8006`
 - This page is an E2 lab run, not a pure E1 draft; it has not been independently reviewed or tested on a physical LAN.
 - Recipe: `tests/recipes/pve-single-nic-25.12.md`. It records the image SHA-256, `qm config 200`, and client results.
 - Single NIC is not dual NIC: do not turn this into a “physically separate WAN/LAN” guide without a second NIC or VLAN switch.
+
+<TestRecord
+  status="partial"
+  environment="Proxmox VE 9.2.2, single Realtek RTL8111; OpenWrt 25.12.6 VM 200; netns DHCP client"
+  recipe="tests/recipes/pve-single-nic-25.12.md"
+  result="WAN DHCP 192.168.50.77; LAN 192.168.1.1; client DHCP 192.168.1.191; DNS/HTTP passed; host SSH still works after qm stop 200"
+  date="2026-10-20"
+/>
 
 <PageSources />

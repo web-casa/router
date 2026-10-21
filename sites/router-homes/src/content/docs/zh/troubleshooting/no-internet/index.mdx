@@ -29,14 +29,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200；WAN 192.168.50.191/24；LAN 192.168.1.1；netns 客户端 192.168.1.175"
-  recipe="tests/recipes/no-internet-triage-25.12.md"
-  result="E2 partial：DNS 停止时公网 IP 可 ping、DNS 失败，恢复后正常；ifdown WAN 时客户端网关通、公网失败，恢复后正常；删除客户端默认路由只影响该终端；间歇断流/物理 Wi-Fi/应用代理未测"
-  date="2026-10-20"
-/>
-
 ## 先定义“没网”是哪一种
 
 | 现象 | 更像哪一层 | 先做什么 |
@@ -174,5 +166,13 @@ WAN 有地址、DNS 正常，但 LAN 客户端公网不通时，查：
 - 本页是 E2 partial：三类受控故障已实测；间歇/物理/应用层未覆盖。
 - 没有第二评审人；结论只限本次 VM/netns 环境。
 - 不要用一个 ping 或一次网页打不开就断言“运营商问题”。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；WAN 192.168.50.191/24；LAN 192.168.1.1；netns 客户端 192.168.1.175"
+  recipe="tests/recipes/no-internet-triage-25.12.md"
+  result="E2 partial：DNS 停止时公网 IP 可 ping、DNS 失败，恢复后正常；ifdown WAN 时客户端网关通、公网失败，恢复后正常；删除客户端默认路由只影响该终端；间歇断流/物理 Wi-Fi/应用代理未测"
+  date="2026-10-20"
+/>
 
 <PageSources />

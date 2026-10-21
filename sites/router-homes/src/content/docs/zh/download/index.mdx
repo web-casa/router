@@ -1,0 +1,37 @@
+---
+title: 下载 OpenWrt
+description: 一次选对 OpenWrt 25.12.6 镜像：认清你手上的设备、对上确切的硬件、校验文件；附 x86 镜像选择器和常见可刷设备。
+template: splash
+pageType: overview
+evidenceLevel: E1
+heroVariant: download
+aliases: ['openwrt 下载', 'openwrt 固件下载', 'openwrt 刷哪个固件', 'openwrt 支持的设备', '哪些路由器能刷 openwrt']
+hero:
+  title: 下载 OpenWrt，<em>一次选对</em>
+  tagline: 先认清你手上的是什么，再对上确切的硬件，最后校验文件。三步核对，不靠猜。
+  actions:
+    - text: 打开固件选择器
+      link: https://firmware-selector.openwrt.org/
+      variant: primary
+    - text: x86 与虚拟机
+      link: '#x86'
+      variant: minimal
+sources:
+  - label: OpenWrt Firmware Selector
+    url: https://firmware-selector.openwrt.org/
+  - label: OpenWrt 25.12.6 下载目录
+    url: https://downloads.openwrt.org/releases/25.12.6/targets/
+  - label: OpenWrt 25.12.6 服务版本公告
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: OpenWrt 25.12.0 发布公告
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: OpenWrt x86 安装
+    url: https://openwrt.org/docs/guide-user/installation/openwrt_x86
+---
+
+import DownloadGuide from '@components/download/DownloadGuide.astro';
+import PageSources from '@components/PageSources.astro';
+
+<DownloadGuide />
+
+<PageSources />

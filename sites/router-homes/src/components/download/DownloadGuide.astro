@@ -1,0 +1,1071 @@
+---
+// Body of the download page: pick your situation, the three-step check,
+// image types, an x86 image picker, common devices and a pre-flash checklist.
+// Interactive parts use radio/checkbox inputs and :has(), so they work without JS.
+import '../../styles/sections.css';
+import Icon from '../Icon.astro';
+import { CHECKED_AT, RELEASE, devices, groups, selectorUrl, targetUrl } from './devices';
+
+const locale = (Astro.locals as any).starlightRoute?.locale ?? 'en';
+const isEn = locale === 'en';
+const L = (p: string) => `/${locale}/${p}/`;
+const x86Base = targetUrl('x86/64');
+const x86File = (fs: string, efi: boolean) => `openwrt-${RELEASE}-x86-64-generic-${fs}-combined${efi ? '-efi' : ''}.img.gz`;
+
+const t = isEn
+  ? {
+      pathKicker: 'Start here',
+      pathTitle: 'Which one are you?',
+      paths: [
+        { tag: 'Router on stock firmware', title: 'I want to put OpenWrt on my router', steps: ['Read the label: model and hardware version', 'Find the exact device in the firmware selector', 'Follow its install notes (often a factory image)', 'Check SHA-256, then flash'], href: L('getting-started/firmware-download'), cta: 'Firmware download check' },
+        { tag: 'Already on OpenWrt or a fork', title: 'I already run OpenWrt, ImmortalWrt or iStoreOS', steps: ['Find out which distribution you run', 'Note target, profile and package manager', 'Back up, then use the matching sysupgrade image'], href: L('getting-started/which-openwrt'), cta: 'Which OpenWrt is this?' },
+        { tag: 'x86 mini PC or VM', title: 'I am installing on x86 or Proxmox', steps: ['Check BIOS or UEFI boot', 'Pick a combined image (ext4 or squashfs)', 'Verify, unpack, import or write to disk'], href: L('getting-started/x86-image'), cta: 'x86 image guide', anchor: '#x86' },
+      ],
+      stepsKicker: 'Three checks',
+      stepsTitle: 'Identify, match, verify.',
+      steps: [
+        { n: '1', title: 'Identify what you have', body: 'On a device already running OpenWrt, these fields say what to download. Trust them over the “About” page.', href: L('getting-started/which-openwrt'), cta: 'Full guide' },
+        { n: '2', title: 'Match the exact hardware', body: 'Same model name does not mean same image. All three examples come from the 25.12.6 build lists:', href: L('getting-started/firmware-download'), cta: 'Full guide' },
+        { n: '3', title: 'Verify the download', body: 'Compare with the sha256sums file in the same download folder. If it does not match, download again.', href: L('getting-started/firmware-download'), cta: 'Full guide' },
+      ],
+      traps: [
+        ['TP-Link Archer C6', 'v2 → ath79/generic · v3 → ramips/mt7621'],
+        ['CMCC RAX3000M', 'eMMC and NAND units · DDR3 / DDR4 boot files'],
+        ['Xiaomi AX3000T', 'stock layout · OpenWrt U-Boot layout'],
+      ],
+      typesKicker: 'Image types',
+      typesTitle: 'What each file is for.',
+      types: [
+        ['factory', 'First install from the vendor firmware, where the device page says so.', 'Upgrading an OpenWrt that is already installed.'],
+        ['sysupgrade', 'Upgrading a device that already runs OpenWrt. Keeps config by default.', 'First install from vendor firmware.'],
+        ['combined', 'x86: whole disk with partitions and boot loader, for BIOS boot.', 'A UEFI-only machine.'],
+        ['combined-efi', 'x86: the same, for UEFI boot (PVE: OVMF).', 'Legacy BIOS / SeaBIOS.'],
+        ['rootfs · tar.gz', 'Root filesystem only: existing boot setups, containers.', 'Writing straight to a disk and expecting it to boot.'],
+        ['sdcard.img.gz', 'Boards that boot from an SD card, such as Banana Pi.', 'Routers with internal flash only.'],
+      ],
+      use: 'Use for',
+      avoid: 'Not for',
+      x86Kicker: 'x86 picker',
+      x86Title: 'Two questions, one file.',
+      boot: 'How does it boot?',
+      fsq: 'Which root filesystem?',
+      bios: 'BIOS / Legacy · PVE SeaBIOS',
+      uefi: 'UEFI · PVE OVMF',
+      ext4: 'ext4 — writable, like a normal Linux disk',
+      squash: 'squashfs — read-only root, can reset to defaults',
+      tested: 'Lab-tested (E2): booted in PVE with SeaBIOS',
+      untested: 'Not tested in our lab yet',
+      getIt: 'Download',
+      sums: 'sha256sums',
+      x86More: 'Unpacking, PVE import and disk writing',
+      devKicker: 'Devices',
+      devTitle: 'Common devices with an official image.',
+      devNote: `Every device here has an official OpenWrt ${RELEASE} image (build lists checked ${CHECKED_AT}). Listed is not the same as recommended: check your hardware version first.`,
+      all: 'All',
+      selector: 'Firmware selector',
+      folder: 'Download folder',
+      wifi: { 'Wi-Fi 6': 'Wi-Fi 6', 'Wi-Fi 5': 'Wi-Fi 5', 'Wi-Fi 4': 'Wi-Fi 4', none: 'No Wi-Fi', addon: 'Wi-Fi via add-on card' } as Record<string, string>,
+      notListed: 'Not here? Search the firmware selector for the full list of more than 2200 devices.',
+      checkKicker: 'Before you flash',
+      checkTitle: 'Tick all six, then start.',
+      checks: [
+        'Model and hardware version match the device page',
+        'The image type fits: factory / sysupgrade / combined',
+        'SHA-256 matches the official sha256sums',
+        'I know how this device gets into failsafe or recovery',
+        'I have a backup of the current config (or the vendor firmware)',
+        'Power is stable and the computer is on a wired port',
+      ],
+      ready: 'Ready. Keep this page open while you flash.',
+      notReady: 'Not yet: anything unticked is a way to brick the device.',
+    }
+  : {
+      pathKicker: '从这里开始',
+      pathTitle: '你是哪种情况？',
+      paths: [
+        { tag: '路由器 · 还是原厂固件', title: '我想给路由器刷 OpenWrt', steps: ['看标签：型号和硬件版本', '在固件选择器里找到完全对应的设备', '按设备页的安装说明来（常是 factory 镜像）', '校验 SHA-256，再刷入'], href: L('getting-started/firmware-download'), cta: '固件下载核对' },
+        { tag: '已经在用 OpenWrt 或衍生版', title: '我已经在用 OpenWrt / ImmortalWrt / iStoreOS', steps: ['先确认你用的是哪个发行版', '记下 target、profile 和包管理器', '备份后，用对应的 sysupgrade 镜像'], href: L('getting-started/which-openwrt'), cta: '固件辨识' },
+        { tag: 'x86 小主机或虚拟机', title: '我要装在 x86 或 PVE 上', steps: ['确认 BIOS 还是 UEFI 启动', '选 combined 镜像（ext4 或 squashfs）', '校验、解压，再导入或写盘'], href: L('getting-started/x86-image'), cta: 'x86 镜像选择', anchor: '#x86' },
+      ],
+      stepsKicker: '三步核对',
+      stepsTitle: '认清，对上，校验。',
+      steps: [
+        { n: '1', title: '认清你手上的是什么', body: '已经在跑 OpenWrt 的设备，看这几个字段就知道该下哪个镜像；以它为准，不看“关于”页面。', href: L('getting-started/which-openwrt'), cta: '完整步骤' },
+        { n: '2', title: '对上确切的硬件', body: '型号名相同不代表镜像相同。下面三个例子都来自 25.12.6 的构建清单：', href: L('getting-started/firmware-download'), cta: '完整步骤' },
+        { n: '3', title: '校验下载的文件', body: '和同一下载目录里的 sha256sums 比对；对不上就重新下载。', href: L('getting-started/firmware-download'), cta: '完整步骤' },
+      ],
+      traps: [
+        ['TP-Link Archer C6', 'v2 → ath79/generic · v3 → ramips/mt7621'],
+        ['中国移动 RAX3000M', '有 eMMC 与 NAND 两种 · 引导文件分 DDR3/DDR4'],
+        ['小米 AX3000T', '原厂分区 · OpenWrt U-Boot 分区'],
+      ],
+      typesKicker: '镜像类型',
+      typesTitle: '每种文件用在哪里。',
+      types: [
+        ['factory', '从原厂固件首次安装（以设备页说明为准）。', '升级已经装好的 OpenWrt。'],
+        ['sysupgrade', '升级已经在跑 OpenWrt 的设备，默认保留配置。', '从原厂固件首次安装。'],
+        ['combined', 'x86：含分区和引导的整盘镜像，BIOS 启动。', '只支持 UEFI 的机器。'],
+        ['combined-efi', 'x86：同上，UEFI 启动（PVE 选 OVMF）。', 'Legacy BIOS / SeaBIOS。'],
+        ['rootfs · tar.gz', '只有根文件系统：已有引导的场景、容器。', '直接写盘并指望它能启动。'],
+        ['sdcard.img.gz', '从 SD 卡启动的开发板，例如 Banana Pi。', '只有内置闪存的路由器。'],
+      ],
+      use: '适用',
+      avoid: '不适用',
+      x86Kicker: 'x86 选择器',
+      x86Title: '两个问题，|选出一个文件。',
+      boot: '用什么方式启动？',
+      fsq: '根文件系统选哪种？',
+      bios: 'BIOS / Legacy · PVE SeaBIOS',
+      uefi: 'UEFI · PVE OVMF',
+      ext4: 'ext4：可写，和普通 Linux 磁盘一样',
+      squash: 'squashfs：只读根，可恢复出厂',
+      tested: '本站实验已验证（E2）：PVE SeaBIOS 下启动成功',
+      untested: '本站实验尚未测试这个组合',
+      getIt: '下载',
+      sums: 'sha256sums',
+      x86More: '解压、PVE 导入和物理机写盘',
+      devKicker: '设备',
+      devTitle: '有官方镜像的|常见设备。',
+      devNote: `以下设备都有 OpenWrt ${RELEASE} 官方镜像（构建清单核对于 ${CHECKED_AT}）。在列表里不等于推荐，先核对你的硬件版本。`,
+      all: '全部',
+      selector: '固件选择器',
+      folder: '下载目录',
+      wifi: { 'Wi-Fi 6': 'Wi-Fi 6', 'Wi-Fi 5': 'Wi-Fi 5', 'Wi-Fi 4': 'Wi-Fi 4', none: '无 Wi-Fi', addon: 'Wi-Fi 需扩展卡' } as Record<string, string>,
+      notListed: '没找到你的设备？在固件选择器里搜，那里有 2200 多款设备的完整清单。',
+      checkKicker: '刷机之前',
+      checkTitle: '六项都勾上，|再开始。',
+      checks: [
+        '型号和硬件版本与设备页一致',
+        '镜像类型对：factory / sysupgrade / combined',
+        'SHA-256 与官方 sha256sums 一致',
+        '知道这台设备怎么进 failsafe 或恢复模式',
+        '已备份当前配置（或原厂固件）',
+        '电源稳定，电脑接在有线口上',
+      ],
+      ready: '可以开始了。刷机时别关这个页面。',
+      notReady: '还不行：每一项没勾上的，都是一种变砖的方式。',
+    };
+
+// Headings may mark preferred break points with '|' (see Home.astro).
+const phrases = (text: string) => text.split('|').map((p) => `<span class="rh-phrase">${p}</span>`).join('');
+
+const arrow =
+  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
+const ext =
+  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h6.5V10M12.5 3.5 4 12"/></svg>';
+const pathIcons = ['wi-fi-router', 'refresh-circle', 'server-square'];
+const typeIcons = ['box', 'refresh-circle', 'ssd-square', 'ssd-round', 'folder', 'sd-card'];
+const groupIcons: Record<string, string> = { wifi6: 'wi-fi-router', wifi5: 'wi-fi-router-minimalistic', travel: 'suitcase', board: 'cpu', x86: 'server-square' };
+const counts = Object.fromEntries(groups.map((g) => [g.id, devices.filter((d) => d.group === g.id).length]));
+---
+
+<div class="rh-home dl not-content">
+  <!-- 01 · paths -->
+  <section class="rh-section" aria-labelledby="dl-paths">
+    <div class="rh-section-head rh-reveal">
+      <p class="rh-kicker"><span>01</span>{t.pathKicker}</p>
+      <h2 id="dl-paths" set:html={phrases(t.pathTitle)} />
+    </div>
+    <ol class="dl-paths">
+      {t.paths.map((p, i) => (
+        <li class="rh-reveal">
+          <a class="dl-path rh-spot" href={p.anchor ?? p.href}>
+            <span class="dl-path-tag"><span class="dl-path-n"><Icon name={pathIcons[i]} /></span>{p.tag}</span>
+            <h3>{p.title}</h3>
+            <ol class="dl-path-steps">
+              {p.steps.map((s) => <li>{s}</li>)}
+            </ol>
+            <span class="dl-path-cta">{p.cta}<Fragment set:html={arrow} /></span>
+          </a>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <!-- 02 · three checks -->
+  <section class="rh-section" aria-labelledby="dl-steps">
+    <div class="rh-section-head rh-reveal">
+      <p class="rh-kicker"><span>02</span>{t.stepsKicker}</p>
+      <h2 id="dl-steps" set:html={phrases(t.stepsTitle)} />
+    </div>
+    <ol class="dl-steps">
+      {t.steps.map((s, i) => (
+        <li class="dl-step rh-reveal">
+          <div class="dl-step-head">
+            <span class="dl-step-n">{s.n}</span>
+            <h3>{s.title}</h3>
+          </div>
+          <p>{s.body}</p>
+          {i === 0 && (
+            <pre class="dl-code"><span class="c">root@OpenWrt:~# </span>ubus call system board
+{'{'}
+  <b>"model"</b>: "&lt;{isEn ? 'device model' : '设备型号'}&gt;",
+  <b>"board_name"</b>: "&lt;{isEn ? 'board id' : '板子 ID'}&gt;",
+  "release": {'{'}
+    <b>"distribution"</b>: "OpenWrt",
+    <b>"version"</b>: "{RELEASE}",
+    <b>"target"</b>: "x86/64"
+  {'}'}
+{'}'}</pre>
+          )}
+          {i === 1 && (
+            <ul class="dl-traps">
+              {t.traps.map(([name, detail]) => (
+                <li><strong>{name}</strong><span>{detail}</span></li>
+              ))}
+            </ul>
+          )}
+          {i === 2 && (
+            <div class="dl-os">
+              {['Linux', 'macOS', 'Windows'].map((os, k) => (
+                <label><input type="radio" name="dl-os" value={os} checked={k === 0} /><span>{os}</span></label>
+              ))}
+              <pre class="dl-code dl-os-linux"><span class="c">$ </span>sha256sum openwrt-*.img.gz</pre>
+              <pre class="dl-code dl-os-macos"><span class="c">$ </span>shasum -a 256 openwrt-*.img.gz</pre>
+              <pre class="dl-code dl-os-windows"><span class="c">&gt; </span>certutil -hashfile openwrt-*.img.gz SHA256</pre>
+            </div>
+          )}
+          <a class="dl-more" href={s.href}>{s.cta}<Fragment set:html={arrow} /></a>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <!-- 03 · image types -->
+  <section class="rh-section" aria-labelledby="dl-types">
+    <div class="rh-section-head rh-reveal">
+      <p class="rh-kicker"><span>03</span>{t.typesKicker}</p>
+      <h2 id="dl-types" set:html={phrases(t.typesTitle)} />
+    </div>
+    <ul class="dl-types">
+      {t.types.map(([name, use, avoid], i) => (
+        <li class="rh-reveal">
+          <div class="dl-type-head"><Icon name={typeIcons[i]} /><code>{name}</code></div>
+          <p><span class="ok">{t.use}</span>{use}</p>
+          <p><span class="no">{t.avoid}</span>{avoid}</p>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <!-- 04 · x86 picker -->
+  <section class="rh-section" id="x86" aria-labelledby="dl-x86">
+    <div class="rh-section-head rh-reveal">
+      <p class="rh-kicker"><span>04</span>{t.x86Kicker}</p>
+      <h2 id="dl-x86" set:html={phrases(t.x86Title)} />
+    </div>
+    <div class="dl-x86 rh-reveal">
+      <fieldset>
+        <legend>{t.boot}</legend>
+        <label><input type="radio" name="dl-boot" value="bios" checked /><span>{t.bios}</span></label>
+        <label><input type="radio" name="dl-boot" value="uefi" /><span>{t.uefi}</span></label>
+      </fieldset>
+      <fieldset>
+        <legend>{t.fsq}</legend>
+        <label><input type="radio" name="dl-fs" value="ext4" checked /><span>{t.ext4}</span></label>
+        <label><input type="radio" name="dl-fs" value="squashfs" /><span>{t.squash}</span></label>
+      </fieldset>
+      <div class="dl-x86-out" aria-live="polite">
+        {['ext4', 'squashfs'].flatMap((fs) =>
+          [false, true].map((efi) => (
+            <div class:list={['dl-x86-result', `r-${fs}-${efi ? 'uefi' : 'bios'}`]}>
+              <code class="dl-x86-file">{x86File(fs, efi)}</code>
+              <p class:list={['dl-x86-badge', { tested: fs === 'ext4' && !efi }]}>
+                <span class="rh-led" data-state={fs === 'ext4' && !efi ? 'ok' : undefined} />
+                {fs === 'ext4' && !efi ? t.tested : t.untested}
+              </p>
+              <div class="dl-x86-links">
+                <a class="rh-pill" href={x86Base + x86File(fs, efi)}><span>{t.getIt}</span><Fragment set:html={arrow} /></a>
+                <a class="rh-text-link" href={x86Base + 'sha256sums'}>{t.sums}</a>
+              </div>
+            </div>
+          ))
+        )}
+        <a class="dl-more" href={L('getting-started/x86-image')}>{t.x86More}<Fragment set:html={arrow} /></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 · devices -->
+  <section class="rh-section" id="devices" aria-labelledby="dl-devices">
+    <div class="rh-section-head rh-reveal">
+      <p class="rh-kicker"><span>05</span>{t.devKicker}</p>
+      <h2 id="dl-devices" set:html={phrases(t.devTitle)} />
+      <p class="rh-lede">{t.devNote}</p>
+    </div>
+    <div class="dl-dev">
+      <div class="dl-filter" role="radiogroup" aria-label={t.devKicker}>
+        <label><input type="radio" name="dl-group" value="all" checked /><span>{t.all}<em>{devices.length}</em></span></label>
+        {groups.map((g) => (
+          <label><input type="radio" name="dl-group" value={g.id} /><span><Icon name={groupIcons[g.id]} />{isEn ? g.en : g.zh}<em>{counts[g.id]}</em></span></label>
+        ))}
+      </div>
+      <ul class="dl-devices">
+        {devices.map((d) => (
+          <li class="dl-device" data-group={d.group}>
+            <div class="dl-device-top">
+              <span class:list={['dl-wifi', `w-${d.wifi.replace(/\W/g, '').toLowerCase()}`]}>{t.wifi[d.wifi]}</span>
+              <code>{d.target}</code>
+            </div>
+            <h3><Icon name={groupIcons[d.group]} />{d.name}</h3>
+            {d.variants && <p class="dl-variants">{isEn ? d.variants.en : d.variants.zh}</p>}
+            <div class="dl-device-links">
+              <a href={selectorUrl(d)}>{t.selector}<Fragment set:html={ext} /></a>
+              <a href={targetUrl(d.target)}>{t.folder}<Fragment set:html={ext} /></a>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <p class="dl-notlisted"><a href="https://firmware-selector.openwrt.org/">{t.notListed}<Fragment set:html={ext} /></a></p>
+    </div>
+  </section>
+
+  <!-- 06 · checklist -->
+  <section class="rh-section rh-close dl-check rh-reveal" aria-labelledby="dl-check">
+    <p class="rh-kicker"><span>06</span>{t.checkKicker}</p>
+    <h2 id="dl-check" set:html={phrases(t.checkTitle)} />
+    <ul class="dl-checks">
+      {t.checks.map((c) => (
+        <li><label><input type="checkbox" /><span class="box" aria-hidden="true" /><span>{c}</span></label></li>
+      ))}
+    </ul>
+    <p class="dl-ready"><span class="rh-led" data-state="ok" /><span>{t.ready}</span></p>
+    <p class="dl-notready"><span class="rh-led" /><span>{t.notReady}</span></p>
+  </section>
+</div>
+
+<script>
+  // Cursor-following highlight on the path cards (fine pointers only).
+  if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    for (const card of document.querySelectorAll<HTMLElement>('.dl-path')) {
+      card.addEventListener('pointermove', (e) => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', `${e.clientX - r.left}px`);
+        card.style.setProperty('--my', `${e.clientY - r.top}px`);
+      });
+    }
+  }
+</script>
+
+<style>
+  /* Shared section styles (.rh-section, .rh-kicker, h2, .rh-close, .rh-pill …)
+     come from styles/sections.css via the .rh-home wrapper. */
+
+  /* 01 · paths */
+  .dl-paths {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (min-width: 60rem) {
+    .dl-paths {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .dl-paths > li {
+    display: flex;
+  }
+  .dl-path {
+    --mx: 50%;
+    --my: 0%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+    padding: 1.5rem;
+    border: 1px solid var(--rh-line);
+    border-radius: 1.4rem;
+    background: var(--rh-surface);
+    color: inherit;
+    text-decoration: none;
+    transition: transform 0.5s var(--rh-ease-out), border-color 0.3s;
+  }
+  .dl-path::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    padding: 1px;
+    border-radius: inherit;
+    background: radial-gradient(22rem circle at var(--mx) var(--my), var(--sl-color-accent), transparent 60%);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.35s;
+    pointer-events: none;
+  }
+  .dl-path:hover {
+    transform: translateY(-4px);
+  }
+  .dl-path:hover::before,
+  .dl-path:focus-visible::before {
+    opacity: 1;
+  }
+  .dl-path-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.74rem;
+    color: var(--sl-color-gray-3);
+  }
+  .dl-path-n {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.8rem;
+    background: color-mix(in srgb, var(--sl-color-accent) 14%, transparent);
+    color: var(--sl-color-accent);
+    transition: transform 0.45s var(--rh-ease-spring);
+  }
+  .dl-path-n :global(.i) {
+    width: 1.45rem;
+    height: 1.45rem;
+  }
+  .dl-path:hover .dl-path-n {
+    transform: rotate(-6deg) scale(1.06);
+  }
+  .dl-path h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 640;
+    letter-spacing: -0.025em;
+    line-height: 1.25;
+    color: var(--sl-color-white);
+    text-wrap: balance;
+  }
+  .dl-path-steps {
+    flex: 1;
+    display: grid;
+    gap: 0.55rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: dl;
+  }
+  .dl-path-steps li {
+    counter-increment: dl;
+    display: grid;
+    grid-template-columns: 1.5rem minmax(0, 1fr);
+    gap: 0.5rem;
+    font-size: 0.93rem;
+    line-height: 1.5;
+    color: var(--sl-color-gray-2);
+  }
+  .dl-path-steps li::before {
+    content: counter(dl);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.75rem;
+    color: var(--sl-color-accent);
+    padding-top: 0.15rem;
+  }
+  .dl-path-cta,
+  .dl-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0.5rem;
+    font-weight: 580;
+    color: var(--sl-color-white);
+    text-decoration: none;
+  }
+  .dl-path-cta :global(svg),
+  .dl-more :global(svg) {
+    width: 1rem;
+    height: 1rem;
+    color: var(--sl-color-accent);
+    transition: transform 0.45s var(--rh-ease-spring);
+  }
+  .dl-path:hover .dl-path-cta :global(svg),
+  .dl-more:hover :global(svg) {
+    transform: translateX(4px);
+  }
+  .dl-more:hover {
+    color: var(--sl-color-accent);
+  }
+
+  /* 02 · steps */
+  .dl-steps {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rh-line);
+  }
+  @media (min-width: 64rem) {
+    .dl-steps {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .dl-step + .dl-step {
+      border-inline-start: 1px solid var(--rh-line);
+      padding-inline-start: 1.75rem;
+    }
+  }
+  .dl-step {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.75rem 1.75rem 1.75rem 0;
+    border-bottom: 1px solid var(--rh-line);
+    min-width: 0;
+  }
+  .dl-step-head {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+  }
+  .dl-step-n {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.8rem;
+    border: 1px solid var(--sl-color-accent);
+    font-family: var(--__sl-font-mono);
+    font-weight: 600;
+    color: var(--sl-color-accent);
+  }
+  .dl-step h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 630;
+    letter-spacing: -0.02em;
+    color: var(--sl-color-white);
+  }
+  .dl-step > p {
+    margin: 0;
+    font-size: 0.93rem;
+    line-height: 1.6;
+    color: var(--sl-color-gray-3);
+  }
+  .dl-step .dl-more {
+    margin-top: auto;
+  }
+  .dl-code {
+    margin: 0;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--rh-line);
+    border-radius: 0.75rem;
+    background: var(--rh-code-bg);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.76rem;
+    line-height: 1.7;
+    color: var(--sl-color-gray-2);
+    overflow-x: auto;
+  }
+  .dl-code .c {
+    color: var(--sl-color-accent);
+  }
+  .dl-code b {
+    color: var(--sl-color-white);
+    font-weight: 600;
+  }
+  .dl-traps {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .dl-traps li {
+    display: grid;
+    gap: 0.2rem;
+    padding: 0.7rem 0.85rem;
+    border: 1px dashed var(--rh-line-strong);
+    border-radius: 0.7rem;
+  }
+  .dl-traps strong {
+    font-size: 0.9rem;
+    font-weight: 620;
+    color: var(--sl-color-white);
+  }
+  .dl-traps span {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.74rem;
+    color: var(--sl-color-accent);
+  }
+  .dl-os {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .dl-os label,
+  .dl-filter label,
+  .dl-x86 label {
+    cursor: pointer;
+  }
+  .dl-os input,
+  .dl-filter input,
+  .dl-x86 input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .dl-os label span {
+    display: block;
+    padding: 0.3rem 0.75rem;
+    border: 1px solid var(--rh-line);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    color: var(--sl-color-gray-3);
+    transition: all 0.2s;
+  }
+  .dl-os input:checked + span {
+    border-color: var(--sl-color-accent);
+    color: var(--sl-color-white);
+    background: var(--sl-color-accent-low);
+  }
+  :is(.dl-os, .dl-filter, .dl-x86) input:focus-visible + span {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 2px;
+  }
+  .dl-os .dl-code {
+    width: 100%;
+    display: none;
+  }
+  .dl-os:has(input[value='Linux']:checked) .dl-os-linux,
+  .dl-os:has(input[value='macOS']:checked) .dl-os-macos,
+  .dl-os:has(input[value='Windows']:checked) .dl-os-windows {
+    display: block;
+  }
+
+  /* 03 · types */
+  .dl-types {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (min-width: 46rem) {
+    .dl-types {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 64rem) {
+    .dl-types {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .dl-types li {
+    display: grid;
+    align-content: start;
+    gap: 0.6rem;
+    padding: 1.25rem;
+    border: 1px solid var(--rh-line);
+    border-radius: 1.1rem;
+    background: var(--rh-surface);
+    transition: border-color 0.3s;
+  }
+  .dl-types li:hover {
+    border-color: var(--rh-line-strong);
+  }
+  .dl-type-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .dl-type-head :global(.i) {
+    width: 1.4rem;
+    height: 1.4rem;
+    color: var(--sl-color-accent);
+  }
+  .dl-types code {
+    justify-self: start;
+    padding: 0.25rem 0.6rem;
+    border-radius: 0.45rem;
+    background: var(--sl-color-accent-low);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--sl-color-accent-high);
+  }
+  :root[data-theme='light'] .dl-types code {
+    background: hsl(38, 80%, 92%);
+  }
+  .dl-types p {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--sl-color-gray-2);
+  }
+  .dl-types p span {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.7rem;
+    padding-top: 0.2rem;
+  }
+  .dl-types .ok {
+    color: var(--rh-ok);
+  }
+  .dl-types .no {
+    color: var(--sl-color-gray-4);
+  }
+
+  /* 04 · x86 picker */
+  .dl-x86 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+    padding: clamp(1.25rem, 3vw, 2rem);
+    border: 1px solid var(--rh-line-strong);
+    border-radius: 1.4rem;
+    background: var(--rh-surface);
+  }
+  @media (min-width: 64rem) {
+    .dl-x86 {
+      grid-template-columns: 1fr 1fr 1.3fr;
+      align-items: start;
+    }
+  }
+  .dl-x86 fieldset {
+    display: grid;
+    gap: 0.6rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+  .dl-x86 legend {
+    margin-bottom: 0.6rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.75rem;
+    color: var(--sl-color-gray-3);
+  }
+  .dl-x86 label span {
+    display: block;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--rh-line);
+    border-radius: 0.8rem;
+    font-size: 0.92rem;
+    color: var(--sl-color-gray-2);
+    transition: border-color 0.2s, background-color 0.2s, color 0.2s;
+  }
+  .dl-x86 label:hover span {
+    border-color: var(--rh-line-strong);
+  }
+  .dl-x86 input:checked + span {
+    border-color: var(--sl-color-accent);
+    background: color-mix(in srgb, var(--sl-color-accent) 9%, transparent);
+    color: var(--sl-color-white);
+  }
+  .dl-x86-out {
+    display: grid;
+    gap: 1rem;
+    padding: 1.25rem;
+    border-radius: 1rem;
+    background: var(--rh-code-bg);
+    border: 1px solid var(--rh-line);
+    min-width: 0;
+  }
+  .dl-x86-result {
+    display: none;
+    gap: 0.9rem;
+  }
+  .dl-x86:has([value='bios']:checked):has([value='ext4']:checked) .r-ext4-bios,
+  .dl-x86:has([value='uefi']:checked):has([value='ext4']:checked) .r-ext4-uefi,
+  .dl-x86:has([value='bios']:checked):has([value='squashfs']:checked) .r-squashfs-bios,
+  .dl-x86:has([value='uefi']:checked):has([value='squashfs']:checked) .r-squashfs-uefi {
+    display: grid;
+    animation: rh-fade-up 0.45s var(--rh-ease-out) both;
+  }
+  .dl-x86-file {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.6;
+    color: var(--sl-color-white);
+    overflow-wrap: anywhere;
+  }
+  .dl-x86-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--sl-color-gray-3);
+  }
+  .dl-x86-badge.tested {
+    color: var(--rh-ok);
+  }
+  .dl-x86-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.5rem;
+  }
+  .dl-x86-out .dl-more {
+    margin-top: 0;
+    font-size: 0.9rem;
+  }
+
+  /* 05 · devices */
+  .dl-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .dl-filter span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.95rem;
+    border: 1px solid var(--rh-line);
+    border-radius: 999px;
+    font-size: 0.88rem;
+    color: var(--sl-color-gray-2);
+    transition: all 0.2s;
+  }
+  .dl-filter span :global(.i) {
+    width: 1.05rem;
+    height: 1.05rem;
+    color: var(--sl-color-accent);
+  }
+  .dl-filter input:checked + span :global(.i) {
+    color: inherit;
+    --icon-duo-opacity: 0.55;
+  }
+  .dl-filter em {
+    font-style: normal;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.72rem;
+    color: var(--sl-color-gray-4);
+  }
+  .dl-filter label:hover span {
+    border-color: var(--rh-line-strong);
+    color: var(--sl-color-white);
+  }
+  .dl-filter input:checked + span {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent);
+    color: var(--sl-color-text-invert);
+  }
+  .dl-filter input:checked + span em {
+    color: inherit;
+    opacity: 0.7;
+  }
+  .dl-devices {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 16.5rem), 1fr));
+    gap: 0.9rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .dl-dev:has([value='wifi6']:checked) .dl-device:not([data-group='wifi6']),
+  .dl-dev:has([value='wifi5']:checked) .dl-device:not([data-group='wifi5']),
+  .dl-dev:has([value='travel']:checked) .dl-device:not([data-group='travel']),
+  .dl-dev:has([value='board']:checked) .dl-device:not([data-group='board']),
+  .dl-dev:has([value='x86']:checked) .dl-device:not([data-group='x86']) {
+    display: none;
+  }
+  .dl-device {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 1.1rem 1.15rem 1rem;
+    border: 1px solid var(--rh-line);
+    border-radius: 1rem;
+    background: var(--rh-surface);
+    transition: border-color 0.3s, transform 0.45s var(--rh-ease-out);
+    animation: rh-fade-up 0.4s var(--rh-ease-out) both;
+  }
+  .dl-device:hover {
+    border-color: var(--rh-line-strong);
+    transform: translateY(-2px);
+  }
+  .dl-device-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .dl-device-top code {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.68rem;
+    color: var(--sl-color-gray-3);
+  }
+  .dl-wifi {
+    padding: 0.12rem 0.5rem;
+    border-radius: 0.35rem;
+    border: 1px solid var(--rh-line);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.66rem;
+    color: var(--sl-color-gray-3);
+    white-space: nowrap;
+  }
+  .dl-wifi.w-wifi6 {
+    border-color: color-mix(in srgb, var(--sl-color-accent) 45%, transparent);
+    color: var(--sl-color-accent);
+  }
+  .dl-wifi.w-wifi5 {
+    color: var(--sl-color-gray-2);
+    border-color: var(--rh-line-strong);
+  }
+  .dl-device h3 :global(.i) {
+    width: 1.1rem;
+    height: 1.1rem;
+    margin-inline-end: 0.45rem;
+    vertical-align: -0.2em;
+    color: var(--sl-color-accent);
+  }
+  .dl-device h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 620;
+    letter-spacing: -0.015em;
+    line-height: 1.35;
+    color: var(--sl-color-white);
+  }
+  .dl-variants {
+    margin: 0;
+    padding-inline-start: 0.6rem;
+    border-inline-start: 2px solid var(--sl-color-accent);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--sl-color-gray-2);
+  }
+  .dl-device-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    margin-top: auto;
+    padding-top: 0.5rem;
+  }
+  .dl-device-links a,
+  .dl-notlisted a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.82rem;
+    font-weight: 540;
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .dl-device-links a:hover,
+  .dl-notlisted a:hover {
+    color: var(--sl-color-accent);
+  }
+  .dl-device-links :global(svg),
+  .dl-notlisted :global(svg) {
+    width: 0.8rem;
+    height: 0.8rem;
+  }
+  .dl-notlisted {
+    margin: 1.5rem 0 0;
+  }
+  .dl-notlisted a {
+    font-size: 0.92rem;
+  }
+
+  /* 06 · checklist */
+  .dl-checks {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.6rem;
+    margin: 2rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (min-width: 52rem) {
+    .dl-checks {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  .dl-checks label {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--rh-line);
+    border-radius: 0.85rem;
+    background: var(--sl-color-bg);
+    cursor: pointer;
+    font-size: 0.94rem;
+    color: var(--sl-color-gray-2);
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .dl-checks input {
+    position: absolute;
+    opacity: 0;
+  }
+  .dl-checks .box {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 1.35rem;
+    height: 1.35rem;
+    border: 1.5px solid var(--rh-line-strong);
+    border-radius: 0.4rem;
+    transition: background-color 0.2s, border-color 0.2s, transform 0.35s var(--rh-ease-spring);
+  }
+  .dl-checks .box::after {
+    content: '';
+    width: 0.4rem;
+    height: 0.7rem;
+    margin-top: -0.15rem;
+    border: solid var(--sl-color-text-invert);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) scale(0);
+    transition: transform 0.3s var(--rh-ease-spring);
+  }
+  .dl-checks input:checked + .box {
+    background: var(--rh-ok);
+    border-color: var(--rh-ok);
+    transform: scale(1.06);
+  }
+  .dl-checks input:checked + .box::after {
+    transform: rotate(45deg) scale(1);
+  }
+  .dl-checks input:checked ~ span:last-child {
+    color: var(--sl-color-white);
+  }
+  .dl-checks input:focus-visible + .box {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 2px;
+  }
+  .dl-checks label:has(input:checked) {
+    border-color: color-mix(in srgb, var(--rh-ok) 50%, transparent);
+  }
+  .dl-ready,
+  .dl-notready {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin: 1.5rem 0 0;
+    font-weight: 560;
+  }
+  .dl-ready {
+    display: none;
+    color: var(--rh-ok);
+  }
+  .dl-notready {
+    color: var(--sl-color-gray-3);
+  }
+  .dl-check:not(:has(.dl-checks input:not(:checked))) .dl-ready {
+    display: flex;
+    animation: rh-fade-up 0.5s var(--rh-ease-out) both;
+  }
+  .dl-check:not(:has(.dl-checks input:not(:checked))) .dl-notready {
+    display: none;
+  }
+</style>

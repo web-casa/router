@@ -12,6 +12,7 @@ const { src, alt, caption } = Astro.props;
 ---
 
 <figure class="doc-figure">
+  <div class="doc-figure-bar" aria-hidden="true"><i></i><i></i><i></i></div>
   <Image
     src={src}
     alt={alt}
@@ -27,10 +28,27 @@ const { src, alt, caption } = Astro.props;
 <style>
   .doc-figure {
     margin: 1.5rem 0;
-    border: 1px solid var(--sl-color-gray-5);
-    border-radius: 0.5rem;
+    border: 1px solid var(--rh-line);
+    border-radius: var(--rh-radius-lg);
     overflow: hidden;
-    background: var(--sl-color-black);
+    background: var(--rh-surface);
+    box-shadow: var(--rh-shadow);
+  }
+
+  .doc-figure-bar {
+    display: flex;
+    gap: 0.35rem;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--rh-line);
+    background: var(--rh-surface-2);
+  }
+
+  .doc-figure-bar i {
+    margin: 0;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--rh-line-strong);
   }
 
   .doc-figure :global(img) {
@@ -44,6 +62,7 @@ const { src, alt, caption } = Astro.props;
     font-size: var(--sl-text-sm);
     line-height: 1.5;
     color: var(--sl-color-gray-2);
-    background: var(--sl-color-gray-6);
+    border-top: 1px solid var(--rh-line);
+    background: var(--rh-surface);
   }
 </style>

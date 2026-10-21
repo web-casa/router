@@ -1,0 +1,190 @@
+---
+// Variant "console": centred headline over a terminal that types a real,
+// read-only session and ends on a backup — the "way back".
+import HeroCopy from './HeroCopy.astro';
+import HeroStats from './HeroStats.astro';
+import type { HeroData } from './data';
+
+interface Props { hero: HeroData }
+const { hero } = Astro.props;
+
+type Line = { kind: 'cmd' | 'out' | 'note'; text: string };
+const script: Line[] = [
+  { kind: 'cmd', text: 'grep RELEASE /etc/openwrt_release' },
+  { kind: 'out', text: `DISTRIB_RELEASE='${hero.release}'` },
+  { kind: 'cmd', text: 'uci get network.lan.ipaddr' },
+  { kind: 'out', text: '192.168.1.1' },
+  { kind: 'cmd', text: "ubus call network.interface.wan status | grep '\"up\"'" },
+  { kind: 'out', text: '\t"up": true,' },
+  { kind: 'cmd', text: 'sysupgrade -b /tmp/backup.tar.gz' },
+  { kind: 'note', text: hero.isEn ? '# backup saved. now you can change things.' : '# 已备份，现在可以放心改了。' },
+];
+
+// Timeline: commands type at ~26ms/char, output lands shortly after.
+let t = 1100;
+const timed = script.map((line) => {
+  const start = t;
+  t += line.kind === 'cmd' ? line.text.length * 26 + 380 : 220;
+  return { ...line, start, n: line.text.length };
+});
+const end = t;
+---
+
+<section class="rh-hero rh-v-console" aria-labelledby="_top">
+  <div class="rh-hero-grid" aria-hidden="true" />
+  <HeroCopy hero={hero} align="center" />
+
+  <div class="rh-term-stage rh-in rh-in-scale" style="--i:4">
+    <div class="rh-term-window" role="img" aria-label={hero.isEn ? 'A terminal session on an OpenWrt router: check the release, the LAN address and WAN status, then save a backup.' : 'OpenWrt 路由器上的终端会话：查看版本、LAN 地址和 WAN 状态，然后保存备份。'}>
+      <div class="rh-term-head" aria-hidden="true">
+        <i></i><i></i><i></i>
+        <span>ssh root@192.168.1.1</span>
+        <span class="rh-term-link"><span class="rh-led" data-state="on" data-blink></span>br-lan</span>
+      </div>
+      <pre class="rh-term-body" aria-hidden="true">{timed.map((l) => (
+        <span class:list={['ln', `ln-${l.kind}`]} style={`--t:${l.start}ms;--n:${l.n}`}>{l.kind === 'cmd' && <span class="ps">root@OpenWrt:~# </span>}<span class="tx">{l.text}</span>{'\n'}</span>
+      ))}<span class="ln ln-cmd" style={`--t:${end}ms;--n:0`}><span class="ps">root@OpenWrt:~# </span><span class="cur" /></span></pre>
+    </div>
+    <div class="rh-term-glow" aria-hidden="true" />
+  </div>
+
+  <HeroStats hero={hero} />
+</section>
+
+<style>
+  .rh-v-console {
+    justify-items: center;
+    gap: clamp(2.5rem, 5vw, 4rem);
+  }
+  .rh-v-console :global(.rh-title) {
+    font-size: clamp(2.85rem, 1rem + 5.8vw, 6.25rem);
+  }
+  .rh-v-console :global(.rh-stats) {
+    width: 100%;
+  }
+
+  .rh-term-stage {
+    position: relative;
+    width: 100%;
+    max-width: 60rem;
+    perspective: 1600px;
+  }
+  .rh-term-window {
+    position: relative;
+    z-index: 1;
+    border: 1px solid var(--rh-line-strong);
+    border-radius: var(--rh-radius-lg);
+    background: var(--rh-code-bg);
+    box-shadow: var(--rh-shadow), 0 40px 80px -40px hsla(30, 40%, 2%, 0.6);
+    overflow: hidden;
+    transform-origin: 50% 0;
+  }
+  .rh-term-glow {
+    position: absolute;
+    inset: 30% 10% -12%;
+    z-index: 0;
+    background: radial-gradient(closest-side, hsla(36, 96%, 60%, 0.22), transparent);
+    filter: blur(30px);
+    pointer-events: none;
+  }
+  .rh-term-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--rh-line);
+    background: var(--rh-code-bar);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.75rem;
+    color: var(--sl-color-gray-3);
+  }
+  .rh-term-head i {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 50%;
+    background: var(--rh-line-strong);
+  }
+  .rh-term-head span:first-of-type {
+    margin-inline: auto;
+  }
+  .rh-term-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .rh-term-body {
+    margin: 0;
+    padding: clamp(1rem, 3vw, 1.75rem) clamp(1rem, 3vw, 2rem) clamp(1.25rem, 3vw, 2.25rem);
+    min-height: 15.5rem;
+    font-family: var(--__sl-font-mono);
+    font-size: clamp(0.7rem, 0.6rem + 0.45vw, 0.95rem);
+    line-height: 1.85;
+    color: var(--sl-color-gray-1);
+    white-space: pre;
+    overflow-x: auto;
+    tab-size: 2;
+    text-align: start;
+    scrollbar-width: none;
+  }
+  .ps {
+    color: var(--sl-color-accent);
+  }
+  .ln-out .tx {
+    color: var(--sl-color-gray-3);
+  }
+  .ln-note .tx {
+    color: var(--rh-ok);
+  }
+  .cur {
+    display: inline-block;
+    width: 0.6em;
+    height: 1.1em;
+    vertical-align: -0.2em;
+    background: var(--sl-color-accent);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ln {
+      animation: rh-line-in 1ms linear var(--t) both;
+    }
+    .ln-cmd .tx {
+      display: inline-block;
+      vertical-align: top;
+      overflow: hidden;
+      animation: rh-type calc(var(--n) * 26ms) steps(var(--n), end) var(--t) both;
+    }
+    .cur {
+      animation: rh-caret 1.1s steps(1, end) infinite;
+    }
+  }
+
+  /* The window starts tilted back and lies flat as it scrolls into view. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .rh-term-window {
+        animation: rh-unfold linear both;
+      }
+    }
+  }
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .rh-term-stage .rh-term-window {
+        animation-timeline: view();
+        animation-range: entry 0% cover 45%;
+      }
+    }
+  }
+
+  @keyframes rh-line-in {
+    from { visibility: hidden; }
+    to { visibility: visible; }
+  }
+  @keyframes rh-type {
+    from { width: 0; }
+    to { width: calc(var(--n) * 1ch); }
+  }
+  @keyframes rh-unfold {
+    from { transform: rotateX(22deg) scale(0.94); }
+    to { transform: none; }
+  }
+</style>

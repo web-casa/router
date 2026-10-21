@@ -1,0 +1,57 @@
+---
+title: "Linux 6.12 and the 25.12 toolchain: why kernel modules must match"
+description: "OpenWrt 25.12 moves from Linux 6.6 to 6.12 and from GCC 13.3 to 14.3. What that means for kmod packages and third-party feeds."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt kernel version", "openwrt 25.12 kernel", "openwrt kmod mismatch"]
+sources:
+  - label: "OpenWrt 25.12.0 release announcement"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: "OpenWrt 25.12.6 service release"
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: "OpenWrt 24.10.0 release announcement"
+    url: https://forum.openwrt.org/t/openwrt-24-10-0-first-stable-release/223845
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="kernel-toolchain" />
+
+## In one sentence
+
+25.12 moves every target from Linux 6.6 to 6.12 and updates the toolchain, so kernel modules built for 24.10 will not load on 25.12.
+
+## Versions side by side
+
+| Component | 24.10.0 | 25.12.0 |
+|---|---|---|
+| Linux kernel | 6.6.73 | 6.12.71 |
+| GCC | 13.3.0 | 14.3.0 |
+| binutils | 2.42 | 2.44 |
+| musl | 1.2.5 | 1.2.5 |
+| glibc | 2.38 | 2.41 |
+
+25.12.6 moves the kernel to 6.12.112. In 25.12.0 the wireless stack (cfg80211/mac80211) comes from kernel 6.18.7, alongside dnsmasq 2.91, dropbear 2025.89 and busybox 1.37.0.
+
+## Why it matters at home
+
+- `kmod-*` packages are built for one exact kernel. The feed path contains the kernel hash, as in `targets/<target>/kmods/<kernel-hash>/`, and it has to match the running kernel.
+- A kmod from another release, another build or a mirror with a different hash will fail to install or to load. That is a common reason a package “will not install”.
+- Third-party builds often ship their own kernel. Official kmods may not fit them at all.
+
+## See it on your router
+
+```sh
+uname -r
+grep -E 'RELEASE|TARGET' /etc/openwrt_release
+```
+
+## Related guides
+
+- [Package sources](/en/software/package-sources/)
+- [Package will not install](/en/troubleshooting/plugin-install/)
+- [Which OpenWrt is this?](/en/getting-started/which-openwrt/)
+
+<PageSources />

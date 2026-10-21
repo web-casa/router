@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200; same-version sysupgrade; config kept; packages 239→182; SQM/OpenClash lost; DNS/HTTP OK"
-  recipe="tests/recipes/firmware-upgrade-25.12.md"
-  result="E2 partial: after same-version sysupgrade, LAN/DHCP config was kept and HTTP/SSH/DNS worked; packages dropped 239→182 and SQM/OpenClash disappeared; no cross-version upgrade; SQM reinstall not completed; snapshot rolled back"
-  date="2026-10-20"
-/>
-
 ## An upgrade is not just “swap the firmware file”
 
 Separate four things:
@@ -194,5 +186,13 @@ This lab used snapshot `pre-019`; after recording results it was rolled back to 
 - This is E2 partial: same-version sysupgrade config retention, management/DNS and package loss were tested; cross-version and plugin rebuild were not completed.
 - Do not infer cross-release behavior from same-version results; read release notes, back up and test in a VM.
 - No independent reviewer; conclusions are limited to this VM environment.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; same-version sysupgrade; config kept; packages 239→182; SQM/OpenClash lost; DNS/HTTP OK"
+  recipe="tests/recipes/firmware-upgrade-25.12.md"
+  result="E2 partial: after same-version sysupgrade, LAN/DHCP config was kept and HTTP/SSH/DNS worked; packages dropped 239→182 and SQM/OpenClash disappeared; no cross-version upgrade; SQM reinstall not completed; snapshot rolled back"
+  date="2026-10-20"
+/>
 
 <PageSources />

@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200; official/TUNA feeds, apk update/search/install, restore official"
-  recipe="tests/recipes/package-sources.md"
-  result="E2 partial: 25.12.6 x86 official feed reported 11220 packages; TUNA also 11220; sqm-scripts 1.7.2 installed; restoring official feed updated normally; 24.10 opkg untested"
-/>
-
 First: the **difference between apk and opkg** starts with the firmware release, not “which mirror is faster”. 25.12 uses `apk`; 24.10 uses `opkg`. Package format, feed paths and verification differ and are not interchangeable.
 
 ## Outcome
@@ -222,5 +215,12 @@ If updates stop working after a mirror change, restore the official feed first, 
 - This is E2 partial: the 25.12 `apk` official/TUNA/install/restore path was tested; `opkg` and bad-feed branches remain documentation.
 - Mirror paths change with releases; rerun `update`/`search` on the target release/target/arch before publishing.
 - Do not mix official, ImmortalWrt or iStoreOS feeds; ABI/kernel/signatures can all mismatch.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; official/TUNA feeds, apk update/search/install, restore official"
+  recipe="tests/recipes/package-sources.md"
+  result="E2 partial: 25.12.6 x86 official feed reported 11220 packages; TUNA also 11220; sqm-scripts 1.7.2 installed; restoring official feed updated normally; 24.10 opkg untested"
+/>
 
 <PageSources />

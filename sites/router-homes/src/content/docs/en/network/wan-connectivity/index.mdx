@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 + real ISP (PPPoE pending)" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="WAN DHCP E2: OpenWrt 25.12.6 x86 VM 200, WAN 192.168.50.166/24, LAN 192.168.10.1; PPPoE untested"
-  recipe="tests/recipes/wan-dhcp-pppoe-25.12.md"
-  result="WAN DHCP got 192.168.50.166/24 with gateway/DNS 192.168.50.1; LAN DHCP client got 192.168.10.191/24; LAN-client NAT/DNS end-to-end was not re-run; PPPoE untested without a real account/line"
-  date="2026-10-20"
-/>
-
 ## Outcome
 
 - Tell whether WAN uses DHCP or PPPoE and which status to check;
@@ -270,5 +262,13 @@ This page has no real ISP account, so **PPPoE stays E1** and makes no “dial su
 - WAN DHCP is E2; PPPoE is E1. Do not merge them into “main router fully tested”.
 - Recipe: `tests/recipes/wan-dhcp-pppoe-25.12.md`.
 - No independent reviewer; conclusions are limited to this VM/upstream environment.
+
+<TestRecord
+  status="partial"
+  environment="WAN DHCP E2: OpenWrt 25.12.6 x86 VM 200, WAN 192.168.50.166/24, LAN 192.168.10.1; PPPoE untested"
+  recipe="tests/recipes/wan-dhcp-pppoe-25.12.md"
+  result="WAN DHCP got 192.168.50.166/24 with gateway/DNS 192.168.50.1; LAN DHCP client got 192.168.10.191/24; LAN-client NAT/DNS end-to-end was not re-run; PPPoE untested without a real account/line"
+  date="2026-10-20"
+/>
 
 <PageSources />

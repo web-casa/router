@@ -30,14 +30,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="verified"
-  environment="OpenWrt 25.12.6 x86 VM 200；LAN 192.168.1.1→192.168.10.1；重启后 DHCP 租约验证"
-  recipe="tests/recipes/lan-address-change-25.12.md"
-  result="E2：旧地址超时、新地址 LuCI/SSH 正常；仅 reload 时 DHCP 未租约，重启后 netns 客户端获得 192.168.10.191/24；回滚后旧地址恢复、新地址超时"
-  date="2026-10-20"
-/>
-
 ## 完成后你能确认什么
 
 - 改 LAN 前先选一个不与 WAN/上游/VPN 冲突的网段；
@@ -236,5 +228,13 @@ uci commit network
 - 本页是 E2：地址切换、旧地址失效、重启后 DHCP 租约、回滚均已实测；真实物理客户端、IPv6 和上游冲突未验证。
 - 复现配方：`tests/recipes/lan-address-change-25.12.md`。
 - 没有第二评审人；关键结论只限本次 VM 环境，不外推到所有固件。
+
+<TestRecord
+  status="verified"
+  environment="OpenWrt 25.12.6 x86 VM 200；LAN 192.168.1.1→192.168.10.1；重启后 DHCP 租约验证"
+  recipe="tests/recipes/lan-address-change-25.12.md"
+  result="E2：旧地址超时、新地址 LuCI/SSH 正常；仅 reload 时 DHCP 未租约，重启后 netns 客户端获得 192.168.10.191/24；回滚后旧地址恢复、新地址超时"
+  date="2026-10-20"
+/>
 
 <PageSources />

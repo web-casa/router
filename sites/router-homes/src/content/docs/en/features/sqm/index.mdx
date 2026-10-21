@@ -1,0 +1,52 @@
+---
+title: "SQM and CAKE on OpenWrt: low latency when the line is full"
+description: "SQM shapes traffic just under your line rate so queues stay short; with CAKE it fights bufferbloat. The settings the OpenWrt guide recommends."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt sqm", "openwrt cake", "bufferbloat openwrt"]
+sources:
+  - label: "OpenWrt SQM guide"
+    url: https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm
+  - label: "Linux 4.19 (kernelnewbies)"
+    url: https://kernelnewbies.org/Linux_4.19
+  - label: "CAKE (bufferbloat.net)"
+    url: https://www.bufferbloat.net/projects/codel/wiki/Cake/
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="sqm" />
+
+## In one sentence
+
+SQM (Smart Queue Management) shapes traffic slightly below your line rate, so the queue forms in the router, where it can be managed, instead of in the modem. Used with the CAKE queueing discipline, it keeps latency low while the line is busy. That problem is known as bufferbloat.
+
+## What the OpenWrt guide recommends
+
+1. Install `luci-app-sqm`, or `sqm-scripts` if you don't use LuCI.
+2. Measure your real download and upload speed, then set both to **90%** of what you measured.
+3. Choose `cake` with `piece_of_cake.qos`.
+4. Test again under load and adjust. `fq_codel` with `simple.qos` is the lighter, less complete alternative.
+
+CAKE has been in the Linux kernel since 4.19.
+
+## See it on your router
+
+After installing SQM:
+
+```sh
+cat /etc/config/sqm
+```
+
+## Watch out
+
+- Shaping uses CPU. On a fast line a small router may not keep up, so compare speed and latency before and after.
+- Set the rates from a measurement, not from your plan's advertised speed.
+
+## Related guides
+
+- [SQM / CAKE](/en/software/sqm/)
+
+<PageSources />

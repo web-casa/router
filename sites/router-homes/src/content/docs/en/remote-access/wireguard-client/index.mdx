@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE netns client" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="PVE netns client; wg0 10.10.0.2/24 → 192.168.1.2:51820; allowed-ips 10.10.0.0/24; handshake/ping/HTTP passed; Windows/phone/DNS/full tunnel untested"
-  recipe="tests/recipes/wireguard-client-25.12.md"
-  result="E2 partial: client 10.10.0.2/24 handshook with server 10.10.0.1/24; tunnel ping 4/4; HTTP 200; Windows/phone, DNS through tunnel, full-tunnel routing and real roaming untested"
-  date="2026-10-20"
-/>
-
 ## What the client needs
 
 - its own private key (client only);
@@ -173,5 +165,13 @@ This lab:
 - This is E2 partial: Linux netns client and LAN-side tunnel were tested; mobile/DNS/full-tunnel/public WAN were not.
 - Private key stays on the client; the server only gets the public key.
 - No independent reviewer; conclusions are limited to this VM/netns environment.
+
+<TestRecord
+  status="partial"
+  environment="PVE netns client; wg0 10.10.0.2/24 → 192.168.1.2:51820; allowed-ips 10.10.0.0/24; handshake/ping/HTTP passed; Windows/phone/DNS/full tunnel untested"
+  recipe="tests/recipes/wireguard-client-25.12.md"
+  result="E2 partial: client 10.10.0.2/24 handshook with server 10.10.0.1/24; tunnel ping 4/4; HTTP 200; Windows/phone, DNS through tunnel, full-tunnel routing and real roaming untested"
+  date="2026-10-20"
+/>
 
 <PageSources />

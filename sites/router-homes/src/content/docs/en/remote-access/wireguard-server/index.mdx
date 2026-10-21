@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 + PVE netns" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200 + PVE netns client; wg0 10.10.0.1/24, UDP 51820; handshake/ping/HTTP passed; no WAN port-forward/DDNS/phone roaming"
-  recipe="tests/recipes/wireguard-server-25.12.md"
-  result="E2 partial: server wg0 10.10.0.1/24 on UDP 51820; client 10.10.0.2/24 handshook, tunnel ping 4/4, HTTP 200; WAN port-forward, DDNS, real phone/roaming and LAN forwarding untested"
-  date="2026-10-20"
-/>
-
 ## Scope
 
 This page verifies:
@@ -225,5 +217,13 @@ This lab client:
 - This is E2 partial: LAN-side server + tunnel were tested; real WAN/mobile clients/LAN forwarding were not.
 - Private keys stay on devices; never put them in the repo/screenshots/chat.
 - No independent reviewer; conclusions are limited to this VM/netns environment.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200 + PVE netns client; wg0 10.10.0.1/24, UDP 51820; handshake/ping/HTTP passed; no WAN port-forward/DDNS/phone roaming"
+  recipe="tests/recipes/wireguard-server-25.12.md"
+  result="E2 partial: server wg0 10.10.0.1/24 on UDP 51820; client 10.10.0.2/24 handshook, tunnel ping 4/4, HTTP 200; WAN port-forward, DDNS, real phone/roaming and LAN forwarding untested"
+  date="2026-10-20"
+/>
 
 <PageSources />

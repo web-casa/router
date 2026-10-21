@@ -1,0 +1,54 @@
+---
+import Icon from './Icon.astro';
+
+// Rendered in the header's right-hand group (Starlight's SocialIcons slot):
+// a persistent way into the download page.
+const route = (Astro.locals as any).starlightRoute;
+const locale = route.locale ?? 'en';
+const href = `/${locale}/download/`;
+const current = route.id === `${locale}/download`;
+---
+
+<a href={href} class="rh-header-dl" aria-current={current ? 'page' : undefined}>
+  <Icon name="download-minimalistic" />
+  {locale === 'en' ? 'Download' : '下载'}
+</a>
+
+<style>
+  .rh-header-dl {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    height: 2.25rem;
+    padding-inline: 0.9rem 1rem;
+    border: 1px solid var(--rh-line-strong);
+    border-radius: 999px;
+    color: var(--sl-color-white);
+    font-size: 0.875rem;
+    font-weight: 560;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: border-color 0.2s, background-color 0.2s, color 0.2s;
+  }
+  .rh-header-dl :global(.i) {
+    width: 1.1rem;
+    height: 1.1rem;
+    color: var(--sl-color-accent);
+    transition: transform 0.4s var(--rh-ease-spring);
+  }
+  .rh-header-dl:hover {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
+  }
+  .rh-header-dl:hover :global(.i) {
+    transform: translateY(2px);
+  }
+  .rh-header-dl[aria-current='page'] {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent);
+    color: var(--sl-color-text-invert);
+  }
+  .rh-header-dl[aria-current='page'] :global(.i) {
+    color: inherit;
+  }
+</style>

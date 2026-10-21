@@ -1,0 +1,323 @@
+---
+// Variant "panel": the router's front panel. Every port is a link to the
+// guide for whatever you plug into it; the reset pinhole leads to recovery.
+import HeroCopy from './HeroCopy.astro';
+import HeroStats from './HeroStats.astro';
+import type { HeroData } from './data';
+
+interface Props { hero: HeroData }
+const { hero } = Astro.props;
+const l = hero.locale;
+const ports = hero.isEn
+  ? [
+      { id: 'WAN', role: 'Internet · DHCP / PPPoE', href: `/${l}/network/wan-connectivity/`, wan: true },
+      { id: 'LAN1', role: 'Your computer · 192.168.1.x', href: `/${l}/network/lan-address/` },
+      { id: 'LAN2', role: 'Wired / wireless AP', href: `/${l}/network/ap-mode/` },
+      { id: 'LAN3', role: 'Bypass gateway', href: `/${l}/network/bypass-gateway/` },
+      { id: 'LAN4', role: 'Proxmox host', href: `/${l}/installation/proxmox/` },
+    ]
+  : [
+      { id: 'WAN', role: '上网 · DHCP / PPPoE', href: `/${l}/network/wan-connectivity/`, wan: true },
+      { id: 'LAN1', role: '你的电脑 · 192.168.1.x', href: `/${l}/network/lan-address/` },
+      { id: 'LAN2', role: '有线 / 无线 AP', href: `/${l}/network/ap-mode/` },
+      { id: 'LAN3', role: '旁路网关', href: `/${l}/network/bypass-gateway/` },
+      { id: 'LAN4', role: 'PVE 宿主机', href: `/${l}/installation/proxmox/` },
+    ];
+const reset = { label: hero.isEn ? 'Reset · failsafe' : '复位 · failsafe', href: `/${l}/troubleshooting/no-web-ui/` };
+const leds = ['PWR', 'SYS', 'WAN', 'LAN'];
+---
+
+<section class="rh-hero rh-v-panel" aria-labelledby="_top">
+  <div class="rh-hero-grid" aria-hidden="true" />
+  <HeroCopy hero={hero} align="center" />
+
+  <div class="rh-device-wrap rh-in rh-in-scale" style="--i:4">
+    <nav class="rh-device" aria-label={hero.isEn ? 'Router ports — pick what you are connecting' : '路由器网口：选你要接的设备'}>
+      <div class="rh-device-brand" aria-hidden="true">
+        <span class="rh-device-logo">OpenWrt</span>
+        <span class="rh-device-model">x86/64 · {hero.release}</span>
+      </div>
+      <ul class="rh-device-leds" aria-hidden="true">
+        {leds.map((name, i) => (
+          <li><span class="rh-dled" style={`--d:${i * 0.37}s`} data-steady={i === 0 ? '' : undefined} />{name}</li>
+        ))}
+      </ul>
+      <ul class="rh-ports">
+        {ports.map((p, i) => (
+          <li>
+            <a href={p.href} class:list={['rh-port', { 'rh-port-wan': p.wan }]} style={`--d:${(i * 0.53) % 1.7}s`}>
+              <span class="rh-jack" aria-hidden="true">
+                <i class="a" /><i class="b" />
+              </span>
+              <span class="rh-port-id">{p.id}</span>
+              <span class="rh-port-role">{p.role}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      <a href={reset.href} class="rh-reset">
+        <span class="rh-pin" aria-hidden="true" />
+        <span class="rh-port-id">RESET</span>
+        <span class="rh-port-role">{reset.label}</span>
+      </a>
+    </nav>
+    <p class="rh-device-hint" aria-hidden="true">{hero.isEn ? 'Hover a port to see where it leads' : '把鼠标移到网口上，看看它通向哪篇'}</p>
+  </div>
+
+  <HeroStats hero={hero} />
+</section>
+
+<style>
+  .rh-v-panel {
+    justify-items: center;
+    gap: clamp(2.5rem, 5vw, 4rem);
+  }
+  .rh-v-panel :global(.rh-title) {
+    font-size: clamp(2.85rem, 1rem + 5.8vw, 6.25rem);
+  }
+  .rh-v-panel :global(.rh-stats) {
+    width: 100%;
+  }
+
+  .rh-device-wrap {
+    width: 100%;
+    max-width: 66rem;
+  }
+  .rh-device {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: clamp(1rem, 3vw, 2.5rem);
+    padding: clamp(1.25rem, 3vw, 2rem) clamp(1.25rem, 3vw, 2.25rem);
+    border: 1px solid var(--rh-line-strong);
+    border-radius: 1.75rem;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 5px, hsla(30, 10%, 50%, 0.05) 5px 6px) left / 18% 100% no-repeat,
+      linear-gradient(180deg, var(--rh-surface-2), var(--rh-surface) 60%);
+    box-shadow:
+      inset 0 1px 0 hsla(40, 40%, 95%, 0.06),
+      inset 0 -12px 24px -16px hsla(30, 40%, 2%, 0.6),
+      0 30px 60px -30px hsla(30, 40%, 2%, 0.7);
+  }
+  .rh-device::after {
+    content: '';
+    position: absolute;
+    inset-inline: 8%;
+    bottom: -10px;
+    height: 10px;
+    border-radius: 0 0 1rem 1rem;
+    background: linear-gradient(var(--rh-line), transparent);
+  }
+
+  .rh-device-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+  .rh-device-logo {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    color: var(--sl-color-white);
+  }
+  .rh-device-model {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.68rem;
+    color: var(--sl-color-gray-3);
+    white-space: nowrap;
+  }
+
+  .rh-device-leds {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: 0.45rem 0.9rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    color: var(--sl-color-gray-3);
+  }
+  .rh-device-leds li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .rh-dled {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background: var(--sl-color-accent);
+    box-shadow: var(--rh-led-glow);
+  }
+
+  .rh-ports {
+    display: flex;
+    justify-content: center;
+    gap: clamp(0.5rem, 1.5vw, 1rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rh-port,
+  .rh-reset {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.55rem;
+    color: inherit;
+    text-decoration: none;
+    border-radius: 0.6rem;
+  }
+  .rh-jack {
+    position: relative;
+    width: clamp(2.6rem, 5vw, 3.6rem);
+    aspect-ratio: 1.15;
+    border-radius: 0.35rem;
+    background: hsl(30, 10%, 5%);
+    box-shadow: inset 0 0 0 1px var(--rh-line-strong), inset 0 6px 10px hsla(0, 0%, 0%, 0.7);
+    clip-path: polygon(0 0, 100% 0, 100% 74%, 78% 74%, 78% 100%, 22% 100%, 22% 74%, 0 74%);
+    transition: transform 0.45s var(--rh-ease-spring), box-shadow 0.3s;
+  }
+  .rh-jack::before {
+    content: '';
+    position: absolute;
+    inset: 22% 14% 40%;
+    background: repeating-linear-gradient(90deg, hsl(40, 50%, 52%) 0 1px, transparent 1px 4px);
+    opacity: 0.55;
+  }
+  .rh-jack i {
+    position: absolute;
+    top: 6%;
+    width: 12%;
+    aspect-ratio: 1;
+    border-radius: 2px;
+    background: var(--sl-color-gray-5);
+  }
+  .rh-jack .a {
+    inset-inline-start: 7%;
+    background: var(--sl-color-accent);
+    box-shadow: 0 0 6px var(--sl-color-accent);
+  }
+  .rh-jack .b {
+    inset-inline-end: 7%;
+  }
+  .rh-port-wan .rh-jack {
+    box-shadow: inset 0 0 0 1px var(--sl-color-accent), inset 0 6px 10px hsla(0, 0%, 0%, 0.7);
+  }
+  .rh-port-id {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    color: var(--sl-color-gray-2);
+    transition: color 0.2s;
+  }
+  .rh-port-wan .rh-port-id {
+    color: var(--sl-color-accent);
+  }
+  .rh-port-role {
+    position: absolute;
+    bottom: calc(100% + 0.75rem);
+    left: 50%;
+    padding: 0.4rem 0.7rem;
+    border: 1px solid var(--rh-line-strong);
+    border-radius: 0.5rem;
+    background: var(--sl-color-black);
+    box-shadow: var(--rh-shadow);
+    font-size: 0.8rem;
+    font-weight: 520;
+    color: var(--sl-color-white);
+    white-space: nowrap;
+    opacity: 0;
+    transform: translate(-50%, 6px);
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.35s var(--rh-ease-out);
+  }
+  .rh-port-role::after {
+    content: ' →';
+    color: var(--sl-color-accent);
+  }
+  .rh-port:hover .rh-jack,
+  .rh-port:focus-visible .rh-jack {
+    transform: translateY(-3px);
+    box-shadow: inset 0 0 0 1.5px var(--sl-color-accent), inset 0 6px 10px hsla(0, 0%, 0%, 0.7), 0 0 0 4px hsla(36, 96%, 60%, 0.12);
+  }
+  .rh-port:hover .rh-jack .b,
+  .rh-port:focus-visible .rh-jack .b {
+    background: var(--sl-color-accent-high);
+    box-shadow: 0 0 6px var(--sl-color-accent-high);
+  }
+  :is(.rh-port, .rh-reset):is(:hover, :focus-visible) .rh-port-id {
+    color: var(--sl-color-white);
+  }
+  :is(.rh-port, .rh-reset):is(:hover, :focus-visible) .rh-port-role {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  .rh-pin {
+    width: 0.85rem;
+    height: 0.85rem;
+    margin-block: 0.9rem;
+    border-radius: 50%;
+    background: hsl(30, 10%, 4%);
+    box-shadow: inset 0 0 0 1px var(--rh-line-strong), inset 0 2px 3px hsla(0, 0%, 0%, 0.8);
+    transition: box-shadow 0.3s;
+  }
+  .rh-reset:hover .rh-pin,
+  .rh-reset:focus-visible .rh-pin {
+    box-shadow: inset 0 0 0 1.5px var(--sl-color-accent), 0 0 0 5px hsla(36, 96%, 60%, 0.12);
+  }
+
+  .rh-device-hint {
+    margin: 1.5rem 0 0;
+    text-align: center;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.72rem;
+    color: var(--sl-color-gray-4);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .rh-dled:not([data-steady]) {
+      animation: rh-led 1.1s steps(2, jump-none) var(--d) infinite;
+    }
+    .rh-jack .a {
+      animation: rh-led 0.8s steps(2, jump-none) var(--d) infinite;
+    }
+  }
+
+  @media (max-width: 52rem) {
+    .rh-device {
+      grid-template-columns: minmax(0, 1fr) auto;
+      row-gap: 1.5rem;
+    }
+    .rh-device-leds {
+      justify-self: end;
+    }
+    .rh-ports {
+      grid-column: 1 / -1;
+      justify-content: space-between;
+    }
+    .rh-reset {
+      display: none;
+    }
+    .rh-port-role {
+      font-size: 0.72rem;
+    }
+    .rh-ports li:first-child .rh-port-role {
+      left: 0;
+      transform: translate(0, 6px);
+    }
+    .rh-ports li:last-child .rh-port-role {
+      left: auto;
+      right: 0;
+      transform: translate(0, 6px);
+    }
+    .rh-ports li:is(:first-child, :last-child) .rh-port:is(:hover, :focus-visible) .rh-port-role {
+      transform: none;
+    }
+  }
+</style>

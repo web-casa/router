@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200; apk official/TUNA feeds 11220 packages; SQM installed; 24.10 opkg not executed"
-  recipe="tests/recipes/apk-vs-opkg.md"
-  result="E2 partial: 25.12 apk update/search/install and mirror switch were tested; 25.12 sysupgrade dropped packages 239→182; 24.10 opkg commands/format are documentation only, not executed"
-  date="2026-10-20"
-/>
-
 ## One line
 
 - **25.12+**: `apk`, packages are `.apk`;
@@ -173,5 +165,13 @@ This lab's 25.12 sysupgrade kept config but dropped packages 239→182; SQM/Open
 - This is E2 partial: 25.12 apk was tested; 24.10 opkg is an official command reference, not executed here.
 - Do not turn a command comparison into a “migration verified”; back up and test in a VM first.
 - No independent reviewer; conclusions are limited to this 25.12 x86 environment.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; apk official/TUNA feeds 11220 packages; SQM installed; 24.10 opkg not executed"
+  recipe="tests/recipes/apk-vs-opkg.md"
+  result="E2 partial: 25.12 apk update/search/install and mirror switch were tested; 25.12 sysupgrade dropped packages 239→182; 24.10 opkg commands/format are documentation only, not executed"
+  date="2026-10-20"
+/>
 
 <PageSources />

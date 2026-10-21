@@ -1,0 +1,30 @@
+---
+// Solar duotone icon (480 Design, CC BY 4.0), inlined as SVG at build time.
+// The secondary tone is drawn by `.i-duo` (see theme.css), so its colour and
+// strength can be themed instead of being a fixed 50% opacity.
+import { icons } from '@iconify-json/solar';
+import { getIconData, iconToSVG } from '@iconify/utils';
+import { ICON_STYLE } from './icon-style';
+
+interface Props {
+  /** Solar icon name without the style suffix, e.g. "wi-fi-router". */
+  name: string;
+  class?: string;
+  /** Accessible name; omit for decorative icons. */
+  label?: string;
+}
+const { name, class: className, label } = Astro.props;
+const data = getIconData(icons, `${name}-${ICON_STYLE}`);
+if (!data) throw new Error(`Unknown Solar icon: ${name}-${ICON_STYLE}`);
+const { attributes, body } = iconToSVG(data);
+const html = body.replace(/opacity="\.5"/g, 'class="i-duo"');
+---
+
+<svg
+  viewBox={attributes.viewBox}
+  class:list={['i', className]}
+  role={label ? 'img' : undefined}
+  aria-label={label}
+  aria-hidden={label ? undefined : 'true'}
+  set:html={html}
+/>

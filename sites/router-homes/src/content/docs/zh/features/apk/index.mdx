@@ -1,0 +1,65 @@
+---
+title: "OpenWrt 25.12 的 apk：取代 opkg 的包管理器"
+description: "从 25.12 起，OpenWrt 用 apk 取代 opkg 安装软件。这里有命令对照、文件位置，以及一条不要运行的命令。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt apk", "apk opkg 区别", "openwrt opkg 没了"]
+sources:
+  - label: "OpenWrt apk"
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: "opkg 到 apk 命令对照"
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: "OpenWrt 25.12.0 发布公告"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="apk" />
+
+## 一句话
+
+从 25.12 起，OpenWrt 用 apk（Alpine Package Keeper，第 3 版）安装和卸载软件；24.10 及更早的版本仍然用 opkg。
+
+## 为什么换
+
+25.12.0 公告说明，OpenWrt 维护的 opkg 分支已经无人维护。改名的软件包不多，但命令全变了。
+
+## 命令对照
+
+| 操作 | apk（25.12） | opkg（24.10） |
+|---|---|---|
+| 刷新软件包索引 | `apk update` | `opkg update` |
+| 安装 | `apk add <pkg>` | `opkg install <pkg>` |
+| 卸载 | `apk del <pkg>` | `opkg remove <pkg>` |
+| 列出已安装 | `apk list --installed` | `opkg list-installed` |
+| 列出可升级 | `apk list --upgradeable` | `opkg list-upgradable` |
+| 查文件属于哪个包 | `apk info --who-owns <file>` | `opkg search <file>` |
+
+## 其他变化
+
+- 软件包文件扩展名是 `.apk`，软件包索引是 `packages.adb`。
+- 软件源列表放在 `/etc/apk/repositories.d/`。
+- 自己编译的软件包没有签名，安装时需要 `--allow-untrusted`。
+
+## 注意
+
+- **不要用 `apk upgrade` 升级整个系统**。OpenWrt 官方 wiki 明确警告过；升级固件请用 attended sysupgrade 客户端，25.12 默认已安装它的 LuCI 应用。
+- 不要把 opkg 命令贴到 25.12 上，也不要把 apk 命令贴到 24.10 上；先确认你用的是哪一个。
+
+## 在你的路由器上看一眼
+
+```sh
+apk list --installed | head
+ls /etc/apk/repositories.d/
+```
+
+## 相关操作页
+
+- [apk / opkg 对照](/zh/software/apk-vs-opkg/)
+- [软件源](/zh/software/package-sources/)
+- [插件装不上](/zh/troubleshooting/plugin-install/)
+
+<PageSources />

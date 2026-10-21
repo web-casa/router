@@ -31,14 +31,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="全新官方镜像" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86_64 VM 200；LuCI 26.288；官方镜像，厂商固件未测"
-  recipe="tests/recipes/luci-first-login.md"
-  result="E2：官方镜像可进 LuCI；首次提示设密；中文包安装并切换成功；SSH 用同一密码登录；厂商固件/failsafe 未测"
-  date="2026-10-20"
-/>
-
 ## 完成后你能确认什么
 
 - 找到 OpenWrt 的 LAN 管理地址，而不是 WAN 口；
@@ -187,5 +179,13 @@ opkg install luci-i18n-base-zh-cn
 - 本页核心流程已在官方 OpenWrt 25.12.6 x86_64 镜像上做 E2：首次进入、设置密码、安装 `luci-i18n-base-zh-cn`、切换中文、SSH 登录。
 - 厂商/改装固件的默认地址/密码/语言包可能不同；failsafe、恢复出厂和厂商限制仍按 E1 处理，不能把官方默认值套到所有固件。
 - 截图来自临时 VM 200；时间、网段等参数以你的环境为准。复现配方：`tests/recipes/luci-first-login.md`。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86_64 VM 200；LuCI 26.288；官方镜像，厂商固件未测"
+  recipe="tests/recipes/luci-first-login.md"
+  result="E2：官方镜像可进 LuCI；首次提示设密；中文包安装并切换成功；SSH 用同一密码登录；厂商固件/failsafe 未测"
+  date="2026-10-20"
+/>
 
 <PageSources />

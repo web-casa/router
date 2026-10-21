@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-21T14:54:05.117Z",
-  "base": "http://127.0.0.1:34751",
+  "generatedAt": "2026-10-21T17:20:05.764Z",
+  "base": "http://127.0.0.1:40973",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -28,6 +28,11 @@
             "excerpt": ""
           },
           {
+            "url": "/zh/features/uci/",
+            "title": "UCI：OpenWrt 如何把所有设置放在 /etc/config",
+            "excerpt": ""
+          },
+          {
             "url": "/zh/software/adguard-home/",
             "title": "AdGuard Home：从后台到终端过滤验证",
             "excerpt": ""
@@ -38,8 +43,8 @@
             "excerpt": ""
           },
           {
-            "url": "/zh/recovery/backup-restore/",
-            "title": "备份与恢复：配置、插件和管理入口分别验证",
+            "url": "/zh/",
+            "title": "OpenWrt，不弄丢你的家庭网络",
             "excerpt": ""
           }
         ]
@@ -104,13 +109,13 @@
             "excerpt": ""
           },
           {
-            "url": "/zh/network/wan-connectivity/",
-            "title": "主路由联网：WAN DHCP 与 PPPoE 分别怎么验证",
+            "url": "/zh/network/lan-address/",
+            "title": "修改 LAN 地址并重新进入后台：新旧网段、DHCP 与恢复",
             "excerpt": ""
           },
           {
-            "url": "/zh/network/lan-address/",
-            "title": "修改 LAN 地址并重新进入后台：新旧网段、DHCP 与恢复",
+            "url": "/zh/network/wan-connectivity/",
+            "title": "主路由联网：WAN DHCP 与 PPPoE 分别怎么验证",
             "excerpt": ""
           }
         ]
@@ -160,8 +165,18 @@
             "excerpt": ""
           },
           {
+            "url": "/zh/",
+            "title": "OpenWrt，不弄丢你的家庭网络",
+            "excerpt": ""
+          },
+          {
             "url": "/zh/installation/proxmox/",
             "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/recovery/backup-restore/",
+            "title": "备份与恢复：配置、插件和管理入口分别验证",
             "excerpt": ""
           }
         ]
@@ -216,11 +231,21 @@
         "expectedUrls": [
           "/zh/software/sqm/"
         ],
-        "rank": 1,
+        "rank": 2,
         "results": [
+          {
+            "url": "/zh/features/sqm/",
+            "title": "OpenWrt 上的 SQM 与 CAKE：带宽跑满时也压住延迟",
+            "excerpt": ""
+          },
           {
             "url": "/zh/software/sqm/",
             "title": "下载时游戏/会议变卡：SQM 与 CAKE 怎么配、怎么测",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/",
+            "title": "OpenWrt，不弄丢你的家庭网络",
             "excerpt": ""
           }
         ]
@@ -239,6 +264,11 @@
           {
             "url": "/zh/software/sqm/",
             "title": "下载时游戏/会议变卡：SQM 与 CAKE 怎么配、怎么测",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/features/sqm/",
+            "title": "OpenWrt 上的 SQM 与 CAKE：带宽跑满时也压住延迟",
             "excerpt": ""
           }
         ]
@@ -275,6 +305,11 @@
           {
             "url": "/zh/getting-started/luci-first-login/",
             "title": "首次登录 LuCI：默认地址、密码与中文界面",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/",
+            "title": "OpenWrt，不弄丢你的家庭网络",
             "excerpt": ""
           }
         ]
@@ -352,8 +387,8 @@
             "excerpt": ""
           },
           {
-            "url": "/zh/software/adguard-home/",
-            "title": "AdGuard Home：从后台到终端过滤验证",
+            "url": "/zh/download/",
+            "title": "下载 OpenWrt，一次选对",
             "excerpt": ""
           }
         ]
@@ -463,6 +498,11 @@
             "excerpt": ""
           },
           {
+            "url": "/zh/download/",
+            "title": "下载 OpenWrt，一次选对",
+            "excerpt": ""
+          },
+          {
             "url": "/zh/getting-started/firmware-download/",
             "title": "下载固件前先核对：型号、硬件修订、target/profile 与恢复入口",
             "excerpt": ""
@@ -470,11 +510,6 @@
           {
             "url": "/zh/getting-started/which-openwrt/",
             "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
-            "excerpt": ""
-          },
-          {
-            "url": "/zh/getting-started/luci-first-login/",
-            "title": "首次登录 LuCI：默认地址、密码与中文界面",
             "excerpt": ""
           }
         ]
@@ -488,8 +523,13 @@
         "expectedUrls": [
           "/zh/getting-started/which-openwrt/"
         ],
-        "rank": 3,
+        "rank": 5,
         "results": [
+          {
+            "url": "/zh/features/failsafe/",
+            "title": "Failsafe 模式与 sysupgrade：OpenWrt 自带的退路",
+            "excerpt": ""
+          },
           {
             "url": "/zh/recovery/backup-restore/",
             "title": "备份与恢复：配置、插件和管理入口分别验证",
@@ -501,18 +541,13 @@
             "excerpt": ""
           },
           {
+            "url": "/zh/",
+            "title": "OpenWrt，不弄丢你的家庭网络",
+            "excerpt": ""
+          },
+          {
             "url": "/zh/getting-started/which-openwrt/",
             "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
-            "excerpt": ""
-          },
-          {
-            "url": "/zh/getting-started/firmware-download/",
-            "title": "下载固件前先核对：型号、硬件修订、target/profile 与恢复入口",
-            "excerpt": ""
-          },
-          {
-            "url": "/zh/software/apk-vs-opkg/",
-            "title": "25.12 apk 与 24.10 opkg：命令、包格式与迁移边界",
             "excerpt": ""
           }
         ]
@@ -535,18 +570,18 @@
             "excerpt": ""
           },
           {
-            "url": "/zh/installation/proxmox/",
-            "title": "PVE 单网口安装 OpenWrt：旁路网关与内部 LAN 实验",
-            "excerpt": ""
-          },
-          {
-            "url": "/zh/getting-started/which-openwrt/",
-            "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
+            "url": "/zh/download/",
+            "title": "下载 OpenWrt，一次选对",
             "excerpt": ""
           },
           {
             "url": "/zh/software/package-sources/",
             "title": "软件源与国内镜像：apk 与 opkg 分开，别混 release/target/ABI",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/getting-started/which-openwrt/",
+            "title": "我用的到底是哪种 OpenWrt：原生、ImmortalWrt、iStoreOS 还是厂商固件",
             "excerpt": ""
           },
           {
@@ -585,6 +620,11 @@
           {
             "url": "/zh/network/lan-address/",
             "title": "修改 LAN 地址并重新进入后台：新旧网段、DHCP 与恢复",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/features/failsafe/",
+            "title": "Failsafe 模式与 sysupgrade：OpenWrt 自带的退路",
             "excerpt": ""
           }
         ]
@@ -687,8 +727,8 @@
             "excerpt": ""
           },
           {
-            "url": "/en/software/openclash/",
-            "title": "OpenClash basics: compatibility, DNS conflicts and clean disable",
+            "url": "/en/network/ap-mode/",
+            "title": "Wired/wireless AP under an existing router: DHCP off, new LAN IP, LAN port",
             "excerpt": ""
           }
         ]
@@ -738,6 +778,16 @@
             "excerpt": ""
           },
           {
+            "url": "/en/download/",
+            "title": "Download OpenWrt, right the first time",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/",
+            "title": "OpenWrt, without losing your network",
+            "excerpt": ""
+          },
+          {
             "url": "/en/getting-started/x86-image/",
             "title": "Choose an x86 image: combined, ext4, squashfs, EFI/BIOS",
             "excerpt": ""
@@ -771,8 +821,18 @@
             "excerpt": ""
           },
           {
+            "url": "/en/",
+            "title": "OpenWrt, without losing your network",
+            "excerpt": ""
+          },
+          {
             "url": "/en/installation/proxmox/",
             "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/recovery/backup-restore/",
+            "title": "Backup and restore: verify config, packages and management separately",
             "excerpt": ""
           }
         ]
@@ -833,6 +893,11 @@
             "url": "/en/software/sqm/",
             "title": "SQM and CAKE: stop lag under download and upload",
             "excerpt": ""
+          },
+          {
+            "url": "/en/features/sqm/",
+            "title": "SQM and CAKE on OpenWrt: low latency when the line is full",
+            "excerpt": ""
           }
         ]
       },
@@ -871,6 +936,11 @@
             "excerpt": ""
           },
           {
+            "url": "/en/features/sqm/",
+            "title": "SQM and CAKE on OpenWrt: low latency when the line is full",
+            "excerpt": ""
+          },
+          {
             "url": "/en/troubleshooting/plugin-install/",
             "title": "Package will not install: download, architecture, dependencies, LuCI and postinst",
             "excerpt": ""
@@ -881,13 +951,8 @@
             "excerpt": ""
           },
           {
-            "url": "/en/software/apk-vs-opkg/",
-            "title": "25.12 apk vs 24.10 opkg: commands, package format and migration boundaries",
-            "excerpt": ""
-          },
-          {
-            "url": "/en/recovery/backup-restore/",
-            "title": "Backup and restore: verify config, packages and management separately",
+            "url": "/en/",
+            "title": "OpenWrt, without losing your network",
             "excerpt": ""
           }
         ]
@@ -911,6 +976,11 @@
           {
             "url": "/en/troubleshooting/no-web-ui/",
             "title": "Cannot reach LuCI: IP, port, DHCP and console recovery",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/",
+            "title": "OpenWrt, without losing your network",
             "excerpt": ""
           }
         ]
@@ -955,6 +1025,11 @@
             "excerpt": ""
           },
           {
+            "url": "/en/download/",
+            "title": "Download OpenWrt, right the first time",
+            "excerpt": ""
+          },
+          {
             "url": "/en/getting-started/luci-first-login/",
             "title": "First LuCI login: address, password and Chinese UI",
             "excerpt": ""
@@ -988,13 +1063,13 @@
             "excerpt": ""
           },
           {
-            "url": "/en/software/adguard-home/",
-            "title": "AdGuard Home: from web UI to client filtering",
+            "url": "/en/download/",
+            "title": "Download OpenWrt, right the first time",
             "excerpt": ""
           },
           {
-            "url": "/en/getting-started/x86-image/",
-            "title": "Choose an x86 image: combined, ext4, squashfs, EFI/BIOS",
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
             "excerpt": ""
           }
         ]
@@ -1133,8 +1208,8 @@
             "excerpt": ""
           },
           {
-            "url": "/en/network/lan-address/",
-            "title": "Change the LAN address and get back in: old/new subnet, DHCP and recovery",
+            "url": "/en/software/adguard-home/",
+            "title": "AdGuard Home: from web UI to client filtering",
             "excerpt": ""
           }
         ]
@@ -1225,6 +1300,11 @@
           {
             "url": "/en/installation/proxmox/",
             "title": "Install OpenWrt on a single-NIC Proxmox VE host",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/recovery/backup-restore/",
+            "title": "Backup and restore: verify config, packages and management separately",
             "excerpt": ""
           }
         ],

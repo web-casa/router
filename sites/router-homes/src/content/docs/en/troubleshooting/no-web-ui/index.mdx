@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200; uhttpd stop/recover, HTTP 80 check, SSH retained"
-  recipe="tests/recipes/troubleshooting-no-web-ui.md"
-  result="E2 partial: after stopping uhttpd, HTTP 80 refused and SSH stayed available; start restored HTTP 200; firewall/port change/failsafe untested"
-/>
-
 ## Outcome
 
 - Tell whether the problem is the physical link, client address, management IP, HTTP service, or SSH/firewall.
@@ -238,5 +231,12 @@ If only the LAN address is wrong, change it back and reboot after verifying. If 
 - This is E2 partial: uhttpd stop/recover and SSH retention were tested; firewall, port and failsafe remain documentation.
 - Decide whether it is link, address, uhttpd or firewall first; do not factory-reset instead of layering the diagnosis.
 - Console/failsafe procedures differ by device/firmware; read the device docs first.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; uhttpd stop/recover, HTTP 80 check, SSH retained"
+  recipe="tests/recipes/troubleshooting-no-web-ui.md"
+  result="E2 partial: after stopping uhttpd, HTTP 80 refused and SSH stayed available; start restored HTTP 200; firewall/port change/failsafe untested"
+/>
 
 <PageSources />

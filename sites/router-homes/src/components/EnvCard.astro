@@ -1,4 +1,9 @@
 ---
+import Icon from './Icon.astro';
+
+// "Applicable environment" plate at the top of a guide: evidence level on the
+// left (signal bars, like the home page ladder), the four facts on the right,
+// and a footer with the last lab run or the untested warning.
 interface Props {
   firmware?: string;
   version?: string;
@@ -7,7 +12,8 @@ interface Props {
   tested?: boolean;
   evidence?: string;
 }
-const locale = (Astro.locals as any).starlightRoute?.locale ?? 'en';
+const route = (Astro.locals as any).starlightRoute;
+const locale = route?.locale ?? 'en';
 const isEn = locale === 'en';
 const {
   firmware = isEn ? 'Not specified' : '未注明',
@@ -17,17 +23,309 @@ const {
   tested = false,
   evidence = 'E1',
 } = Astro.props;
+const data = route?.entry?.data ?? {};
+const lastVerified: string | undefined = data.lastVerifiedAt;
+// The test record sits at the end of the page; link to it when there is one.
+const hasRecord = Boolean(data.testRecipe);
+
+const level = Number(evidence.replace(/\D/g, '')) || 1;
 const labels = isEn
-  ? { firmware: 'Firmware', version: 'Version', pm: 'Package manager', device: 'Device', evidence: 'Evidence', tested: 'tested', untested: 'not tested', warning: 'These steps have not been tested on the device described above. Back up first and keep a management path open.' }
-  : { firmware: '固件', version: '版本', pm: '包管理器', device: '设备', evidence: '验证级别', tested: '已实测', untested: '未实测', warning: '本页步骤尚未在本文所述设备上实测，请先备份并保留管理入口。' };
+  ? {
+      heading: 'Applicable environment',
+      firmware: 'Firmware', version: 'Version', pm: 'Package manager', device: 'Device',
+      levels: ['Official docs', 'Reproduced in a lab VM', 'Measured on real hardware'],
+      tested: 'Tested', untested: 'Not tested',
+      verified: 'Last lab run', record: 'Test record',
+      warning: 'These steps have not been tested on the device described above. Back up first and keep a management path open.',
+    }
+  : {
+      heading: '适用环境',
+      firmware: '固件', version: '版本', pm: '包管理器', device: '设备',
+      levels: ['依据官方文档', '实验 VM 复现', '真实设备实测'],
+      tested: '已实测', untested: '未实测',
+      verified: '最近一次实验', record: '测试记录',
+      warning: '本页步骤尚未在本文所述设备上实测，请先备份并保留管理入口。',
+    };
+
+const icons = { firmware: 'cpu-bolt', version: 'tag', pm: 'box', device: 'wi-fi-router' };
+const specs = [
+  { k: 'firmware', label: labels.firmware, value: firmware },
+  { k: 'version', label: labels.version, value: version },
+  { k: 'pm', label: labels.pm, value: packageManager },
+  { k: 'device', label: labels.device, value: device },
+] as const;
 ---
-<aside class="env-card" aria-label={isEn ? 'Applicable environment' : '适用环境'}>
-  <dl>
-    <dt>{labels.firmware}</dt><dd>{firmware}</dd>
-    <dt>{labels.version}</dt><dd>{version}</dd>
-    <dt>{labels.pm}</dt><dd>{packageManager}</dd>
-    <dt>{labels.device}</dt><dd>{device}</dd>
-    <dt>{labels.evidence}</dt><dd>{evidence} · {tested ? labels.tested : labels.untested}</dd>
-  </dl>
-  {!tested && <p class="warn">{labels.warning}</p>}
+
+<aside class="env-card not-content" data-level={`E${level}`} data-tested={tested ? '' : undefined} aria-label={labels.heading}>
+  <div class="env-level">
+    <span class="env-bars" aria-hidden="true">
+      {[1, 2, 3].map((b) => <i class:list={{ on: b <= level }} />)}
+    </span>
+    <span class="env-code">{`E${level}`}</span>
+    <span class="env-level-name">{labels.levels[level - 1]}</span>
+  </div>
+
+  <div class="env-main">
+    <div class="env-head">
+      <span class="env-title">{labels.heading}</span>
+      <span class:list={['env-status', { ok: tested }]}>
+        <span class="rh-led" data-state={tested ? 'ok' : undefined} aria-hidden="true" />
+        {tested ? labels.tested : labels.untested}
+      </span>
+    </div>
+    <dl class="env-specs">
+      {specs.map((s) => (
+        <div class="env-spec" data-wide={[...s.value].length > 12 ? '' : undefined}>
+          <dt>
+            <Icon name={icons[s.k]} />
+            {s.label}
+          </dt>
+          <dd>{s.value}</dd>
+        </div>
+      ))}
+    </dl>
+  </div>
+
+  {(tested || hasRecord) && (
+    <div class="env-foot">
+      {tested && lastVerified && (
+        <span class="env-verified">{labels.verified} <time datetime={lastVerified}>{lastVerified}</time></span>
+      )}
+      {hasRecord && (
+        <a href="#test-record" class="env-jump">
+          {labels.record}
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v10M4 9l4 4 4-4" /></svg>
+        </a>
+      )}
+    </div>
+  )}
+  {!tested && <p class="env-warn">{labels.warning}</p>}
 </aside>
+
+<style>
+  .env-card {
+    --lv: var(--sl-color-gray-3);
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin-block: 1.75rem 2.25rem;
+    border: 1px solid var(--rh-line-strong);
+    border-radius: 1.25rem;
+    background:
+      radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--lv) 9%, transparent), transparent 55%),
+      var(--rh-surface);
+    box-shadow: var(--rh-shadow);
+    overflow: hidden;
+  }
+  .env-card[data-level='E2'] {
+    --lv: var(--sl-color-accent);
+  }
+  .env-card[data-level='E3'] {
+    --lv: var(--rh-ok);
+  }
+
+  /* evidence column */
+  .env-level {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.9rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--rh-line);
+  }
+  .env-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 1.6rem;
+  }
+  .env-bars i {
+    width: 0.42rem;
+    border-radius: 2px;
+    background: var(--rh-line-strong);
+  }
+  .env-bars i:nth-child(1) { height: 35%; }
+  .env-bars i:nth-child(2) { height: 65%; }
+  .env-bars i:nth-child(3) { height: 100%; }
+  .env-bars i.on {
+    background: var(--lv);
+  }
+  .env-code {
+    font-family: var(--__sl-font-mono);
+    font-size: 1.6rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: var(--lv);
+  }
+  .env-level-name {
+    font-size: 0.85rem;
+    font-weight: 560;
+    line-height: 1.35;
+    color: var(--sl-color-gray-2);
+  }
+
+  /* facts */
+  .env-main {
+    padding: 1rem 1.25rem 1.15rem;
+    min-width: 0;
+  }
+  .env-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.9rem;
+  }
+  .env-title {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sl-color-gray-3);
+  }
+  .env-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.2rem 0.65rem 0.2rem 0.55rem;
+    border: 1px solid var(--rh-line-strong);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 560;
+    color: var(--sl-color-gray-3);
+    white-space: nowrap;
+  }
+  .env-status.ok {
+    border-color: color-mix(in srgb, var(--rh-ok) 45%, transparent);
+    background: var(--rh-ok-low);
+    color: var(--rh-ok);
+  }
+  /* Wrapping flex rather than a fixed grid: every row fills its width,
+     and a long value simply gets a wider cell. */
+  .env-specs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 0;
+  }
+  .env-spec {
+    flex: 1 1 6.5rem;
+    min-width: 0;
+    padding: 0.7rem 0.8rem 0.75rem;
+    border: 1px solid var(--rh-line);
+    border-radius: 0.8rem;
+    background: var(--sl-color-bg);
+    transition: border-color 0.25s, transform 0.4s var(--rh-ease-out);
+  }
+  .env-spec:hover {
+    border-color: color-mix(in srgb, var(--lv) 45%, var(--rh-line));
+    transform: translateY(-1px);
+  }
+  .env-spec dt {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sl-color-gray-3);
+  }
+  .env-spec dt :global(.i) {
+    width: 1rem;
+    height: 1rem;
+    color: var(--lv);
+  }
+  .env-spec dd {
+    margin: 0.3rem 0 0;
+    padding: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.35;
+    color: var(--sl-color-white);
+    overflow-wrap: anywhere;
+  }
+
+  /* footer */
+  .env-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1.5rem;
+    padding: 0.7rem 1.25rem;
+    border-top: 1px solid var(--rh-line);
+    font-size: 0.82rem;
+    color: var(--sl-color-gray-3);
+  }
+  .env-verified time {
+    margin-inline-start: 0.35rem;
+    font-family: var(--__sl-font-mono);
+    color: var(--sl-color-gray-1);
+  }
+  .env-jump {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-inline-start: auto;
+    font-weight: 560;
+    color: var(--sl-color-white);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .env-jump svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    color: var(--lv);
+    transition: transform 0.4s var(--rh-ease-spring);
+  }
+  .env-jump:hover {
+    color: var(--lv);
+  }
+  .env-jump:hover svg {
+    transform: translateY(2px);
+  }
+  .env-warn {
+    margin: 0;
+    padding: 0.8rem 1.25rem;
+    border-top: 1px solid var(--rh-line);
+    background: repeating-linear-gradient(-45deg, hsla(36, 96%, 60%, 0.07) 0 8px, transparent 8px 16px);
+    color: var(--sl-color-accent-high);
+    font-size: 0.9rem;
+    font-weight: 500;
+    line-height: 1.55;
+  }
+
+  @media (min-width: 46rem) {
+    .env-card {
+      grid-template-columns: 10.5rem minmax(0, 1fr);
+    }
+    .env-level {
+      grid-template-columns: minmax(0, 1fr);
+      align-content: center;
+      justify-items: start;
+      gap: 0.55rem;
+      padding: 1.25rem;
+      border-bottom: 0;
+      border-inline-end: 1px solid var(--rh-line);
+    }
+    .env-bars {
+      height: 2rem;
+    }
+    .env-code {
+      font-size: 2.4rem;
+    }
+    .env-main {
+      padding: 1.1rem 1.35rem 1.25rem;
+    }
+    .env-spec[data-wide] {
+      flex-basis: 15rem;
+    }
+    .env-foot,
+    .env-warn {
+      grid-column: 1 / -1;
+    }
+  }
+</style>

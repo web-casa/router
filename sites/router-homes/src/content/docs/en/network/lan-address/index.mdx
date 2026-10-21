@@ -30,14 +30,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="verified"
-  environment="OpenWrt 25.12.6 x86 VM 200; LAN 192.168.1.1→192.168.10.1; DHCP lease verified after reboot"
-  recipe="tests/recipes/lan-address-change-25.12.md"
-  result="E2: old address timed out and new LuCI/SSH worked; reload alone did not lease DHCP, but after reboot the netns client got 192.168.10.191/24; rollback restored old and new timed out"
-  date="2026-10-20"
-/>
-
 ## Outcome
 
 - Pick a new LAN subnet that does not overlap WAN/upstream/VPN;
@@ -236,5 +228,13 @@ Overlap with the upstream ONT, VPN, or another LAN/VLAN causes routing/resolutio
 - This is E2: address switch, old-address failure, DHCP lease after reboot and rollback were tested; physical clients, IPv6 and upstream conflicts were not.
 - Recipe: `tests/recipes/lan-address-change-25.12.md`.
 - No independent reviewer; conclusions are limited to this VM environment.
+
+<TestRecord
+  status="verified"
+  environment="OpenWrt 25.12.6 x86 VM 200; LAN 192.168.1.1→192.168.10.1; DHCP lease verified after reboot"
+  recipe="tests/recipes/lan-address-change-25.12.md"
+  result="E2: old address timed out and new LuCI/SSH worked; reload alone did not lease DHCP, but after reboot the netns client got 192.168.10.191/24; rollback restored old and new timed out"
+  date="2026-10-20"
+/>
 
 <PageSources />

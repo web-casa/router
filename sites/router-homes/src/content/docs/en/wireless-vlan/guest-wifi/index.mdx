@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="Wireless + DSA device (untested)" tested={false} evidence="E1" />
 
-<TestRecord
-  status="planned"
-  environment="Compiled from OpenWrt 25.12 Wi-Fi/VLAN/firewall docs; no real wireless/switch validation"
-  recipe="tests/recipes/guest-wifi-25.12.md"
-  result="E1: separate SSID/subnet/DHCP/firewall zone, isolation and VLAN approach documented; not verified on real wireless/switch hardware"
-/>
-
 > **Status**: E1 documentation. Guest isolation spans Wi-Fi, VLAN, DHCP and firewall; without real wireless hardware, do not claim “isolated”.
 
 ## Goals
@@ -188,5 +181,12 @@ Without wireless/VLAN hardware, none of this is “verified”.
 - Documentation only; not verified on real wireless/DSA hardware; no “guest isolation is active” claim.
 - Real E2 needs: AP with multiple SSIDs, VLAN-capable switch/DSA device, two clients, console and rollback config.
 - After testing, record device model, VLAN/SSID, firewall zone, DHCP and isolation result.
+
+<TestRecord
+  status="planned"
+  environment="Compiled from OpenWrt 25.12 Wi-Fi/VLAN/firewall docs; no real wireless/switch validation"
+  recipe="tests/recipes/guest-wifi-25.12.md"
+  result="E1: separate SSID/subnet/DHCP/firewall zone, isolation and VLAN approach documented; not verified on real wireless/switch hardware"
+/>
 
 <PageSources />

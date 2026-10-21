@@ -1,0 +1,64 @@
+---
+title: "OpenWrt 25.12: what changed since 24.10 and when to upgrade"
+description: "OpenWrt 25.12 “Dave’s Guitar” switches to apk, moves every target to Linux 6.12 and supports over 2200 devices. What changed and what to check before upgrading."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt 25.12", "openwrt 25.12 release", "what is new in openwrt 25.12"]
+sources:
+  - label: "OpenWrt 25.12.0 release announcement"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: "OpenWrt 25.12.6 service release"
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: "OpenWrt 25.12.0 release notes"
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: "OpenWrt 24.10.0 release announcement"
+    url: https://forum.openwrt.org/t/openwrt-24-10-0-first-stable-release/223845
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="openwrt-25-12" />
+
+## In one sentence
+
+OpenWrt 25.12 is the current stable series. The 25.12.0 images are dated 2026-03-03, and 25.12.6 (2026-10-18) is the latest service release at the time of writing.
+
+## What changed since 24.10
+
+- **Package manager.** apk replaces opkg. Few package names changed, but the command-line arguments are different. See [apk replaces opkg](/en/features/apk/).
+- **Kernel.** Every target runs Linux 6.12: 6.12.71 in 25.12.0 and 6.12.112 in 25.12.6. 24.10 used 6.6. See [kernel and toolchain](/en/features/kernel-toolchain/).
+- **Toolchain.** GCC 14.3.0, binutils 2.44, musl 1.2.5, glibc 2.41.
+- **Upgrades.** The attended sysupgrade LuCI app is installed by default. On devices with larger flash, `owut` is included too.
+- **Under the hood.** The Wi-Fi scripts were rewritten in ucode, and shell history is now kept in a RAM-backed filesystem.
+- **Hardware.** Over 2200 supported devices, more than 180 of them new. New targets include siflower, sunxi/arm926ejs and microchipsw/lan969x.
+
+The release is named “Dave’s Guitar” in honour of Dave Täht, and it brings over 4700 commits since 24.10.
+
+## Should you upgrade?
+
+- **On 24.10:** the 25.12.0 announcement says 24.10 gets no security updates after September 2026. Plan the move.
+- **On 23.05:** upgrading straight from 23.05 to 25.12 with sysupgrade is not officially supported. Read the release notes before you choose a path.
+- **On vendor or third-party firmware:** check what you actually run first, with [Which OpenWrt is this?](/en/getting-started/which-openwrt/).
+
+Before any upgrade, take a backup and keep a wired path to the router. [Firmware upgrade](/en/recovery/firmware-upgrade/) walks through it.
+
+## See it on your router
+
+These commands only read:
+
+```sh
+cat /etc/openwrt_release
+uname -r
+```
+
+`DISTRIB_RELEASE` shows the release, and `uname -r` shows the kernel version.
+
+## Related guides
+
+- [Firmware upgrade](/en/recovery/firmware-upgrade/)
+- [Backup and restore](/en/recovery/backup-restore/)
+- [apk vs opkg](/en/software/apk-vs-opkg/)
+
+<PageSources />

@@ -1,0 +1,57 @@
+---
+title: "Linux 6.12 与 25.12 工具链：为什么内核模块必须对得上"
+description: "OpenWrt 25.12 从 Linux 6.6 升到 6.12，GCC 从 13.3 升到 14.3。这对 kmod 软件包和第三方软件源意味着什么。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt 内核版本", "openwrt 25.12 内核", "openwrt kmod 不匹配"]
+sources:
+  - label: "OpenWrt 25.12.0 发布公告"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: "OpenWrt 25.12.6 服务版本公告"
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: "OpenWrt 24.10.0 发布公告"
+    url: https://forum.openwrt.org/t/openwrt-24-10-0-first-stable-release/223845
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="kernel-toolchain" />
+
+## 一句话
+
+25.12 把所有平台从 Linux 6.6 升到 6.12，并更新了工具链；为 24.10 编译的内核模块，在 25.12 上加载不了。
+
+## 版本对照
+
+| 组件 | 24.10.0 | 25.12.0 |
+|---|---|---|
+| Linux 内核 | 6.6.73 | 6.12.71 |
+| GCC | 13.3.0 | 14.3.0 |
+| binutils | 2.42 | 2.44 |
+| musl | 1.2.5 | 1.2.5 |
+| glibc | 2.38 | 2.41 |
+
+25.12.6 把内核更新到 6.12.112。25.12.0 的无线协议栈（cfg80211/mac80211）来自内核 6.18.7，同时带有 dnsmasq 2.91、dropbear 2025.89、busybox 1.37.0。
+
+## 对家庭网络意味着什么
+
+- `kmod-*` 软件包只针对一个确定的内核编译。软件源路径里带着内核 hash，例如 `targets/<target>/kmods/<kernel-hash>/`，必须和正在运行的内核一致。
+- 来自其他版本、其他构建或 hash 不同的镜像站的 kmod，会装不上或加载失败。“插件装不上”很多就是这个原因。
+- 第三方固件常常自带不同的内核，官方 kmod 可能完全不适用。
+
+## 在你的路由器上看一眼
+
+```sh
+uname -r
+grep -E 'RELEASE|TARGET' /etc/openwrt_release
+```
+
+## 相关操作页
+
+- [软件源](/zh/software/package-sources/)
+- [插件装不上](/zh/troubleshooting/plugin-install/)
+- [固件辨识](/zh/getting-started/which-openwrt/)
+
+<PageSources />

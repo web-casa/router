@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 + 真实宽带（PPPoE 待测）" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="WAN DHCP E2：OpenWrt 25.12.6 x86 VM 200，WAN 192.168.50.166/24，LAN 192.168.10.1；PPPoE 未测"
-  recipe="tests/recipes/wan-dhcp-pppoe-25.12.md"
-  result="WAN DHCP 获取 192.168.50.166/24、网关/DNS 192.168.50.1；LAN DHCP 客户端获得 192.168.10.191/24；LAN 客户端到公网的 NAT/DNS 端到端未复测；PPPoE 无真实账号/线路，未测"
-  date="2026-10-20"
-/>
-
 ## 完成后你能确认什么
 
 - WAN 是 DHCP 还是 PPPoE，分别看哪些状态；
@@ -272,5 +264,13 @@ logread | grep -Ei 'pppd|pppoe' | tail -30
 - 本页 WAN DHCP 为 E2；PPPoE 为 E1，不能把两者混成“主路由已全部实测”。
 - 复现配方：`tests/recipes/wan-dhcp-pppoe-25.12.md`。
 - 没有第二评审人；结论只限本次 VM/上游环境。
+
+<TestRecord
+  status="partial"
+  environment="WAN DHCP E2：OpenWrt 25.12.6 x86 VM 200，WAN 192.168.50.166/24，LAN 192.168.10.1；PPPoE 未测"
+  recipe="tests/recipes/wan-dhcp-pppoe-25.12.md"
+  result="WAN DHCP 获取 192.168.50.166/24、网关/DNS 192.168.50.1；LAN DHCP 客户端获得 192.168.10.191/24；LAN 客户端到公网的 NAT/DNS 端到端未复测；PPPoE 无真实账号/线路，未测"
+  date="2026-10-20"
+/>
 
 <PageSources />

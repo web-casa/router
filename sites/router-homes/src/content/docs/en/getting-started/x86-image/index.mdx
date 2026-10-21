@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 / x86" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86/64 generic-ext4-combined (BIOS/SeaBIOS) imported into PVE VM 200; 13.0MB gz/120.5MB img; UEFI/squashfs/USB untested"
-  recipe="tests/recipes/x86-image-25.12.md"
-  result="E2 partial: generic-ext4-combined (BIOS) SHA-256 passed, qm importdisk + scsi0 booted 25.12.6; EFI/squashfs/physical USB untested"
-  date="2026-10-20"
-/>
-
 ## One-line choice
 
 - **PVE default SeaBIOS**: prefer `generic-ext4-combined.img.gz` (tested here);
@@ -194,5 +186,13 @@ rootfs has no bootloader/partition table; use an existing bootloader or the appr
 - This is E2 partial: BIOS/ext4 combined + PVE import were tested; UEFI/squashfs/physical write were not.
 - Image names/availability change per release; use the download page.
 - No independent reviewer; conclusions are limited to this PVE/VM environment.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86/64 generic-ext4-combined (BIOS/SeaBIOS) imported into PVE VM 200; 13.0MB gz/120.5MB img; UEFI/squashfs/USB untested"
+  recipe="tests/recipes/x86-image-25.12.md"
+  result="E2 partial: generic-ext4-combined (BIOS) SHA-256 passed, qm importdisk + scsi0 booted 25.12.6; EFI/squashfs/physical USB untested"
+  date="2026-10-20"
+/>
 
 <PageSources />

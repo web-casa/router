@@ -1,0 +1,52 @@
+---
+title: "OpenWrt 上的 WireGuard：当作网络接口配置的内核级 VPN"
+description: "WireGuard 自 Linux 5.6 起进入主线；在 OpenWrt 上它是一种网络协议，像普通接口一样配置。需要哪些包、配置在哪里、怎么检查。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt wireguard", "openwrt vpn", "路由器 wireguard"]
+sources:
+  - label: "Linux 5.6（kernelnewbies）"
+    url: https://kernelnewbies.org/Linux_5.6
+  - label: "OpenWrt WireGuard 基础"
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/basics
+  - label: "wireguard-tools 软件包（OpenWrt 25.12）"
+    url: https://github.com/openwrt/openwrt/tree/openwrt-25.12/package/network/utils/wireguard-tools
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="wireguard" />
+
+## 一句话
+
+WireGuard 从 Linux 5.6（2020-03-29 发布）起成为主线内核的一部分。在 OpenWrt 上它是一种名为 `wireguard` 的网络协议，和其他接口一样配置。
+
+## 需要的组件
+
+- `kmod-wireguard`：内核模块。
+- `wireguard-tools`：提供 `wg` 命令，依赖内核模块，并向 netifd 注册 `wireguard` 协议。
+- `luci-proto-wireguard`：在 LuCI 新建接口时，提供 “WireGuard VPN” 这个协议选项。
+
+## 在家里用来做什么
+
+- **服务端**：从外面连回家里的网络。
+- **客户端**：让路由器的全部或部分流量经由远端节点出去。
+
+两种情况下，隧道都是 `/etc/config/network` 里的一个接口，需要防火墙区域；作服务端时，还需要在 WAN 上放行一个 UDP 端口。
+
+## 在你的路由器上看一眼
+
+```sh
+wg show
+uci show network | grep wireguard
+```
+
+## 相关操作页
+
+- [WireGuard 服务端](/zh/remote-access/wireguard-server/)
+- [WireGuard 客户端](/zh/remote-access/wireguard-client/)
+- [firewall4 与区域](/zh/features/firewall4/)
+
+<PageSources />

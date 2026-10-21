@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 + PVE netns" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200 + PVE netns 客户端；wg0 10.10.0.1/24，UDP 51820；握手/ping/HTTP 成功；无 WAN 端口映射/DDNS/手机漫游"
-  recipe="tests/recipes/wireguard-server-25.12.md"
-  result="E2 partial：服务端 wg0 10.10.0.1/24、UDP 51820；客户端 10.10.0.2/24 握手成功，隧道 ping 4/4，HTTP 200；未测 WAN 端口映射、DDNS、真实手机/漫游、LAN 转发"
-  date="2026-10-20"
-/>
-
 ## 目标与边界
 
 本页验证：
@@ -225,5 +217,13 @@ peer: <client-public-key>
 - 本页是 E2 partial：LAN 侧服务端+隧道已验证；真实 WAN/移动客户端/LAN 转发未测。
 - 私钥只留设备；仓库/截图/聊天不要出现私钥。
 - 没有第二评审人；结论只限本次 VM/netns 环境。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200 + PVE netns 客户端；wg0 10.10.0.1/24，UDP 51820；握手/ping/HTTP 成功；无 WAN 端口映射/DDNS/手机漫游"
+  recipe="tests/recipes/wireguard-server-25.12.md"
+  result="E2 partial：服务端 wg0 10.10.0.1/24、UDP 51820；客户端 10.10.0.2/24 握手成功，隧道 ping 4/4，HTTP 200；未测 WAN 端口映射、DDNS、真实手机/漫游、LAN 转发"
+  date="2026-10-20"
+/>
 
 <PageSources />

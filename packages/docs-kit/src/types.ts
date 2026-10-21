@@ -43,6 +43,8 @@ export interface SiteMeta extends SiteConfig {
   sidebar: SidebarItem[];
   customCss?: string[];
   components?: Record<string, string>;
+  /** Extra Starlight options passed through as-is (e.g. `expressiveCode`, `head`). */
+  starlight?: Record<string, unknown>;
 }
 
 export function parseFleetConfig(input: unknown): FleetConfig {

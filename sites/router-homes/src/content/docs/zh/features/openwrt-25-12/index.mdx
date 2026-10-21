@@ -1,0 +1,64 @@
+---
+title: "OpenWrt 25.12：相对 24.10 改了什么，什么时候该升级"
+description: "OpenWrt 25.12 “Dave’s Guitar” 改用 apk，所有平台升到 Linux 6.12，支持 2200 多款设备。这里列出主要变化和升级前要核对的事。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt 25.12", "openwrt 25.12 新特性", "openwrt 25.12 更新了什么"]
+sources:
+  - label: "OpenWrt 25.12.0 发布公告"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: "OpenWrt 25.12.6 服务版本公告"
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: "OpenWrt 25.12.0 发行说明"
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: "OpenWrt 24.10.0 发布公告"
+    url: https://forum.openwrt.org/t/openwrt-24-10-0-first-stable-release/223845
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="openwrt-25-12" />
+
+## 一句话
+
+OpenWrt 25.12 是当前的稳定版系列。25.12.0 镜像日期为 2026-03-03；截至本文写作时，最新的服务版本是 25.12.6（2026-10-18）。
+
+## 相对 24.10 的变化
+
+- **包管理器**：apk 取代 opkg。改名的软件包不多，但命令参数变了。详见 [apk 取代 opkg](/zh/features/apk/)。
+- **内核**：所有平台都用 Linux 6.12：25.12.0 是 6.12.71，25.12.6 是 6.12.112；24.10 用的是 6.6。详见 [内核与工具链](/zh/features/kernel-toolchain/)。
+- **工具链**：GCC 14.3.0、binutils 2.44、musl 1.2.5、glibc 2.41。
+- **升级方式**：默认安装 attended sysupgrade 的 LuCI 应用；闪存较大的设备还会带上 `owut`。
+- **底层**：Wi-Fi 脚本用 ucode 重写；Shell 历史改为保存在内存文件系统里。
+- **硬件**：支持 2200 多款设备，其中 180 多款是新增的；新增平台包括 siflower、sunxi/arm926ejs、microchipsw/lan969x。
+
+这个版本命名为 “Dave’s Guitar”，以纪念 Dave Täht；相对 24.10 共有 4700 多个提交。
+
+## 该不该升级
+
+- **正在用 24.10**：25.12.0 公告写明，24.10 在 2026 年 9 月之后不再有安全更新，应安排迁移。
+- **正在用 23.05**：官方不支持用 sysupgrade 从 23.05 直接升到 25.12，选路线前先读发行说明。
+- **用的是厂商或第三方固件**：先用 [固件辨识](/zh/getting-started/which-openwrt/) 确认你实际在用什么。
+
+任何升级之前都先备份，并保留一条有线管理路径；完整流程见 [固件升级](/zh/recovery/firmware-upgrade/)。
+
+## 在你的路由器上看一眼
+
+以下命令只读不改：
+
+```sh
+cat /etc/openwrt_release
+uname -r
+```
+
+`DISTRIB_RELEASE` 是发行版本，`uname -r` 是内核版本。
+
+## 相关操作页
+
+- [固件升级](/zh/recovery/firmware-upgrade/)
+- [备份与恢复](/zh/recovery/backup-restore/)
+- [apk / opkg 对照](/zh/software/apk-vs-opkg/)
+
+<PageSources />

@@ -12,6 +12,7 @@ const extended = z.object({
   lastVerifiedAt: z.string().optional(),
   aliases: z.array(z.string()).default([]),
   symptoms: z.array(z.string()).default([]),
+  heroVariant: z.enum(['signal', 'console', 'release', 'panel', 'rings', 'download']).optional(),
   sources: z.array(z.object({ label: z.string(), url: z.string().url() })).default([]),
 });
 

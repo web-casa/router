@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="DSA 多网口设备（未实测）" tested={false} evidence="E1" />
 
-<TestRecord
-  status="planned"
-  environment="基于 OpenWrt 25.12 DSA/VLAN 文档整理；未在真实多网口 DSA 设备/交换机验证"
-  recipe="tests/recipes/dsa-vlan-25.12.md"
-  result="E1：DSA 端口、bridge-vlan、tagged/untagged/PVID 和回滚路径已整理；没有真实硬件验证，不提供“已通”结论"
-/>
-
 > **状态**：这是 E1 文档页。VLAN 配置高度依赖具体 DSA 端口名、CPU 口和交换机对端；没有真实设备时不要把示例当已验证配置。
 
 ## DSA 和 swconfig 的区别
@@ -149,5 +142,12 @@ ip -d link show br-lan
 - 本页只做文档整理，未在真实 DSA 硬件/交换机验证；不写“已配置成功”。
 - 真实测试需要：多网口 DSA 设备、可配置交换机、控制台、可回滚配置、至少两个客户端。
 - 测试通过后再升级 E2，并记录设备型号、端口名、交换机配置和失败恢复。
+
+<TestRecord
+  status="planned"
+  environment="基于 OpenWrt 25.12 DSA/VLAN 文档整理；未在真实多网口 DSA 设备/交换机验证"
+  recipe="tests/recipes/dsa-vlan-25.12.md"
+  result="E1：DSA 端口、bridge-vlan、tagged/untagged/PVID 和回滚路径已整理；没有真实硬件验证，不提供“已通”结论"
+/>
 
 <PageSources />

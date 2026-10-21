@@ -1,0 +1,557 @@
+---
+// One illustration per feature. Shared by the home-page cards and the banner
+// at the top of each feature page. Decorative: the text beside it carries the
+// meaning, so everything here is aria-hidden.
+import Icon from '../Icon.astro';
+import type { FeatureSlug } from './features';
+
+interface Props {
+  slug: FeatureSlug;
+  isEn: boolean;
+}
+const { slug, isEn } = Astro.props;
+---
+
+<div class:list={['fv', `fv--${slug}`]} aria-hidden="true">
+  {slug === 'openwrt-25-12' && (
+    <div class="fv-release">
+      <span class="fv-release-ghost">24.10</span>
+      <span class="fv-release-num">25.12</span>
+    </div>
+  )}
+
+  {slug === 'apk' && (
+    <div class="fv-swap">
+      <code class="fv-old">opkg install</code>
+      <span class="fv-arrow">→</span>
+      <code class="fv-new">apk add</code>
+    </div>
+  )}
+
+  {slug === 'kernel-toolchain' && (
+    <ul class="fv-bars">
+      {[
+        ['linux', '6.6', '6.12', 0.62],
+        ['gcc', '13.3', '14.3', 0.74],
+        ['binutils', '2.42', '2.44', 0.86],
+      ].map(([name, from, to, w]) => (
+        <li style={`--w:${w}`}>
+          <span class="n">{name}</span>
+          <span class="bar"><i /></span>
+          <span class="v"><span class="from">{from}</span><span class="to-arrow">→</span><b>{to}</b></span>
+        </li>
+      ))}
+    </ul>
+  )}
+
+  {slug === 'uci' && (
+    <div class="fv-files">
+      {['firewall', 'dhcp', 'wireless', 'network'].map((f, i) => (
+        <span class="fv-file" style={`--k:${i}`}>/etc/config/<b>{f}</b></span>
+      ))}
+      <code class="fv-uci">uci commit</code>
+    </div>
+  )}
+
+  {slug === 'firewall4' && (
+    <div class="fv-zones">
+      <div class="fv-zone-row"><span class="z">lan</span><span class="flow ok" /><span class="z">wan</span><span class="mark ok">✓</span></div>
+      <div class="fv-zone-row"><span class="z">wan</span><span class="flow no" /><span class="z">lan</span><span class="mark no">✕</span></div>
+      <code class="fv-nft">nftables · fw4</code>
+    </div>
+  )}
+
+  {slug === 'dsa' && (
+    <div class="fv-dsa">
+      <span class="fv-bridge">br-lan <em>VLAN 1 · 3</em></span>
+      <span class="fv-legs">{[0, 1, 2, 3].map(() => <i />)}</span>
+      <span class="fv-ports">{['lan1', 'lan2', 'lan3', 'lan4'].map((p) => <span>{p}</span>)}</span>
+    </div>
+  )}
+
+  {slug === 'wireguard' && (
+    <div class="fv-toggle">
+      <code>wg0</code>
+      <span class="sw"><i /></span>
+    </div>
+  )}
+
+  {slug === 'sqm' && (
+    <ul class="fv-latency">
+      <li class="fifo"><span class="n">fifo</span><span class="bar"><i /></span></li>
+      <li class="cake"><span class="n">cake</span><span class="bar"><i /></span></li>
+      <li class="cap">{isEn ? 'latency under load' : '满载时的延迟'}</li>
+    </ul>
+  )}
+
+  {slug === 'failsafe' && (
+    <div class="fv-buoy">
+      <span class="ring r1" />
+      <span class="ring r2" />
+      <span class="core"><Icon name="shield-check" /></span>
+      <code class="ip">192.168.1.1</code>
+    </div>
+  )}
+</div>
+
+<style>
+  .fv {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    min-height: 9.5rem;
+    font-family: var(--__sl-font-mono);
+    color: var(--sl-color-gray-2);
+  }
+  .fv code {
+    font-family: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+
+  /* release */
+  .fv-release {
+    position: relative;
+    display: grid;
+    place-items: center;
+  }
+  .fv-release-num {
+    font-family: var(--__sl-font);
+    font-size: clamp(6rem, 3rem + 10vw, 12.5rem);
+    font-weight: 720;
+    line-height: 0.85;
+    letter-spacing: -0.07em;
+    color: var(--sl-color-accent);
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 30px 60px hsla(36, 96%, 50%, 0.25);
+    transition: transform 0.8s var(--rh-ease-out), letter-spacing 0.8s var(--rh-ease-out);
+  }
+  .fv-release-ghost {
+    position: absolute;
+    top: -0.9em;
+    right: -0.4em;
+    font-size: clamp(1rem, 0.7rem + 1vw, 1.6rem);
+    color: var(--sl-color-gray-4);
+    text-decoration: line-through;
+    text-decoration-color: var(--sl-color-accent);
+  }
+  :global(.rh-fcard:hover) .fv-release-num {
+    transform: translateY(-4px);
+    letter-spacing: -0.055em;
+  }
+
+  /* apk */
+  .fv-swap {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: baseline;
+    gap: 0.5rem 0.9rem;
+    font-size: clamp(1.05rem, 0.9rem + 0.8vw, 1.6rem);
+  }
+  .fv-old {
+    position: relative;
+    color: var(--sl-color-gray-4);
+  }
+  .fv-old::after {
+    content: '';
+    position: absolute;
+    left: -2%;
+    right: -2%;
+    top: 55%;
+    height: 2px;
+    background: var(--sl-color-accent);
+    transform-origin: 0 50%;
+    transition: transform 0.6s var(--rh-ease-out);
+  }
+  .fv-arrow {
+    color: var(--sl-color-gray-4);
+    transition: transform 0.5s var(--rh-ease-spring);
+  }
+  .fv-new {
+    font-weight: 600;
+    color: var(--sl-color-white);
+  }
+  :global(.rh-fcard:hover) .fv-arrow {
+    transform: translateX(4px);
+    color: var(--sl-color-accent);
+  }
+
+  /* kernel/toolchain */
+  .fv-bars {
+    display: grid;
+    gap: 0.9rem;
+    width: min(100%, 24rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.8rem;
+  }
+  .fv-bars li {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.9rem;
+  }
+  .fv-bars .n {
+    color: var(--sl-color-gray-3);
+  }
+  .fv-bars .bar {
+    height: 4px;
+    border-radius: 4px;
+    background: var(--rh-line);
+    overflow: hidden;
+  }
+  .fv-bars .bar i {
+    display: block;
+    height: 100%;
+    width: calc(var(--w) * 100%);
+    border-radius: inherit;
+    background: var(--sl-color-accent);
+    transform-origin: 0 50%;
+    transition: transform 0.8s var(--rh-ease-out);
+  }
+  .fv-bars .v {
+    display: inline-flex;
+    gap: 0.45rem;
+    white-space: nowrap;
+    color: var(--sl-color-gray-3);
+  }
+  .fv-bars .to-arrow {
+    color: var(--sl-color-accent);
+  }
+  .fv-bars b {
+    color: var(--sl-color-white);
+    font-weight: 600;
+  }
+  :global(.rh-fcard:hover) .fv-bars .bar i {
+    transform: scaleX(1.12);
+  }
+
+  /* uci */
+  .fv-files {
+    position: relative;
+    display: grid;
+    width: min(100%, 15rem);
+    height: 8.5rem;
+  }
+  .fv-file {
+    position: absolute;
+    inset-inline: 0;
+    top: calc(var(--k) * 1.35rem);
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--rh-line-strong);
+    border-radius: 0.55rem;
+    background: var(--rh-surface-2);
+    font-size: 0.75rem;
+    color: var(--sl-color-gray-3);
+    box-shadow: 0 -6px 14px -10px hsla(30, 40%, 2%, 0.5);
+    transform: translateX(calc((3 - var(--k)) * -6px));
+    transition: transform 0.6s var(--rh-ease-out);
+  }
+  .fv-file b {
+    color: var(--sl-color-white);
+    font-weight: 600;
+  }
+  .fv-file:last-of-type {
+    border-color: var(--sl-color-accent);
+  }
+  .fv-uci {
+    position: absolute;
+    right: -0.75rem;
+    bottom: -0.25rem;
+    padding: 0.25rem 0.55rem !important;
+    border-radius: 0.4rem;
+    background: var(--sl-color-accent) !important;
+    color: var(--sl-color-text-invert);
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+  :global(.rh-fcard:hover) .fv-file {
+    transform: translateX(calc((3 - var(--k)) * -12px)) translateY(calc(var(--k) * -2px));
+  }
+
+  /* firewall4 */
+  .fv-zones {
+    display: grid;
+    gap: 0.75rem;
+    justify-items: center;
+    font-size: 0.82rem;
+  }
+  .fv-zone-row {
+    display: grid;
+    grid-template-columns: auto 5rem auto 1.25rem;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .fv-zones .z {
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--rh-line-strong);
+    border-radius: 999px;
+    background: var(--rh-surface-2);
+    color: var(--sl-color-white);
+  }
+  .fv-zones .flow {
+    position: relative;
+    height: 2px;
+    background: var(--rh-line-strong);
+    overflow: hidden;
+  }
+  .fv-zones .flow.ok::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    width: 40%;
+    background: var(--sl-color-accent);
+  }
+  .fv-zones .flow.no {
+    background: repeating-linear-gradient(90deg, var(--rh-line-strong) 0 4px, transparent 4px 8px);
+  }
+  .fv-zones .mark.ok {
+    color: var(--rh-ok);
+  }
+  .fv-zones .mark.no {
+    color: var(--sl-color-gray-4);
+  }
+  .fv-nft {
+    margin-top: 0.4rem;
+    font-size: 0.72rem;
+    color: var(--sl-color-gray-3);
+  }
+
+  /* dsa */
+  .fv-dsa {
+    display: grid;
+    justify-items: center;
+    width: min(100%, 17rem);
+    font-size: 0.75rem;
+  }
+  .fv-bridge {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--sl-color-accent);
+    border-radius: 0.6rem;
+    background: var(--rh-surface-2);
+    color: var(--sl-color-white);
+    text-align: center;
+    font-weight: 600;
+  }
+  .fv-bridge em {
+    margin-inline-start: 0.4rem;
+    font-style: normal;
+    font-weight: 400;
+    color: var(--sl-color-accent);
+  }
+  .fv-legs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    width: 100%;
+    height: 1.25rem;
+  }
+  .fv-legs i {
+    justify-self: center;
+    width: 1px;
+    background: var(--rh-line-strong);
+    transition: background-color 0.3s;
+  }
+  .fv-ports {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.4rem;
+    width: 100%;
+  }
+  .fv-ports span {
+    padding: 0.4rem 0;
+    border: 1px solid var(--rh-line-strong);
+    border-radius: 0.4rem;
+    text-align: center;
+    background: var(--rh-surface);
+    transition: border-color 0.3s, color 0.3s, transform 0.4s var(--rh-ease-spring);
+  }
+  :global(.rh-fcard:hover) .fv-legs i {
+    background: var(--sl-color-accent);
+  }
+  :global(.rh-fcard:hover) .fv-ports span {
+    border-color: var(--sl-color-accent);
+    color: var(--sl-color-white);
+    transform: translateY(-2px);
+  }
+
+  /* wireguard */
+  .fv-toggle {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    font-size: 1.05rem;
+  }
+  .fv-toggle .sw {
+    position: relative;
+    width: 4.5rem;
+    height: 2.5rem;
+    border-radius: 999px;
+    background: var(--sl-color-accent);
+    box-shadow: 0 8px 24px -8px hsla(36, 96%, 50%, 0.6), inset 0 1px 0 hsla(0, 0%, 100%, 0.3);
+  }
+  .fv-toggle .sw i {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.3rem;
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 6px hsla(30, 40%, 10%, 0.35);
+    transition: width 0.35s var(--rh-ease-spring);
+  }
+  :global(.rh-fcard:hover) .fv-toggle .sw i {
+    width: 2.4rem;
+  }
+
+  /* sqm */
+  .fv-latency {
+    display: grid;
+    gap: 0.85rem;
+    width: min(100%, 20rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.8rem;
+  }
+  .fv-latency li:not(.cap) {
+    display: grid;
+    grid-template-columns: 3rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.8rem;
+  }
+  .fv-latency .n {
+    color: var(--sl-color-gray-3);
+  }
+  .fv-latency .bar {
+    height: 0.55rem;
+    border-radius: 4px;
+    background: var(--rh-line);
+    overflow: hidden;
+  }
+  .fv-latency .bar i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    transform-origin: 0 50%;
+  }
+  .fv-latency .fifo .bar i {
+    width: 92%;
+    background: repeating-linear-gradient(90deg, var(--sl-color-gray-4) 0 6px, var(--sl-color-gray-5) 6px 9px);
+  }
+  .fv-latency .cake .bar i {
+    width: 18%;
+    background: var(--sl-color-accent);
+  }
+  .fv-latency .cap {
+    justify-self: end;
+    font-size: 0.7rem;
+    color: var(--sl-color-gray-4);
+  }
+
+  /* failsafe */
+  .fv-buoy {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 11rem;
+    height: 11rem;
+  }
+  .fv-buoy .ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid var(--rh-line-strong);
+  }
+  .fv-buoy .r2 {
+    inset: 1.5rem;
+    border-style: dashed;
+  }
+  .fv-buoy .core {
+    display: grid;
+    place-items: center;
+    width: 4.25rem;
+    height: 4.25rem;
+    border-radius: 50%;
+    background: var(--sl-color-accent);
+    color: var(--sl-color-text-invert);
+    box-shadow: 0 0 0 8px hsla(36, 96%, 60%, 0.12), 0 14px 30px -10px hsla(36, 96%, 50%, 0.6);
+    transition: transform 0.5s var(--rh-ease-spring);
+  }
+  .fv-buoy .core :global(.i) {
+    --icon-duo: var(--sl-color-text-invert);
+    --icon-duo-opacity: 0.35;
+    width: 2.1rem;
+    height: 2.1rem;
+  }
+  .fv-buoy .ip {
+    position: absolute;
+    bottom: -0.2rem;
+    padding: 0.15rem 0.5rem !important;
+    border: 1px solid var(--rh-line-strong) !important;
+    border-radius: 999px;
+    background: var(--sl-color-bg) !important;
+    font-size: 0.7rem;
+    color: var(--sl-color-gray-2);
+  }
+  :global(.rh-fcard:hover) .fv-buoy .core {
+    transform: scale(1.08);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .fv-zones .flow.ok::after {
+      animation: fv-flow 1.6s linear infinite;
+    }
+    .fv-latency .fifo .bar i {
+      animation: fv-jitter 1.4s ease-in-out infinite alternate;
+    }
+    .fv-buoy .r2 {
+      animation: fv-spin 24s linear infinite;
+    }
+    .fv-buoy .r1 {
+      animation: fv-breathe 3.2s ease-in-out infinite;
+    }
+  }
+  /* Draw-on effects as the card scrolls into view. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .fv-old::after { animation: fv-strike linear both; }
+      .fv-bars .bar i { animation: fv-grow linear both; }
+    }
+  }
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .fv .fv-old::after { animation-timeline: view(); animation-range: entry 40% cover 45%; }
+      .fv .fv-bars .bar i { animation-timeline: view(); animation-range: entry 30% cover 45%; }
+    }
+  }
+
+  @keyframes fv-flow {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(250%); }
+  }
+  @keyframes fv-jitter {
+    from { transform: scaleX(0.82); }
+    to { transform: scaleX(1); }
+  }
+  @keyframes fv-spin {
+    to { rotate: 360deg; }
+  }
+  @keyframes fv-breathe {
+    50% { transform: scale(1.06); opacity: 0.5; }
+  }
+  @keyframes fv-strike {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+  @keyframes fv-grow {
+    from { transform: scaleX(0); }
+    to { transform: none; }
+  }
+</style>

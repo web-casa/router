@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200；LAN ULA fd2f:385b:7d0a::/48；RA/SLAAC 客户端获得 /64；无上游 GUA/PD"
-  recipe="tests/recipes/ipv6-25.12.md"
-  result="E2 partial：LAN 有 ULA fd2f:385b:7d0a::1/60；RA/SLAAC 客户端获得 fd2f:385b:7d0a:0:.../64 并可 ping 路由器；没有上游 GUA/PD，WAN IPv6 未测"
-  date="2026-10-20"
-/>
-
 ## 先分清五种地址/机制
 
 | 名称 | 例子/作用 | 常见误区 |
@@ -211,5 +203,13 @@ nft list ruleset 2>/dev/null | head -80
 - 本页是 E2 partial：LAN ULA/RA/SLAAC 已实测；WAN GUA/PD 和真实 ISP 未测。
 - 没有第二评审人；结论只限本次 VM/netns 环境。
 - 不要把“LAN 有 ULA”写成“IPv6 已上网”；ULA 只是内网地址。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；LAN ULA fd2f:385b:7d0a::/48；RA/SLAAC 客户端获得 /64；无上游 GUA/PD"
+  recipe="tests/recipes/ipv6-25.12.md"
+  result="E2 partial：LAN 有 ULA fd2f:385b:7d0a::1/60；RA/SLAAC 客户端获得 fd2f:385b:7d0a:0:.../64 并可 ping 路由器；没有上游 GUA/PD，WAN IPv6 未测"
+  date="2026-10-20"
+/>
 
 <PageSources />

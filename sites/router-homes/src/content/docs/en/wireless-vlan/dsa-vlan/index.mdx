@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="DSA multi-port device (untested)" tested={false} evidence="E1" />
 
-<TestRecord
-  status="planned"
-  environment="Compiled from OpenWrt 25.12 DSA/VLAN docs; not verified on real multi-port DSA hardware/switch"
-  recipe="tests/recipes/dsa-vlan-25.12.md"
-  result="E1: DSA ports, bridge-vlan, tagged/untagged/PVID and rollback documented; no real hardware validation and no “it works” claim"
-/>
-
 > **Status**: E1 documentation. VLAN config depends on the exact DSA port names, CPU port and switch peer; without real hardware, do not treat the example as verified.
 
 ## DSA vs swconfig
@@ -149,5 +142,12 @@ Verify:
 - Documentation only; not verified on real DSA hardware/switch; no “configured successfully” claim.
 - Real testing needs a multi-port DSA device, a managed switch, console access, rollback config and at least two clients.
 - Promote to E2 only after recording device model, port names, switch config and failure recovery.
+
+<TestRecord
+  status="planned"
+  environment="Compiled from OpenWrt 25.12 DSA/VLAN docs; not verified on real multi-port DSA hardware/switch"
+  recipe="tests/recipes/dsa-vlan-25.12.md"
+  result="E1: DSA ports, bridge-vlan, tagged/untagged/PVID and rollback documented; no real hardware validation and no “it works” claim"
+/>
 
 <PageSources />

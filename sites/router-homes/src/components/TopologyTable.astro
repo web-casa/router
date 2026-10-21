@@ -8,10 +8,14 @@ interface Row {
 }
 interface Props { rows: Row[] }
 const { rows } = Astro.props;
+const isEn = ((Astro.locals as any).starlightRoute?.locale ?? 'en') === 'en';
+const head = isEn
+  ? ['Physical port', 'PVE bridge', 'Virtual NIC', 'OpenWrt interface', 'Role']
+  : ['物理口', 'PVE bridge', '虚拟网卡', 'OpenWrt 接口', '职责'];
 ---
 <table class="topology">
   <thead>
-    <tr><th>物理口</th><th>PVE bridge</th><th>虚拟网卡</th><th>OpenWrt 接口</th><th>职责</th></tr>
+    <tr>{head.map((cell) => <th>{cell}</th>)}</tr>
   </thead>
   <tbody>
     {rows.map((row) => (

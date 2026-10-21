@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200；luci-app-openclash 0.48.002 apk 安装/启停；无代理端点/订阅"
-  recipe="tests/recipes/openclash-25.12.md"
-  result="E2 partial：0.48.002 apk 安装成功（43 个包，含 luci-compat/ruby）；无配置启动为 inactive；停用后 DNS 拒绝，重启 dnsmasq 恢复；未接代理端点/未验证分流"
-/>
-
 > **范围**：本页只讨论合法网络环境中的兼容性、DNS 冲突、启停与恢复，不提供代理服务器、订阅链接、规则集，也不提供绕过网络封锁或规避服务地域/访问控制的步骤。使用前请确认当地法律、网络服务商条款和你要访问的服务条款。
 
 ## 完成后你能确认什么
@@ -194,5 +187,12 @@ logread | tail -50
 - 本页是 E2 partial：25.12 `.apk` 安装、无配置启动、停用和 DNS 恢复已实测；代理运行/分流仍是 E1/E3 范围。
 - 没有合法代理端点和配置，就不要把“安装成功”写成“代理可用”。
 - 不要把本页扩展成代理订阅/绕过教程；那超出站点范围。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；luci-app-openclash 0.48.002 apk 安装/启停；无代理端点/订阅"
+  recipe="tests/recipes/openclash-25.12.md"
+  result="E2 partial：0.48.002 apk 安装成功（43 个包，含 luci-compat/ruby）；无配置启动为 inactive；停用后 DNS 拒绝，重启 dnsmasq 恢复；未接代理端点/未验证分流"
+/>
 
 <PageSources />

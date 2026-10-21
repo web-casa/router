@@ -1,0 +1,50 @@
+---
+title: "firewall4: OpenWrt’s nftables firewall and its zones"
+description: "Since 22.03, OpenWrt’s firewall is firewall4 on nftables, configured with the same zone-based UCI syntax as before. How to read it and what no longer applies."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt firewall4", "openwrt fw4", "openwrt nftables"]
+sources:
+  - label: "OpenWrt 22.03.0 release announcement"
+    url: https://forum.openwrt.org/t/openwrt-22-03-0-first-stable-release/136252
+  - label: "OpenWrt firewall configuration"
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="firewall4" />
+
+## In one sentence
+
+Since 22.03, OpenWrt's default firewall is firewall4 (fw4). It generates nftables rules instead of iptables, and keeps the UCI syntax of the older fw3 in `/etc/config/firewall`.
+
+## Zones, not rule lists
+
+- Interfaces are grouped into zones, usually `lan` and `wan`. Policies and forwardings are set between zones.
+- In the default setup, LAN and WAN are separate zones and LAN traffic is forwarded to WAN. Connections from WAN into your network are not forwarded unless you add a rule.
+- New interfaces, such as a guest network or a WireGuard tunnel, normally need a zone of their own or need to join an existing one.
+
+## See it on your router
+
+```sh
+uci show firewall | grep '=zone'
+fw4 print
+```
+
+`fw4 print` prints the table, chain and rule structure fw4 would load, without applying anything. After you edit the config, `fw4 reload` applies it.
+
+## Watch out
+
+- Guides built on `iptables -A …` commands do not apply to fw4. Express the rule in UCI instead.
+- A wrong zone on a new interface is a common reason a tunnel or a guest network “connects but has no internet”.
+
+## Related guides
+
+- [WireGuard server](/en/remote-access/wireguard-server/)
+- [Guest Wi-Fi](/en/wireless-vlan/guest-wifi/)
+- [Bypass gateway](/en/network/bypass-gateway/)
+
+<PageSources />

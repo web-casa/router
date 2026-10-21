@@ -33,14 +33,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 201 / 1GB" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="PVE 9.2.2 单网口；OpenWrt 25.12.6 VM 201；AGH 0.107.79；vmbr2 192.168.2.0/24"
-  recipe="tests/recipes/agh-25.12-vm201.md"
-  result="AGH 53 + Web 3000；dnsmasq 5353；DHCP option 6 → 192.168.2.1；客户端 blocked.example=0.0.0.0，openwrt.org 正常；重启后 fstab/规则/服务保留"
-  date="2026-10-20"
-/>
-
 ## 完成后你能确认什么
 
 - AdGuard Home 接管 OpenWrt 的 `53`，Web 后台在 `3000`；
@@ -301,5 +293,13 @@ logread | grep -i fstab
 - 本页是 E2 实验记录；未做独立复核，也未在真实物理 LAN 上验证。
 - 复现配方：`tests/recipes/agh-25.12-vm201.md`；环境记录：`docs/agh-e2-run.md`。
 - AGH 版本/包名变化时更新 `testedVersions`；不要直接套用其他固件版本的 init 脚本。
+
+<TestRecord
+  status="partial"
+  environment="PVE 9.2.2 单网口；OpenWrt 25.12.6 VM 201；AGH 0.107.79；vmbr2 192.168.2.0/24"
+  recipe="tests/recipes/agh-25.12-vm201.md"
+  result="AGH 53 + Web 3000；dnsmasq 5353；DHCP option 6 → 192.168.2.1；客户端 blocked.example=0.0.0.0，openwrt.org 正常；重启后 fstab/规则/服务保留"
+  date="2026-10-20"
+/>
 
 <PageSources />

@@ -1,0 +1,57 @@
+---
+title: "Failsafe 模式与 sysupgrade：OpenWrt 自带的退路"
+description: "Failsafe 让 OpenWrt 以最小配置启动在 192.168.1.1，方便修复；sysupgrade 默认保留你的设置。两者分别怎么用。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt failsafe", "openwrt 恢复模式", "sysupgrade 保留配置"]
+sources:
+  - label: "OpenWrt failsafe 与恢复出厂"
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+  - label: "sysupgrade 源码（OpenWrt 25.12）"
+    url: https://github.com/openwrt/openwrt/blob/openwrt-25.12/package/base-files/files/sbin/sysupgrade
+  - label: "OpenWrt 备份与恢复"
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="failsafe" />
+
+## 一句话
+
+Failsafe 模式让 OpenWrt 以一套最小的已知配置启动在 `192.168.1.1`，方便修复改坏的设置；sysupgrade 负责替换固件，除非你另外指定，否则会保留配置。
+
+## Failsafe 模式
+
+- **怎么进入**：开机过程中有一个 2–4 秒的窗口，这时按下设备上几乎任意一个按键；用串口控制台的话，按 `f` 再按回车。
+- **进入后**：路由器启动在 `192.168.1.1/24`，DHCP 和无线都关闭，只运行必要的服务。给电脑设一个同网段的静态地址，再用 SSH 连接。
+- **能做什么**：运行 `mount_root` 挂载 overlay 后修复文件，或者用 `firstboot && reboot` 重置所有设置。
+- Failsafe 需要 SquashFS 镜像。
+
+## sysupgrade
+
+- 默认保留配置；`-n` 表示刷写时不保留。
+- `sysupgrade -b <文件>` 把 `sysupgrade.conf` 里列出的文件打包成 `.tar.gz` 备份；`-r <文件>` 用来恢复，`-l` 列出会被保存的文件。
+
+## 在你的路由器上看一眼
+
+以下命令只读不改：
+
+```sh
+sysupgrade -l | head
+```
+
+## 注意
+
+- 恢复出厂会清掉所有设置，先备份。
+- Failsafe 下没有 DHCP；电脑不设静态 IP，看起来就像路由器“死了”。
+
+## 相关操作页
+
+- [进不去后台](/zh/troubleshooting/no-web-ui/)
+- [备份与恢复](/zh/recovery/backup-restore/)
+- [固件升级](/zh/recovery/firmware-upgrade/)
+
+<PageSources />

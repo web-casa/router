@@ -1,0 +1,357 @@
+---
+// Variant "signal": headline left, live network schematic right.
+import HeroCopy from './HeroCopy.astro';
+import HeroStats from './HeroStats.astro';
+import type { HeroData } from './data';
+
+interface Props { hero: HeroData }
+const { hero } = Astro.props;
+const isEn = hero.isEn;
+const t = isEn
+  ? {
+      diagram:
+        'Diagram: the internet reaches the OpenWrt router over WAN; the router serves a computer, a phone and a Wi-Fi access point on the LAN. A dashed line marks the recovery path from a local console.',
+      n: { isp: 'ISP · ONT', ispSub: 'pppoe-wan', router: 'OpenWrt', routerSub: 'br-lan 192.168.1.1', pc: 'Computer', pcSub: 'DHCP .100–.250', phone: 'Phone', phoneSub: 'DNS → .1:53', ap: 'Wi-Fi AP', apSub: 'dumb AP .2', back: 'Way back', backSub: 'failsafe · console' },
+    }
+  : {
+      diagram:
+        '示意图：互联网经 WAN 到达 OpenWrt 路由器；路由器在 LAN 侧为电脑、手机和 Wi-Fi AP 提供服务。虚线表示从本地控制台进入的恢复路径。',
+      n: { isp: 'ISP · 光猫', ispSub: 'pppoe-wan', router: 'OpenWrt', routerSub: 'br-lan 192.168.1.1', pc: '电脑', pcSub: 'DHCP .100–.250', phone: '手机', phoneSub: 'DNS → .1:53', ap: 'Wi-Fi AP', apSub: '有线 AP .2', back: '恢复路径', backSub: 'failsafe · 控制台' },
+    };
+
+// Wires of the schematic: id, path and packet duration (s).
+const wires = [
+  { id: 'isp', d: 'M154 78 H178 Q186 78 186 86 V196 Q186 204 194 204 H214', dur: 3.2 },
+  { id: 'pc', d: 'M386 196 H404 Q412 196 412 188 V92 Q412 84 420 84 H436', dur: 2.6 },
+  { id: 'phone', d: 'M386 222 H436', dur: 1.9 },
+  { id: 'ap', d: 'M386 248 H404 Q412 248 412 256 V342 Q412 350 420 350 H436', dur: 2.9 },
+];
+---
+
+<section class="rh-hero rh-v-signal" aria-labelledby="_top">
+  <div class="rh-hero-grid" aria-hidden="true" />
+  <HeroCopy hero={hero} />
+
+<figure class="rh-topo-wrap rh-in rh-in-scale" style="--i:3">
+  <svg class="rh-topo" viewBox="0 0 560 440" role="img" aria-label={t.diagram}>
+    <defs>
+      <pattern id="rh-dots" width="16" height="16" patternUnits="userSpaceOnUse">
+        <circle cx="1" cy="1" r="1" class="rh-dot" />
+      </pattern>
+      <radialGradient id="rh-fade" cx="50%" cy="50%" r="60%">
+        <stop offset="0" stop-color="#fff" />
+        <stop offset="1" stop-color="#000" />
+      </radialGradient>
+      <mask id="rh-mask">
+        <rect width="560" height="440" fill="url(#rh-fade)" />
+      </mask>
+    </defs>
+    <rect width="560" height="440" fill="url(#rh-dots)" mask="url(#rh-mask)" />
+
+    {wires.map((w) => (
+      <g class:list={['wire', `w-${w.id}`]}>
+        <path id={`rh-p-${w.id}`} d={w.d} class="wire-base" />
+        <path d={w.d} class="wire-glow" pathLength="1" />
+        <circle r="3" class="packet">
+          <animateMotion dur={`${w.dur}s`} repeatCount="indefinite" calcMode="linear">
+            <mpath href={`#rh-p-${w.id}`} />
+          </animateMotion>
+        </circle>
+        <circle r="2.25" class="packet packet-rx">
+          <animateMotion dur={`${w.dur * 1.3}s`} begin={`${w.dur / 2}s`} repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1" calcMode="linear">
+            <mpath href={`#rh-p-${w.id}`} />
+          </animateMotion>
+        </circle>
+      </g>
+    ))}
+    <g class="wire w-back">
+      <path id="rh-p-back" d="M154 372 H246 Q254 372 254 364 V278" class="wire-base wire-dashed" />
+      <path d="M154 372 H246 Q254 372 254 364 V278" class="wire-glow" pathLength="1" />
+    </g>
+
+    <g class="node n-isp" tabindex="-1">
+      <rect x="14" y="52" width="140" height="52" rx="10" class="box" />
+      <text x="30" y="75" class="lbl">{t.n.isp}</text>
+      <text x="30" y="93" class="sub">{t.n.ispSub}</text>
+    </g>
+
+    <g class="node n-router">
+      <rect x="214" y="168" width="172" height="110" rx="16" class="box box-router" />
+      <text x="232" y="197" class="lbl lbl-lg">{t.n.router}</text>
+      <text x="232" y="216" class="sub">{t.n.routerSub}</text>
+      <line x1="232" x2="368" y1="234" y2="234" class="sep" />
+      {[0, 1, 2, 3, 4].map((i) => (
+        <g transform={`translate(${236 + i * 28} 254)`}>
+          <rect x="-9" y="-8" width="18" height="14" rx="3" class="port" />
+          <circle cx="0" cy="-1" r="2.4" class:list={['led', `led-${i}`]} />
+        </g>
+      ))}
+    </g>
+
+    <g class="node n-pc">
+      <rect x="436" y="58" width="104" height="52" rx="10" class="box" />
+      <text x="452" y="81" class="lbl">{t.n.pc}</text>
+      <text x="452" y="99" class="sub">{t.n.pcSub}</text>
+    </g>
+    <g class="node n-phone">
+      <rect x="436" y="196" width="104" height="52" rx="10" class="box" />
+      <text x="452" y="219" class="lbl">{t.n.phone}</text>
+      <text x="452" y="237" class="sub">{t.n.phoneSub}</text>
+    </g>
+    <g class="node n-ap">
+      <rect x="436" y="324" width="104" height="52" rx="10" class="box" />
+      <text x="452" y="347" class="lbl">{t.n.ap}</text>
+      <text x="452" y="365" class="sub">{t.n.apSub}</text>
+      <path d="M520 340a9 9 0 0 1 0 12M525 335a16 16 0 0 1 0 22" class="waves" />
+    </g>
+    <g class="node n-back">
+      <rect x="14" y="346" width="140" height="52" rx="10" class="box box-back" />
+      <text x="30" y="369" class="lbl lbl-accent">{t.n.back}</text>
+      <text x="30" y="387" class="sub">{t.n.backSub}</text>
+    </g>
+
+    <text x="196" y="138" class="tag">WAN</text>
+    <text x="424" y="158" class="tag">LAN</text>
+  </svg>
+</figure>
+
+  <HeroStats hero={hero} />
+</section>
+
+<script>
+  // Gentle pointer tilt on the schematic; skipped for touch and reduced motion.
+  const wrap = document.querySelector<HTMLElement>('.rh-topo-wrap');
+  if (wrap && matchMedia('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)').matches) {
+    let frame = 0;
+    const hero = wrap.closest('.rh-hero') as HTMLElement;
+    hero.addEventListener('pointermove', (e) => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const r = wrap.getBoundingClientRect();
+        const x = (e.clientX - (r.left + r.width / 2)) / r.width;
+        const y = (e.clientY - (r.top + r.height / 2)) / r.height;
+        wrap.style.setProperty('--rx', `${(-y * 5).toFixed(2)}deg`);
+        wrap.style.setProperty('--ry', `${(x * 7).toFixed(2)}deg`);
+      });
+    });
+    hero.addEventListener('pointerleave', () => {
+      wrap.style.setProperty('--rx', '0deg');
+      wrap.style.setProperty('--ry', '0deg');
+    });
+  }
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelector<SVGSVGElement>('.rh-topo')?.pauseAnimations();
+  }
+</script>
+
+<style>
+  @media (min-width: 64rem) {
+    .rh-v-signal {
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+      column-gap: 3.5rem;
+      align-items: center;
+    }
+  }
+
+  .rh-topo-wrap {
+    --rx: 0deg;
+    --ry: 0deg;
+    margin: 0;
+    perspective: 1400px;
+    max-width: 38rem;
+    width: 100%;
+    justify-self: center;
+  }
+  .rh-topo {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    transform: rotateX(var(--rx)) rotateY(var(--ry));
+    transition: transform 0.8s var(--rh-ease-out);
+    font-family: var(--__sl-font-mono);
+  }
+  .rh-topo :global(.rh-dot) {
+    fill: var(--rh-line-strong);
+  }
+  .rh-topo .box {
+    fill: var(--rh-surface);
+    stroke: var(--rh-line-strong);
+    stroke-width: 1;
+    transition: stroke 0.3s, fill 0.3s;
+  }
+  .rh-topo .box-router {
+    fill: var(--rh-surface-2);
+    filter: drop-shadow(0 18px 30px hsla(30, 40%, 2%, 0.35));
+  }
+  .rh-topo .box-back {
+    stroke-dasharray: 4 4;
+  }
+  .rh-topo .lbl {
+    font-size: 12.5px;
+    font-weight: 600;
+    fill: var(--sl-color-white);
+    font-family: var(--__sl-font);
+    letter-spacing: -0.01em;
+  }
+  .rh-topo .lbl-lg {
+    font-size: 17px;
+    font-weight: 650;
+    letter-spacing: -0.03em;
+  }
+  .rh-topo .lbl-accent {
+    fill: var(--sl-color-accent);
+  }
+  .rh-topo .sub {
+    font-size: 10px;
+    fill: var(--sl-color-gray-3);
+  }
+  .rh-topo .tag {
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    fill: var(--sl-color-gray-4);
+  }
+  .rh-topo .sep {
+    stroke: var(--rh-line);
+  }
+  .rh-topo .port {
+    fill: var(--sl-color-black);
+    stroke: var(--rh-line-strong);
+  }
+  .rh-topo .led {
+    fill: var(--sl-color-gray-5);
+  }
+  .rh-topo .led-0,
+  .rh-topo .led-1,
+  .rh-topo .led-2,
+  .rh-topo .led-3 {
+    fill: var(--sl-color-accent);
+  }
+  .rh-topo .waves {
+    fill: none;
+    stroke: var(--sl-color-gray-4);
+    stroke-width: 1.4;
+    stroke-linecap: round;
+  }
+
+  .rh-topo .wire-base {
+    fill: none;
+    stroke: var(--sl-color-gray-4);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    transition: stroke 0.3s, opacity 0.3s;
+  }
+  .rh-topo .wire-dashed {
+    stroke-dasharray: 3 5;
+  }
+  .rh-topo .wire-glow {
+    fill: none;
+    stroke: var(--sl-color-accent);
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    opacity: 0.9;
+  }
+  .rh-topo .packet {
+    fill: var(--sl-color-accent);
+    filter: drop-shadow(0 0 4px var(--sl-color-accent));
+  }
+  .rh-topo .packet-rx {
+    fill: var(--sl-color-accent-high);
+    opacity: 0.85;
+  }
+  .rh-topo .w-back .wire-glow {
+    stroke: var(--sl-color-accent-high);
+  }
+
+  /* Hover a device to trace its path; everything else steps back. */
+  .rh-topo .node {
+    cursor: default;
+  }
+  .rh-topo .node,
+  .rh-topo .wire {
+    transition: opacity 0.35s;
+  }
+  .rh-topo:has(.n-isp:hover, .n-pc:hover, .n-phone:hover, .n-ap:hover, .n-back:hover) :is(.node, .wire) {
+    opacity: 0.35;
+  }
+  .rh-topo:has(.n-isp:hover, .n-pc:hover, .n-phone:hover, .n-ap:hover, .n-back:hover) .n-router {
+    opacity: 1;
+  }
+  .rh-topo:has(.n-isp:hover) :is(.n-isp, .w-isp),
+  .rh-topo:has(.n-pc:hover) :is(.n-pc, .w-pc),
+  .rh-topo:has(.n-phone:hover) :is(.n-phone, .w-phone),
+  .rh-topo:has(.n-ap:hover) :is(.n-ap, .w-ap),
+  .rh-topo:has(.n-back:hover) :is(.n-back, .w-back) {
+    opacity: 1;
+  }
+  .rh-topo .node:hover .box {
+    stroke: var(--sl-color-accent);
+  }
+  .rh-topo:has(.n-isp:hover) .w-isp .wire-glow,
+  .rh-topo:has(.n-pc:hover) .w-pc .wire-glow,
+  .rh-topo:has(.n-phone:hover) .w-phone .wire-glow,
+  .rh-topo:has(.n-ap:hover) .w-ap .wire-glow,
+  .rh-topo:has(.n-back:hover) .w-back .wire-glow {
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.6s var(--rh-ease-out);
+  }
+
+  /* Small screens: bigger labels, secondary lines dropped. */
+  @media (max-width: 40rem) {
+    .rh-topo .sub:not(.n-router .sub) {
+      display: none;
+    }
+    .rh-topo .lbl {
+      font-size: 17px;
+      transform: translateY(9px);
+    }
+    .rh-topo .n-router .lbl {
+      transform: none;
+    }
+    .rh-topo .lbl-lg {
+      font-size: 21px;
+    }
+    .rh-topo .n-router .sub {
+      font-size: 12.5px;
+    }
+    .rh-topo .tag {
+      font-size: 13px;
+    }
+    .rh-topo .waves {
+      display: none;
+    }
+  }
+
+
+  @media (prefers-reduced-motion: no-preference) {
+    .rh-topo .wire-base {
+      stroke-dasharray: 600;
+      animation: rh-draw 1.6s var(--rh-ease-out) 0.5s both;
+    }
+    .rh-topo .wire-dashed {
+      animation: rh-march 1.2s linear infinite;
+      stroke-dasharray: 3 5;
+    }
+    .rh-topo .packet {
+      animation: rh-fade-in 0.6s ease 1.6s both;
+    }
+    .rh-topo .led-1 { animation: rh-led 1.3s steps(2, jump-none) infinite; }
+    .rh-topo .led-2 { animation: rh-led 0.9s steps(2, jump-none) 0.3s infinite; }
+    .rh-topo .led-3 { animation: rh-led 2.1s steps(2, jump-none) 0.6s infinite; }
+    .rh-topo .led-0 { animation: rh-led 1.7s steps(2, jump-none) 0.1s infinite; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rh-topo .packet {
+      display: none;
+    }
+  }
+  @keyframes rh-draw {
+    from { stroke-dashoffset: 600; }
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes rh-march {
+    to { stroke-dashoffset: -16; }
+  }
+</style>

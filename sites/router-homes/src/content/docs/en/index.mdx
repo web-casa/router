@@ -1,18 +1,19 @@
 ---
-title: Router.Homes
+title: OpenWrt documentation
 description: OpenWrt documentation for real home networks.
 template: splash
 hero:
-  title: OpenWrt, without losing your network
+  title: OpenWrt, without losing <em>your network</em>
   tagline: Start from the router you already have, verify each step, and keep a way back.
   actions:
     - text: Start with DNS
       link: /en/network/dns/
       variant: primary
-    - text: PVE install
-      link: /en/installation/proxmox/
+    - text: Download OpenWrt
+      link: /en/download/
+      variant: minimal
 ---
 
-## What this site is
+import Home from '@components/Home.astro';
 
-Practical OpenWrt notes for home and small-office networks. Every operation page states the firmware, device revision, package manager, execution location, and recovery path.
+<Home />

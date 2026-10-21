@@ -1,0 +1,154 @@
+---
+// Variant "rings": a centred headline inside broadcast rings, with the
+// devices of a home network slowly orbiting the router.
+import HeroCopy from './HeroCopy.astro';
+import HeroStats from './HeroStats.astro';
+import type { HeroData } from './data';
+
+interface Props { hero: HeroData }
+const { hero } = Astro.props;
+const orbits = hero.isEn
+  ? [
+      { r: 0.62, dur: 90, items: ['Laptop', 'Phone', 'Smart TV'] },
+      { r: 0.82, dur: 130, items: ['NAS', 'Wi-Fi AP', 'Printer', 'Game console'] },
+      { r: 1, dur: 170, items: ['PVE host', 'Camera', 'Tablet'] },
+    ]
+  : [
+      { r: 0.62, dur: 90, items: ['笔记本', '手机', '电视'] },
+      { r: 0.82, dur: 130, items: ['NAS', 'Wi-Fi AP', '打印机', '游戏机'] },
+      { r: 1, dur: 170, items: ['PVE 宿主机', '摄像头', '平板'] },
+    ];
+---
+
+<section class="rh-hero rh-v-rings" aria-labelledby="_top">
+  <div class="rh-field" aria-hidden="true">
+    {[0, 1, 2, 3].map((i) => <span class="rh-pulse" style={`--k:${i}`} />)}
+    {orbits.map((o, oi) => (
+      <div class="rh-orbit" style={`--r:${o.r};--dur:${o.dur}s`}>
+        {o.items.map((name, i) => (
+          <span class="rh-sat" style={`--a:${(360 / o.items.length) * i + oi * 40}deg`}>
+            <span class="rh-sat-chip"><span class="rh-led" data-state="on" />{name}</span>
+          </span>
+        ))}
+      </div>
+    ))}
+  </div>
+
+  <HeroCopy hero={hero} align="center" />
+  <HeroStats hero={hero} />
+</section>
+
+<style>
+  .rh-v-rings {
+    position: relative;
+    justify-items: center;
+    gap: clamp(3rem, 6vw, 5rem);
+    padding-top: clamp(4rem, 12vw, 9rem);
+  }
+  .rh-v-rings :global(.rh-hero-copy) {
+    position: relative;
+    z-index: 1;
+    max-width: 52rem;
+  }
+  .rh-v-rings :global(.rh-title) {
+    font-size: clamp(2.85rem, 1rem + 5.8vw, 6.25rem);
+  }
+  .rh-v-rings :global(.rh-stats) {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    background: var(--sl-color-bg);
+  }
+
+  .rh-field {
+    --size: min(66rem, 135vw);
+    position: absolute;
+    z-index: 0;
+    top: clamp(-6rem, -4vw, -2rem);
+    left: 50%;
+    width: var(--size);
+    aspect-ratio: 1;
+    transform: translateX(-50%);
+    -webkit-mask-image: radial-gradient(circle, #000 35%, transparent 70%);
+    mask-image: radial-gradient(circle, #000 35%, transparent 70%);
+    pointer-events: none;
+  }
+  .rh-field::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle, hsla(36, 96%, 60%, 0.12), transparent 40%),
+      repeating-radial-gradient(circle, transparent 0 calc(var(--size) * 0.081 - 1px), var(--rh-line) calc(var(--size) * 0.081 - 1px) calc(var(--size) * 0.081));
+  }
+  .rh-pulse {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid var(--sl-color-accent);
+    opacity: 0;
+  }
+  .rh-orbit {
+    position: absolute;
+    inset: calc((1 - var(--r)) * 50%);
+    border-radius: 50%;
+    border: 1px dashed var(--rh-line-strong);
+  }
+  .rh-sat {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    transform: rotate(var(--a)) translateX(calc(var(--size) * var(--r) / 2)) rotate(calc(-1 * var(--a)));
+  }
+  .rh-sat-chip {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--rh-line-strong);
+    border-radius: 999px;
+    background: var(--rh-surface);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.72rem;
+    color: var(--sl-color-gray-2);
+    white-space: nowrap;
+    /* `translate` (not transform) so the counter-rotation pivots on the chip's centre. */
+    translate: -50% -50%;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .rh-pulse {
+      animation: rh-pulse 6s cubic-bezier(0.2, 0.6, 0.3, 1) calc(var(--k) * 1.5s) infinite;
+    }
+    .rh-orbit {
+      animation: rh-spin var(--dur) linear infinite;
+    }
+    .rh-orbit:nth-of-type(2n) {
+      animation-direction: reverse;
+    }
+    .rh-orbit .rh-sat-chip {
+      animation: rh-spin var(--dur) linear infinite reverse;
+    }
+    .rh-orbit:nth-of-type(2n) .rh-sat-chip {
+      animation-direction: normal;
+    }
+  }
+
+  @media (max-width: 40rem) {
+    .rh-sat-chip {
+      font-size: 0.62rem;
+      padding: 0.25rem 0.5rem;
+    }
+  }
+
+  @keyframes rh-pulse {
+    from { transform: scale(0.12); opacity: 0.7; }
+    to { transform: scale(1); opacity: 0; }
+  }
+  @keyframes rh-spin {
+    to { rotate: 360deg; }
+  }
+</style>

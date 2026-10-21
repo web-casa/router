@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200; sysupgrade -b 4.2MB/59 entries; sysupgrade -r restore; LAN/HTTP/SSH checked"
-  recipe="tests/recipes/backup-restore-25.12.md"
-  result="E2 partial: sysupgrade -b produced a 4.2MB/59-entry config archive; after adding a test marker, sysupgrade -r removed it and LAN 192.168.1.2, HTTP 200 and SSH still worked; full image/cross-version/package reinstall untested"
-  date="2026-10-20"
-/>
-
 ## Three different “backups”
 
 | Type | Contains | Does not contain | Typical use |
@@ -201,5 +193,13 @@ A config archive does not contain binaries. After reflash, reinstall from the pa
 - This is E2 partial: same-version config backup/restore and management entry were tested; whole-machine/cross-version/package rebuild were not.
 - Config archives contain sensitive data; do not commit or share them.
 - No independent reviewer; conclusions are limited to this VM environment.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; sysupgrade -b 4.2MB/59 entries; sysupgrade -r restore; LAN/HTTP/SSH checked"
+  recipe="tests/recipes/backup-restore-25.12.md"
+  result="E2 partial: sysupgrade -b produced a 4.2MB/59-entry config archive; after adding a test marker, sysupgrade -r removed it and LAN 192.168.1.2, HTTP 200 and SSH still worked; full image/cross-version/package reinstall untested"
+  date="2026-10-20"
+/>
 
 <PageSources />

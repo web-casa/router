@@ -29,14 +29,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="带 WAN 的旁路网关 E2：LAN 192.168.1.2/24，DHCP 关闭，WAN 192.168.50.5/24；客户端静态 192.168.1.100；纯单臂旁路未测"
-  recipe="tests/recipes/bypass-gateway-25.12.md"
-  result="E2 partial：DHCP 关闭后客户端拿不到租约；静态客户端网关/DNS 指向 .2 时公网 ping、DNS 正常；DNS 切到 1.1.1.1 正常；改死网关 .250 公网失败，恢复 .2 正常"
-  date="2026-10-20"
-/>
-
 ## 先选模式：单臂旁路 vs 带 WAN 的二级网关
 
 | 模式 | OpenWrt 接口 | 谁做 DHCP | 客户端网关/DNS | 本页验证 |
@@ -229,5 +221,13 @@ ip route replace default via 192.168.1.2
 - 本页是 E2 partial：带 WAN 的旁路网关已实测；单臂旁路只有 E1 步骤。
 - 没有第二评审人；结论只限本次 VM/netns 环境。
 - 不要把“旁路网关”当成一个固定配置；先确认谁做 DHCP、谁做 NAT、回程路由是否存在。
+
+<TestRecord
+  status="partial"
+  environment="带 WAN 的旁路网关 E2：LAN 192.168.1.2/24，DHCP 关闭，WAN 192.168.50.5/24；客户端静态 192.168.1.100；纯单臂旁路未测"
+  recipe="tests/recipes/bypass-gateway-25.12.md"
+  result="E2 partial：DHCP 关闭后客户端拿不到租约；静态客户端网关/DNS 指向 .2 时公网 ping、DNS 正常；DNS 切到 1.1.1.1 正常；改死网关 .250 公网失败，恢复 .2 正常"
+  date="2026-10-20"
+/>
 
 <PageSources />

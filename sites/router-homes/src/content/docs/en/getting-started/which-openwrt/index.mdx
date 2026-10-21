@@ -29,13 +29,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="unknown" version="—" packageManager="—" device="any OpenWrt-like device" tested={false} evidence="E1" />
 
-<TestRecord
-  status="planned"
-  environment="Device capture pending; read-only commands, no dependency on the lab"
-  recipe="tests/recipes/which-openwrt.md"
-  result="E1: fields, decision table and image-selection method documented; no device capture yet"
-/>
-
 ## Outcome
 
 - Tell whether the device runs **official OpenWrt, ImmortalWrt, iStoreOS or vendor firmware**.
@@ -171,5 +164,12 @@ Stop flashing. Use the device's failsafe, TFTP or vendor recovery procedure. If 
 - This is E1: fields, decision table and image-selection method are based on public documentation; no device was captured in this environment.
 - Forks/vendor outputs may differ; run `tests/recipes/which-openwrt.md` on a real device, record the fields and screenshots, then promote to E2.
 - This page only identifies firmware; it does not provide cross-model flashing or vendor-restriction bypasses.
+
+<TestRecord
+  status="planned"
+  environment="Device capture pending; read-only commands, no dependency on the lab"
+  recipe="tests/recipes/which-openwrt.md"
+  result="E1: fields, decision table and image-selection method documented; no device capture yet"
+/>
 
 <PageSources />

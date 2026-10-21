@@ -31,14 +31,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="fresh official image" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86_64 VM 200; LuCI 26.288; official image, vendor firmware untested"
-  recipe="tests/recipes/luci-first-login.md"
-  result="E2: official image reached; first-run password prompt; Chinese pack installed and selected; SSH accepted the same password; vendor firmware/failsafe untested"
-  date="2026-10-20"
-/>
-
 ## Outcome
 
 - Find the OpenWrt LAN management address, not the WAN port.
@@ -187,5 +179,13 @@ Log out and back in. If it reverts to English, check whether the language settin
 - Core flow is E2 on the official OpenWrt 25.12.6 x86_64 image: first login, password setup, `luci-i18n-base-zh-cn` install, Chinese UI, SSH login.
 - Vendor/community firmware may differ; failsafe, factory reset and vendor restrictions remain E1. Do not generalize the official defaults.
 - Screenshots are from temporary VM 200; timing/network values depend on your environment. Recipe: `tests/recipes/luci-first-login.md`.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86_64 VM 200; LuCI 26.288; official image, vendor firmware untested"
+  recipe="tests/recipes/luci-first-login.md"
+  result="E2: official image reached; first-run password prompt; Chinese pack installed and selected; SSH accepted the same password; vendor firmware/failsafe untested"
+  date="2026-10-20"
+/>
 
 <PageSources />

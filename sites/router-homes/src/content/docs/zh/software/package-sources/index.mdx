@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200；官方源/TUNA 切换、apk update/search/install、恢复官方源"
-  recipe="tests/recipes/package-sources.md"
-  result="E2 partial：25.12.6 x86 官方源更新 11220 包；切 TUNA 后同样 11220；安装 sqm-scripts 1.7.2；恢复官方源后再 update 正常；24.10 opkg 未测"
-/>
-
 先记住一句话：**apk 与 opkg 的区别**首先是固件版本，不是“哪个源更快”。25.12 用 `apk`，24.10 用 `opkg`；包格式、源路径和校验方式都不同，不能互换。
 
 ## 完成后你能确认什么
@@ -226,5 +219,12 @@ opkg update
 - 本页是 E2 partial：25.12 `apk` 的官方源/TUNA/安装/恢复已实测；`opkg` 和错误源分支仍是文档步骤。
 - 镜像路径会随 release 变化；发布前在目标 release/target/arch 上再跑一次 `update`/`search`。
 - 不要混用官方、ImmortalWrt、iStoreOS 的源；ABI/内核/签名都可能不匹配。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；官方源/TUNA 切换、apk update/search/install、恢复官方源"
+  recipe="tests/recipes/package-sources.md"
+  result="E2 partial：25.12.6 x86 官方源更新 11220 包；切 TUNA 后同样 11220；安装 sqm-scripts 1.7.2；恢复官方源后再 update 正常；24.10 opkg 未测"
+/>
 
 <PageSources />

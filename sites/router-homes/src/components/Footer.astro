@@ -1,0 +1,69 @@
+---
+import Default from '@astrojs/starlight/components/Footer.astro';
+
+const route = (Astro.locals as any).starlightRoute;
+const isEn = route.locale === 'en';
+const isSplash = route.entry.data.template === 'splash';
+const home = `/${route.locale ?? 'en'}/`;
+// Splash pages have no Starlight footer; use a footer landmark there.
+const ColophonTag = isSplash ? 'footer' : 'div';
+---
+
+{!isSplash && <Default />}
+<ColophonTag class="rh-colophon" role={isSplash ? 'contentinfo' : undefined}>
+  <a href={home} class="rh-colophon-brand" translate="no">Router.Homes</a>
+  <p>
+    {isEn
+      ? 'Independent OpenWrt notes. Every page states the firmware, device, package manager and way back.'
+      : '独立的 OpenWrt 实操笔记。每页写明固件、设备、包管理器与恢复路径。'}
+  </p>
+  <span class="rh-colophon-credit">
+    {isEn ? 'Icons: ' : '图标：'}<a href="https://www.figma.com/community/file/1166831539721848736" rel="noopener noreferrer">Solar</a>
+    {' '}by 480 Design, <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener noreferrer">CC BY 4.0</a>
+  </span>
+  <span class="rh-colophon-sig" aria-hidden="true">
+    <span class="rh-led" data-state="on" data-blink></span> link up
+  </span>
+</ColophonTag>
+
+<style>
+  .rh-colophon {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.25rem;
+    margin-top: 3rem;
+    padding-block: 1.5rem 0.5rem;
+    border-top: 1px solid var(--sl-color-hairline);
+    color: var(--sl-color-gray-3);
+    font-size: 0.85rem;
+  }
+  .rh-colophon p {
+    margin: 0;
+    flex: 1 1 18rem;
+    text-wrap: pretty;
+  }
+  .rh-colophon-brand {
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    color: var(--sl-color-white);
+    text-decoration: none;
+  }
+  .rh-colophon-credit {
+    font-size: 0.78rem;
+  }
+  .rh-colophon-credit a {
+    color: var(--sl-color-gray-2);
+  }
+  .rh-colophon-credit a:hover {
+    color: var(--sl-color-accent);
+  }
+  .rh-colophon-sig {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+  }
+</style>

@@ -29,13 +29,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="待识别" version="—" packageManager="—" device="任意 OpenWrt/类 OpenWrt 设备" tested={false} evidence="E1" />
 
-<TestRecord
-  status="planned"
-  environment="待具体设备采集；只读命令，不依赖本次实验环境"
-  recipe="tests/recipes/which-openwrt.md"
-  result="E1：字段、判断表、镜像选择方法已整理；未在具体设备上采集"
-/>
-
 ## 完成后你能确认什么
 
 - 这台设备是**原生 OpenWrt、ImmortalWrt、iStoreOS，还是厂商定制固件**；
@@ -173,5 +166,12 @@ ubus call system board
 - 本页是 E1：字段、判断表和镜像选择方法按公开资料整理；没有在本次实验环境采集具体设备。
 - 不同 fork/厂商的输出可能不同；发布前用真实设备跑一遍 `tests/recipes/which-openwrt.md`，记录字段和截图，再升级 E2。
 - 本页只做识别，不提供跨型号刷机或绕过厂商限制的步骤。
+
+<TestRecord
+  status="planned"
+  environment="待具体设备采集；只读命令，不依赖本次实验环境"
+  recipe="tests/recipes/which-openwrt.md"
+  result="E1：字段、判断表、镜像选择方法已整理；未在具体设备上采集"
+/>
 
 <PageSources />

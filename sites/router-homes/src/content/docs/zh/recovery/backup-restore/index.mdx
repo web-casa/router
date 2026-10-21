@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200；sysupgrade -b 4.2MB/59 项；sysupgrade -r 恢复；LAN/HTTP/SSH 验证"
-  recipe="tests/recipes/backup-restore-25.12.md"
-  result="E2 partial：sysupgrade -b 生成 4.2MB/59 项配置归档；写入测试标记后 sysupgrade -r 恢复，标记消失，LAN 192.168.1.2、HTTP 200、SSH 正常；完整镜像/跨版本/插件重装未测"
-  date="2026-10-20"
-/>
-
 ## 先分清三种“备份”
 
 | 类型 | 包含 | 不包含 | 典型用途 |
@@ -201,5 +193,13 @@ apk list --installed | grep -E 'openclash|sqm|adguard|luci-app' || true
 - 本页是 E2 partial：同版本配置备份/恢复和管理入口已验证；整机/跨版本/插件重建未测。
 - 配置归档含敏感信息；不要提交到仓库或公开分享。
 - 没有第二评审人；结论只限本次 VM 环境。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；sysupgrade -b 4.2MB/59 项；sysupgrade -r 恢复；LAN/HTTP/SSH 验证"
+  recipe="tests/recipes/backup-restore-25.12.md"
+  result="E2 partial：sysupgrade -b 生成 4.2MB/59 项配置归档；写入测试标记后 sysupgrade -r 恢复，标记消失，LAN 192.168.1.2、HTTP 200、SSH 正常；完整镜像/跨版本/插件重装未测"
+  date="2026-10-20"
+/>
 
 <PageSources />

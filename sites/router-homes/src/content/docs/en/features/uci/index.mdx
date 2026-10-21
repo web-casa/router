@@ -1,0 +1,52 @@
+---
+title: "UCI: how OpenWrt keeps every setting in /etc/config"
+description: "UCI is the configuration system behind OpenWrt. Where the files live, how changes are staged and committed, and how it relates to LuCI."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt uci", "uci commit", "openwrt /etc/config"]
+sources:
+  - label: "OpenWrt UCI"
+    url: https://openwrt.org/docs/guide-user/base-system/uci
+  - label: "LuCI essentials"
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="uci" />
+
+## In one sentence
+
+UCI (Unified Configuration Interface) keeps the configuration for OpenWrt's services in plain-text files under `/etc/config/`. LuCI and the `uci` command edit those same files.
+
+## How it works
+
+- There is one file per subsystem, such as `network`, `wireless`, `dhcp`, `firewall` and `system`.
+- `uci set`, `uci add`, `uci rename` and `uci delete` are staged first. `uci commit` writes them to flash in one go.
+- A committed change takes effect only after the service reloads or restarts through its init script. The official example changes the uhttpd port, commits, then runs `/etc/init.d/uhttpd restart`.
+- LuCI is a front end: its pages read and write the same UCI files through APIs.
+
+## See it on your router
+
+These commands only read:
+
+```sh
+uci show network.lan
+uci get network.lan.ipaddr
+uci export dhcp
+```
+
+## Watch out
+
+- A change you commit but never reload is not live yet. It takes effect at the next service restart or reboot, which can be long after you have forgotten about it.
+- Copy `/etc/config` somewhere safe before you edit by hand. [Backup and restore](/en/recovery/backup-restore/) covers a full backup.
+
+## Related guides
+
+- [LAN address](/en/network/lan-address/)
+- [DNS](/en/network/dns/)
+- [Backup and restore](/en/recovery/backup-restore/)
+
+<PageSources />

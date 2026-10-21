@@ -1,4 +1,6 @@
 ---
+import Icon from './Icon.astro';
+
 interface Props {
   status: 'planned' | 'partial' | 'verified';
   environment?: string;
@@ -22,10 +24,16 @@ const warning = status === 'planned'
         : '已在固定实验环境完成 E2 复现；未做独立复核或真实物理网络验证，E3 仍需真实设备。')
     : '';
 ---
-<aside class={`test-record test-record-${status}`} aria-label={isEn ? 'Test record' : '测试记录'}>
-  <strong>{isEn ? 'Test record' : '测试记录'}</strong>
+<aside id="test-record" class={`test-record test-record-${status}`} aria-label={isEn ? 'Test record' : '测试记录'}>
+  <div class="test-head">
+    <Icon name="test-tube" />
+    <strong>{isEn ? 'Test record' : '测试记录'}</strong>
+    <span class="test-status">
+      <span class="rh-led" data-state={status === 'verified' ? 'ok' : status === 'partial' ? 'on' : undefined} aria-hidden="true"></span>
+      <span class="sr-only">{isEn ? 'Status' : '状态'}: </span>{labels[status]}
+    </span>
+  </div>
   <dl>
-    <dt>{isEn ? 'Status' : '状态'}</dt><dd>{labels[status]}</dd>
     <dt>{isEn ? 'Environment' : '环境'}</dt><dd>{environment}</dd>
     <dt>{isEn ? 'Recipe' : '配方'}</dt><dd><code>{recipe}</code></dd>
     {date && <><dt>{isEn ? 'Date' : '日期'}</dt><dd>{date}</dd></>}

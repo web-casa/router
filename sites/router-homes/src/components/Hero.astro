@@ -1,0 +1,50 @@
+---
+// Hero dispatcher: the home page renders one of several variants (chosen with
+// `heroVariant` in frontmatter, default "panel"); the download page uses
+// "download"; any other splash page with a hero is the 404.
+import '../styles/hero.css';
+import meta from '../../site.meta';
+import { getHeroData, type HeroAction, type HeroVariant } from './hero/data';
+import Signal from './hero/Signal.astro';
+import Console from './hero/Console.astro';
+import Release from './hero/Release.astro';
+import Panel from './hero/Panel.astro';
+import Rings from './hero/Rings.astro';
+import Download from './hero/Download.astro';
+
+const route = (Astro.locals as any).starlightRoute;
+const { data } = route.entry;
+const locale = route.locale ?? 'en';
+const isHome = route.id === locale || route.id === `${locale}/index` || route.id === '' || Boolean(data.heroVariant);
+const { title = data.title, tagline, actions = [] as HeroAction[] } = data.hero || {};
+const variant: HeroVariant = data.heroVariant ?? 'panel';
+const components = { signal: Signal, console: Console, release: Release, panel: Panel, rings: Rings, download: Download };
+const Variant = components[variant] ?? Signal;
+const hero = isHome ? await getHeroData(locale, { title, tagline, actions }, meta.sidebar as any) : undefined;
+
+const notFound = locale === 'en'
+  ? { cmd: 'ping', lines: ['From 192.168.1.1 icmp_seq=1 Destination Host Unreachable', 'From 192.168.1.1 icmp_seq=2 Destination Host Unreachable'], stat: '2 packets transmitted, 0 received, 100% packet loss', home: 'Back to the start', search: 'Or press Ctrl K to search' }
+  : { cmd: 'ping', lines: ['From 192.168.1.1 icmp_seq=1 Destination Host Unreachable', 'From 192.168.1.1 icmp_seq=2 Destination Host Unreachable'], stat: '2 packets transmitted, 0 received, 100% packet loss', home: '回到首页', search: '或按 Ctrl K 搜索' };
+---
+
+{
+  hero ? (
+    <Variant hero={hero} />
+  ) : (
+    <section class="rh-404" aria-labelledby="_top">
+      <div class="rh-hero-grid" aria-hidden="true" />
+      <h1 id="_top" data-page-title class="rh-404-title">
+        <span class="rh-word-mask"><span class="rh-word" style="--i:0">{title}</span></span>
+      </h1>
+      {tagline && <p class="rh-tagline rh-in" style="--i:2" set:html={tagline} />}
+      <pre class="rh-404-log rh-in" style="--i:3" aria-hidden="true"><span class="p">$</span> {notFound.cmd} router.homes{'\n'}{notFound.lines.map((l) => `${l}\n`)}<span class="muted">--- router.homes ping statistics ---{'\n'}{notFound.stat}</span><span class="caret" /></pre>
+      <div class="rh-actions rh-in" style="--i:4">
+        <a href={`/${locale}/`} class="rh-btn rh-btn-primary">
+          <span>{notFound.home}</span>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
+        </a>
+        <span class="rh-404-hint">{notFound.search}</span>
+      </div>
+    </section>
+  )
+}

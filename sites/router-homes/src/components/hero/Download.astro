@@ -1,0 +1,275 @@
+---
+// Hero for the download page: headline left, a firmware filename taken apart
+// right. Hover or focus a segment to light up what it means. No JS.
+import HeroCopy from './HeroCopy.astro';
+import HeroStats from './HeroStats.astro';
+import type { HeroData } from './data';
+import { RELEASE, RELEASE_DATE, devices } from '../download/devices';
+
+interface Props { hero: HeroData }
+const { hero } = Astro.props;
+const isEn = hero.isEn;
+
+type Seg = { k: string; text: string };
+const examples: { id: string; label: string; segs: Seg[] }[] = [
+  {
+    id: 'router',
+    label: isEn ? 'Router' : '路由器',
+    segs: [
+      { k: 'project', text: 'openwrt' },
+      { k: 'version', text: RELEASE },
+      { k: 'target', text: 'mediatek-filogic' },
+      { k: 'profile', text: 'xiaomi_mi-router-ax3000t' },
+      { k: 'fs', text: 'squashfs' },
+      { k: 'type', text: 'sysupgrade' },
+    ],
+  },
+  {
+    id: 'x86',
+    label: 'x86',
+    segs: [
+      { k: 'project', text: 'openwrt' },
+      { k: 'version', text: RELEASE },
+      { k: 'target', text: 'x86-64' },
+      { k: 'profile', text: 'generic' },
+      { k: 'fs', text: 'ext4' },
+      { k: 'type', text: 'combined-efi' },
+    ],
+  },
+];
+const ext = { router: '.bin', x86: '.img.gz' } as Record<string, string>;
+
+const legend: { k: string; name: string; text: string }[] = isEn
+  ? [
+      { k: 'version', name: 'Release', text: `${RELEASE} is the current stable release.` },
+      { k: 'target', name: 'Target', text: 'Set by the chip platform. It must match your device exactly.' },
+      { k: 'profile', name: 'Profile', text: 'The exact model, and sometimes the flash layout.' },
+      { k: 'fs', name: 'Filesystem', text: 'squashfs can reset to defaults; ext4 is fully writable.' },
+      { k: 'type', name: 'Image type', text: 'sysupgrade upgrades an existing OpenWrt; combined is a whole-disk image, -efi for UEFI.' },
+      { k: 'ext', name: 'Extension', text: '.bin / .itb are flashed as is; .img.gz is unpacked before writing to disk.' },
+    ]
+  : [
+      { k: 'version', name: '版本', text: `${RELEASE} 是当前稳定版。` },
+      { k: 'target', name: 'target', text: '由芯片平台决定，必须和设备完全一致。' },
+      { k: 'profile', name: 'profile', text: '精确到型号，有时还区分分区布局。' },
+      { k: 'fs', name: '文件系统', text: 'squashfs 可以恢复出厂；ext4 整体可写。' },
+      { k: 'type', name: '镜像类型', text: 'sysupgrade 用于已装 OpenWrt 的升级；combined 是含引导的整盘镜像，-efi 用于 UEFI。' },
+      { k: 'ext', name: '扩展名', text: '.bin/.itb 直接刷入；.img.gz 要先解压再写盘。' },
+    ];
+
+const data: HeroData = {
+  ...hero,
+  eyebrow: isEn ? `OpenWrt ${RELEASE} · released ${RELEASE_DATE}` : `OpenWrt ${RELEASE} · ${RELEASE_DATE} 发布`,
+  stats: isEn
+    ? [
+        [RELEASE, 'current stable release'],
+        [RELEASE_DATE, 'release date'],
+        [String(devices.length), 'common devices listed below'],
+        ['2026-09', 'end of 24.10 security updates'],
+      ]
+    : [
+        [RELEASE, '当前稳定版'],
+        [RELEASE_DATE, '发布日期'],
+        [String(devices.length), '本页列出的常见设备'],
+        ['2026-09', '24.10 安全更新截止'],
+      ],
+};
+---
+
+<section class="rh-hero rh-v-download" aria-labelledby="_top">
+  <div class="rh-hero-grid" aria-hidden="true" />
+  <HeroCopy hero={data} />
+
+  <figure class="fa rh-in rh-in-scale" style="--i:3">
+    <div class="fa-head">
+      <span class="fa-title">{isEn ? 'Read a firmware filename' : '读懂固件文件名'}</span>
+      <div class="fa-tabs" role="radiogroup" aria-label={isEn ? 'Example' : '示例'}>
+        {examples.map((ex, i) => (
+          <label>
+            <input type="radio" name="fa-example" value={ex.id} checked={i === 0} />
+            <span>{ex.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+
+    {examples.map((ex) => (
+      <p class:list={['fa-name', `fa-ex-${ex.id}`]}>
+        {ex.segs.map((s, i) => (
+          <><button type="button" class="fa-seg" data-k={s.k}>{s.text}</button>{i < ex.segs.length - 1 && <span class="fa-dash">-</span>}</>
+        ))}<button type="button" class="fa-seg" data-k="ext">{ext[ex.id]}</button>
+      </p>
+    ))}
+
+    <dl class="fa-legend">
+      {legend.map((l) => (
+        <div data-k={l.k}>
+          <dt>{l.name}</dt>
+          <dd>{l.text}</dd>
+        </div>
+      ))}
+    </dl>
+  </figure>
+
+  <HeroStats hero={data} />
+</section>
+
+<style>
+  @media (min-width: 64rem) {
+    .rh-v-download {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+      column-gap: 3.5rem;
+      align-items: center;
+    }
+  }
+
+  .fa {
+    margin: 0;
+    padding: 1.25rem;
+    border: 1px solid var(--rh-line-strong);
+    border-radius: 1.4rem;
+    background:
+      radial-gradient(80% 60% at 70% 0%, color-mix(in srgb, var(--sl-color-accent) 10%, transparent), transparent 70%),
+      var(--rh-surface);
+    box-shadow: var(--rh-shadow);
+  }
+  .fa-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  .fa-title {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    color: var(--sl-color-gray-3);
+  }
+  .fa-tabs {
+    display: inline-flex;
+    padding: 0.2rem;
+    border: 1px solid var(--rh-line);
+    border-radius: 999px;
+    background: var(--sl-color-bg);
+  }
+  .fa-tabs label {
+    cursor: pointer;
+  }
+  .fa-tabs input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .fa-tabs span {
+    display: block;
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 560;
+    color: var(--sl-color-gray-3);
+    transition: background-color 0.25s, color 0.25s;
+  }
+  .fa-tabs input:checked + span {
+    background: var(--sl-color-accent);
+    color: var(--sl-color-text-invert);
+  }
+  .fa-tabs input:focus-visible + span {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 2px;
+  }
+
+  .fa-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 0.4rem;
+    margin: 0 0 1.25rem;
+    padding: 1rem;
+    border-radius: 0.9rem;
+    background: var(--rh-code-bg);
+    border: 1px solid var(--rh-line);
+    font-family: var(--__sl-font-mono);
+    font-size: clamp(0.78rem, 0.7rem + 0.3vw, 0.92rem);
+  }
+  .fa:has(input[value='router']:checked) .fa-ex-x86,
+  .fa:has(input[value='x86']:checked) .fa-ex-router {
+    display: none;
+  }
+  .fa-seg {
+    padding: 0.25rem 0.45rem;
+    border: 1px solid transparent;
+    border-radius: 0.4rem;
+    color: var(--sl-color-gray-1);
+    font: inherit;
+    cursor: help;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.3s var(--rh-ease-spring);
+  }
+  .fa-seg[data-k='project'] {
+    color: var(--sl-color-gray-4);
+    cursor: default;
+  }
+  .fa-dash {
+    color: var(--sl-color-gray-4);
+  }
+  .fa-seg[data-k='target'],
+  .fa-seg[data-k='profile'] {
+    color: var(--sl-color-white);
+    font-weight: 600;
+  }
+
+  .fa-legend {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0;
+  }
+  .fa-legend div {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.55rem;
+    transition: background-color 0.2s;
+  }
+  .fa-legend dt {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.72rem;
+    color: var(--sl-color-gray-3);
+    padding-top: 0.1rem;
+    transition: color 0.2s;
+  }
+  .fa-legend dd {
+    margin: 0;
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: var(--sl-color-gray-2);
+  }
+
+  /* Pair a segment with its legend row, from either side. */
+  .fa:has([data-k='version']:is(:hover, :focus-visible)) [data-k='version'],
+  .fa:has([data-k='target']:is(:hover, :focus-visible)) [data-k='target'],
+  .fa:has([data-k='profile']:is(:hover, :focus-visible)) [data-k='profile'],
+  .fa:has([data-k='fs']:is(:hover, :focus-visible)) [data-k='fs'],
+  .fa:has([data-k='type']:is(:hover, :focus-visible)) [data-k='type'],
+  .fa:has([data-k='ext']:is(:hover, :focus-visible)) [data-k='ext'] {
+    --on: 1;
+  }
+  .fa-seg {
+    background: color-mix(in srgb, var(--sl-color-accent) calc(var(--on, 0) * 18%), transparent);
+    border-color: color-mix(in srgb, var(--sl-color-accent) calc(var(--on, 0) * 100%), transparent);
+  }
+  .fa-legend div {
+    background: color-mix(in srgb, var(--sl-color-accent) calc(var(--on, 0) * 9%), transparent);
+  }
+  .fa-legend div dt {
+    color: color-mix(in srgb, var(--sl-color-accent) calc(var(--on, 0) * 100%), var(--sl-color-gray-3));
+  }
+  .fa-seg:is(:hover, :focus-visible) {
+    transform: translateY(-2px);
+    outline: none;
+  }
+  .fa-seg[data-k='project']:hover {
+    transform: none;
+  }
+</style>

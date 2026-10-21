@@ -1,0 +1,52 @@
+---
+title: "WireGuard on OpenWrt: a kernel VPN set up as a network interface"
+description: "WireGuard is in mainline Linux since 5.6; on OpenWrt it is a network protocol you configure like any interface. Packages, where it lives and how to check it."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt wireguard", "openwrt vpn", "wireguard router"]
+sources:
+  - label: "Linux 5.6 (kernelnewbies)"
+    url: https://kernelnewbies.org/Linux_5.6
+  - label: "OpenWrt WireGuard basics"
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/basics
+  - label: "wireguard-tools package (OpenWrt 25.12)"
+    url: https://github.com/openwrt/openwrt/tree/openwrt-25.12/package/network/utils/wireguard-tools
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="wireguard" />
+
+## In one sentence
+
+WireGuard has been part of mainline Linux since 5.6, released on 2020-03-29. On OpenWrt it is a network protocol called `wireguard`, and you set it up like any other interface.
+
+## The pieces
+
+- `kmod-wireguard`: the kernel module.
+- `wireguard-tools`: the `wg` command. It depends on the kernel module and registers the `wireguard` protocol with netifd.
+- `luci-proto-wireguard`: adds “WireGuard VPN” as a protocol when you create an interface in LuCI.
+
+## What it is for at home
+
+- **Server:** reach your home network from outside.
+- **Client:** send the router's traffic, or part of it, through a remote peer.
+
+In both cases the tunnel is an interface in `/etc/config/network`. It needs a firewall zone, and on a server an open UDP port on WAN.
+
+## See it on your router
+
+```sh
+wg show
+uci show network | grep wireguard
+```
+
+## Related guides
+
+- [WireGuard server](/en/remote-access/wireguard-server/)
+- [WireGuard client](/en/remote-access/wireguard-client/)
+- [firewall4 and zones](/en/features/firewall4/)
+
+<PageSources />

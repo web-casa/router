@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86 VM" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="PVE 9.2.2 single NIC; OpenWrt 25.12.6 VM 200; netns DHCP client"
-  recipe="tests/recipes/dns-25.12-x86.md"
-  result="WAN DNS 192.168.50.1 → 1.1.1.1 applied; bad upstream timed out; recovery worked; client DHCP DNS 192.168.1.1, resolution OK"
-  date="2026-10-20"
-/>
-
 ## Outcome
 
 You can answer three questions separately:
@@ -259,5 +251,13 @@ Common causes are another resolver holding port 53, a syntax error, or an unreac
 - This page has an E2 lab reproduction; browser DoH and IPv6 upstream are still untested and must not be described as verified.
 - Evidence: `docs/dns-e2-run.md` and `tests/recipes/dns-25.12-x86.md`.
 - Update `testedVersions` and `lastVerifiedAt` when the menu or version changes; do not put 24.10 `opkg` commands into a 25.12 procedure.
+
+<TestRecord
+  status="partial"
+  environment="PVE 9.2.2 single NIC; OpenWrt 25.12.6 VM 200; netns DHCP client"
+  recipe="tests/recipes/dns-25.12-x86.md"
+  result="WAN DNS 192.168.50.1 → 1.1.1.1 applied; bad upstream timed out; recovery worked; client DHCP DNS 192.168.1.1, resolution OK"
+  date="2026-10-20"
+/>
 
 <PageSources />

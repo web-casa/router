@@ -28,14 +28,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86 虚拟机" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="PVE 9.2.2 单网口；OpenWrt 25.12.6 VM 200；netns DHCP 客户端"
-  recipe="tests/recipes/dns-25.12-x86.md"
-  result="WAN DNS 192.168.50.1 → 1.1.1.1 生效；坏上游查询超时；恢复后正常；客户端 DHCP DNS 192.168.1.1，解析成功"
-  date="2026-10-20"
-/>
-
 ## 完成后你能确认什么
 
 你能分别回答三个问题：
@@ -259,5 +251,13 @@ dnsmasq --test
 - 本页已在固定实验环境完成 E2 复现；浏览器 DoH 与 IPv6 上游仍未测，不能写成已验证。
 - 复现记录见 `docs/dns-e2-run.md` 与 `tests/recipes/dns-25.12-x86.md`。
 - 版本/菜单变化时更新 `testedVersions` 与 `lastVerifiedAt`；不要把 24.10 的 `opkg` 命令写进 25.12 的步骤。
+
+<TestRecord
+  status="partial"
+  environment="PVE 9.2.2 单网口；OpenWrt 25.12.6 VM 200；netns DHCP 客户端"
+  recipe="tests/recipes/dns-25.12-x86.md"
+  result="WAN DNS 192.168.50.1 → 1.1.1.1 生效；坏上游查询超时；恢复后正常；客户端 DHCP DNS 192.168.1.1，解析成功"
+  date="2026-10-20"
+/>
 
 <PageSources />

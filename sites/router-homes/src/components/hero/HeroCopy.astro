@@ -1,0 +1,40 @@
+---
+import type { HeroData } from './data';
+
+interface Props {
+  hero: HeroData;
+  /** Visual alignment of the copy block. */
+  align?: 'start' | 'center';
+  /** Show the "tested against" pill above the title. */
+  eyebrow?: boolean;
+}
+const { hero, align = 'start', eyebrow = true } = Astro.props;
+---
+
+<div class:list={['rh-hero-copy', { 'rh-hero-copy-center': align === 'center' }]}>
+  {eyebrow && (
+    <p class="rh-eyebrow rh-in" style="--i:0">
+      <span class="rh-led" data-state="on" data-blink aria-hidden="true" />
+      {hero.eyebrow}
+    </p>
+  )}
+  <h1 id="_top" data-page-title class="rh-title">
+    {hero.words.map((w, i) => (
+      <><span class="rh-word-mask"><span class:list={['rh-word', { 'rh-em': w.em }]} style={`--i:${i}`}>{w.text}</span></span>{w.space && ' '}</>
+    ))}
+  </h1>
+  {hero.tagline && <p class="rh-tagline rh-in" style="--i:5" set:html={hero.tagline} />}
+  {hero.actions.length > 0 && (
+    <div class="rh-actions rh-in" style="--i:6">
+      {hero.actions.map(({ link, text, variant }) => (
+        <a href={link} class:list={['rh-btn', variant === 'primary' ? 'rh-btn-primary' : 'rh-btn-ghost']}>
+          <span>{text}</span>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 8h10M9 4l4 4-4 4" />
+          </svg>
+        </a>
+      ))}
+    </div>
+  )}
+  <slot />
+</div>

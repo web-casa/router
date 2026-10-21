@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200; luci-app-openclash 0.48.002 apk install/start/stop; no proxy endpoints/subscriptions"
-  recipe="tests/recipes/openclash-25.12.md"
-  result="E2 partial: 0.48.002 apk installed (43 packages incl. luci-compat/ruby); start without config was inactive; after stop/disable DNS was refused until dnsmasq restart; no proxy endpoint or routing test"
-/>
-
 > **Scope**: this page covers compatibility, DNS conflicts, start/stop and recovery in a lawful environment. It does not provide proxy servers, subscription links, rule sets, or steps to bypass network controls or service/region restrictions. Check local law, ISP terms and the terms of the service you access before use.
 
 ## Outcome
@@ -194,5 +187,12 @@ If a firewall rule blocks management, recover from the console; do not factory-r
 - This is E2 partial: 25.12 `.apk` install, no-config start, disable and DNS recovery were tested; actual proxy/routing remains E1/E3.
 - Without a lawful endpoint/config, do not turn “installed” into “proxy works”.
 - Do not expand this page into a proxy subscription/bypass tutorial; that is out of scope.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; luci-app-openclash 0.48.002 apk install/start/stop; no proxy endpoints/subscriptions"
+  recipe="tests/recipes/openclash-25.12.md"
+  result="E2 partial: 0.48.002 apk installed (43 packages incl. luci-compat/ruby); start without config was inactive; after stop/disable DNS was refused until dnsmasq restart; no proxy endpoint or routing test"
+/>
 
 <PageSources />

@@ -29,14 +29,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200；apk；sqm-scripts 1.7.2 / luci-app-sqm"
-  recipe="tests/recipes/plugin-install-25.12.md"
-  result="E2 partial：sqm-scripts 安装成功但无 LuCI 菜单；luci-app-sqm 安装后 /usr/share/luci/menu.d/luci-app-sqm.json 出现；移除后菜单文件消失，重装恢复；架构/postinst 失败未做破坏性复现"
-  date="2026-10-20"
-/>
-
 ## 完成后你能确认什么
 
 - 是“源里没有/下错包”，还是“包存在但装不上”；
@@ -205,5 +197,13 @@ reboot
 - 本页是 E2 partial：安装/依赖/LuCI 菜单/卸载重装已实测；架构拒绝/postinst 失败未完整复现。
 - 复现配方：`tests/recipes/plugin-install-25.12.md`。
 - 不要把本页写成“所有插件都能装”；具体包仍要按 release/target/arch 核对。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；apk；sqm-scripts 1.7.2 / luci-app-sqm"
+  recipe="tests/recipes/plugin-install-25.12.md"
+  result="E2 partial：sqm-scripts 安装成功但无 LuCI 菜单；luci-app-sqm 安装后 /usr/share/luci/menu.d/luci-app-sqm.json 出现；移除后菜单文件消失，重装恢复；架构/postinst 失败未做破坏性复现"
+  date="2026-10-20"
+/>
 
 <PageSources />

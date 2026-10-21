@@ -29,14 +29,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200; apk; sqm-scripts 1.7.2 / luci-app-sqm"
-  recipe="tests/recipes/plugin-install-25.12.md"
-  result="E2 partial: sqm-scripts installed but no LuCI menu; luci-app-sqm added /usr/share/luci/menu.d/luci-app-sqm.json; remove removed the menu and reinstall restored it; architecture/postinst failures were not destructively reproduced"
-  date="2026-10-20"
-/>
-
 ## Outcome
 
 - Tell whether the package is missing from the feed or exists but fails to install;
@@ -205,5 +197,13 @@ If the package breaks management, stop the service/restore config backups first;
 - This is E2 partial: install/dependency/LuCI menu/remove-reinstall were tested; architecture rejection/postinst failure were not fully reproduced.
 - Recipe: `tests/recipes/plugin-install-25.12.md`.
 - Do not turn this into “every package installs”; verify release/target/arch per package.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; apk; sqm-scripts 1.7.2 / luci-app-sqm"
+  recipe="tests/recipes/plugin-install-25.12.md"
+  result="E2 partial: sqm-scripts installed but no LuCI menu; luci-app-sqm added /usr/share/luci/menu.d/luci-app-sqm.json; remove removed the menu and reinstall restored it; architecture/postinst failures were not destructively reproduced"
+  date="2026-10-20"
+/>
 
 <PageSources />

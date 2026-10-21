@@ -27,13 +27,6 @@ import PageSources from '@components/PageSources.astro';
 
 <EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
 
-<TestRecord
-  status="partial"
-  environment="OpenWrt 25.12.6 x86 VM 200; sqm-scripts 1.7.2 + luci-app-sqm; WAN eth1 DHCP; CAKE qdisc attached; no real-line performance data"
-  recipe="tests/recipes/sqm-25.12.md"
-  result="E2 partial: SQM started on eth1 at 100/20 Mbit with piece_of_cake.qos; tc showed cake 20Mbit; stopping restored fq_codel; no real-line throughput/latency data"
-/>
-
 ## Outcome
 
 - Decide whether “lag while downloading/uploading” is bufferbloat, rather than Wi-Fi, ONT, or ISP congestion.
@@ -242,5 +235,12 @@ Or restore the previous `/etc/config/sqm` backup.
 - This is E2 partial: install, CAKE attach/stop and recovery were tested; real-line performance remains E3 scope.
 - A VM only proves commands/qdisc attach; it cannot represent home broadband. Do not use VM numbers to claim “it works”.
 - In a real environment, record line/CPU/qdisc, idle/load latency and throughput before deciding to keep SQM.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; sqm-scripts 1.7.2 + luci-app-sqm; WAN eth1 DHCP; CAKE qdisc attached; no real-line performance data"
+  recipe="tests/recipes/sqm-25.12.md"
+  result="E2 partial: SQM started on eth1 at 100/20 Mbit with piece_of_cake.qos; tc showed cake 20Mbit; stopping restored fq_codel; no real-line throughput/latency data"
+/>
 
 <PageSources />
