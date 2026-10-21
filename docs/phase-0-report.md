@@ -35,7 +35,7 @@
 
 ## 尚未完成
 
-- DNS、PVE、AGH、005 LuCI、006 LAN、007 WAN DHCP、008 有线 AP、009 旁路网关、014 软件源、015 无法上网、016 进不去后台、017 插件装不上、025 SQM 配置/启停、043 OpenClash 安装/停用恢复已用临时 VM 做 E2；002、041 仍为 E1；008 的 Wi-Fi/真实上游、009 的纯单臂旁路、015 的间歇/物理/应用层、007 的 PPPoE、017 的架构拒绝/postinst、025 的真实线路性能、043 的代理运行/分流未测；OpenClash 严格限定兼容性/DNS/停用恢复，不含代理订阅或绕过内容。
+- DNS、PVE、AGH、005 LuCI、006 LAN、007 WAN DHCP、008 有线 AP、009 旁路网关、018 备份恢复、014 软件源、015 无法上网、016 进不去后台、017 插件装不上、025 SQM 配置/启停、043 OpenClash 安装/停用恢复已用临时 VM 做 E2；002、041 仍为 E1；008 的 Wi-Fi/真实上游、009 的纯单臂旁路、015 的间歇/物理/应用层、007 的 PPPoE、017 的架构拒绝/postinst、025 的真实线路性能、043 的代理运行/分流未测；OpenClash 严格限定兼容性/DNS/停用恢复，不含代理订阅或绕过内容。
 - 搜索验收：43/43 正向 + 5/5 负向，Top 5；22/22 alias 场景通过；见 `docs/search-acceptance.md`。
 - Pagefind extended 中文分词配置与查询扩展层。
 - Pages：golden placeholder 已部署到 `router-homes.pages.dev`（noindex，见 `docs/pages-deploy.md`）；域名仍为 Spaceship NS，绑定/内容生产部署/回滚演练尚未完成。
