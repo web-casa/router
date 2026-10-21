@@ -27,6 +27,8 @@ await mustExist(path.join(dist, 'en/getting-started/which-openwrt/index.html'), 
 await mustExist(path.join(dist, 'zh/getting-started/which-openwrt/index.html'), '/zh/getting-started/which-openwrt/');
 await mustExist(path.join(dist, 'en/getting-started/firmware-download/index.html'), '/en/getting-started/firmware-download/');
 await mustExist(path.join(dist, 'zh/getting-started/firmware-download/index.html'), '/zh/getting-started/firmware-download/');
+await mustExist(path.join(dist, 'en/getting-started/x86-image/index.html'), '/en/getting-started/x86-image/');
+await mustExist(path.join(dist, 'zh/getting-started/x86-image/index.html'), '/zh/getting-started/x86-image/');
 await mustExist(path.join(dist, 'en/network/dns/index.html'), '/en/network/dns/');
 await mustExist(path.join(dist, 'zh/network/dns/index.html'), '/zh/network/dns/');
 await mustExist(path.join(dist, 'en/network/lan-address/index.html'), '/en/network/lan-address/');
@@ -47,6 +49,8 @@ await mustExist(path.join(dist, 'en/software/openclash/index.html'), '/en/softwa
 await mustExist(path.join(dist, 'zh/software/openclash/index.html'), '/zh/software/openclash/');
 await mustExist(path.join(dist, 'en/software/package-sources/index.html'), '/en/software/package-sources/');
 await mustExist(path.join(dist, 'zh/software/package-sources/index.html'), '/zh/software/package-sources/');
+await mustExist(path.join(dist, 'en/software/apk-vs-opkg/index.html'), '/en/software/apk-vs-opkg/');
+await mustExist(path.join(dist, 'zh/software/apk-vs-opkg/index.html'), '/zh/software/apk-vs-opkg/');
 await mustExist(path.join(dist, 'en/recovery/backup-restore/index.html'), '/en/recovery/backup-restore/');
 await mustExist(path.join(dist, 'zh/recovery/backup-restore/index.html'), '/zh/recovery/backup-restore/');
 await mustExist(path.join(dist, 'en/recovery/firmware-upgrade/index.html'), '/en/recovery/firmware-upgrade/');

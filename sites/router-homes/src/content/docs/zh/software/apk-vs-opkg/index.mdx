@@ -1,0 +1,177 @@
+---
+title: 25.12 apk 与 24.10 opkg：命令、包格式与迁移边界
+description: 25.12 用 apk、24.10 用 opkg；对照包格式、源文件、更新/安装/查询命令，以及升级后插件要重装而不是“转换包”的边界。
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；apk 官方/TUNA 源 11220 包；安装 SQM；24.10 opkg 未在本次环境执行'
+testRecipe: 'tests/recipes/apk-vs-opkg.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['apk opkg 区别', 'openwrt apk', 'openwrt opkg', 'openwrt 包管理器']
+symptoms: ['apk 命令不存在', 'opkg 命令不存在', 'ipk 装不上', '升级后包管理变了']
+sources:
+  - label: OpenWrt apk package manager
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: OpenWrt opkg package manager
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg
+  - label: OpenWrt opkg to apk cheat sheet
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: OpenWrt 25.12 release notes
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；apk 官方/TUNA 源 11220 包；安装 SQM；24.10 opkg 未在本次环境执行"
+  recipe="tests/recipes/apk-vs-opkg.md"
+  result="E2 partial：25.12 apk 的 update/search/install 与镜像切换已实测；25.12 sysupgrade 后包从 239 降到 182；24.10 opkg 命令/包格式仅按官方资料整理，未执行"
+  date="2026-10-20"
+/>
+
+## 一句话
+
+- **25.12+**：`apk`，包是 `.apk`；
+- **24.10 及更早**：`opkg`，包是 `.ipk`；
+- 两者不是改后缀的关系，**不能把 `.ipk` 改名成 `.apk` 安装**；
+- 升级到 25.12 后，插件要按 `apk` 源重装，配置可备份/恢复。
+
+## 先确认你在哪一边
+
+```sh
+cat /etc/openwrt_release
+command -v apk
+command -v opkg
+```
+
+本实验：25.12.6，`apk` 存在，`opkg` 不存在。
+
+## 对照表
+
+| 项目 | 25.12 `apk` | 24.10 `opkg` |
+|---|---|---|
+| 包格式 | `.apk` | `.ipk` |
+| 源文件 | `/etc/apk/repositories.d/distfeeds.list` | `/etc/opkg/distfeeds.conf` |
+| 更新索引 | `apk update` | `opkg update` |
+| 安装 | `apk add <pkg>` | `opkg install <pkg>` |
+| 删除 | `apk del <pkg>` | `opkg remove <pkg>` |
+| 搜索 | `apk search <term>` | `opkg list \| grep <term>` |
+| 已安装 | `apk list --installed` | `opkg list-installed` |
+| 包信息 | `apk info -a <pkg>` | `opkg info <pkg>` |
+| 清理缓存 | `apk cache clean` | `opkg clean` |
+
+## 源和架构
+
+25.12：
+
+```text
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/packages/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/packages/x86_64/base/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/kmods/<kernel-hash>/packages.adb
+```
+
+24.10：
+
+```text
+src/gz openwrt_core https://downloads.openwrt.org/releases/24.10.8/targets/x86/64/packages
+src/gz openwrt_base https://downloads.openwrt.org/releases/24.10.8/packages/x86_64/base
+```
+
+- `release`、`target`、`arch`、kmod 内核 hash 必须匹配；
+- 混用官方/ImmortalWrt/iStoreOS 的源，ABI/签名/包名都可能不匹配；
+- 国内镜像只替换主机名/路径前缀，不要改 target/arch。
+
+## 常用操作
+
+<Step where="router-shell" title="25.12 安装一个包" expected="源更新、搜索、安装、验证都走 apk。" >
+
+```sh
+apk update
+apk search -x sqm-scripts
+apk add sqm-scripts
+apk info -e sqm-scripts
+apk list --installed | wc -l
+```
+
+本实验官方/TUNA 源均为 11220 个包；`sqm-scripts 1.7.2-r1` 安装成功。
+
+</Step>
+
+<Step where="router-shell" title="24.10 等价操作" expected="命令和包格式都是 opkg/ipk，不混用 apk。" >
+
+```sh
+opkg update
+opkg list | grep sqm-scripts
+opkg install sqm-scripts
+opkg list-installed | grep sqm-scripts
+```
+
+这一组是官方文档等价命令，**本次没有 24.10 设备，未执行**；不要把它当成已实测输出。
+
+</Step>
+
+## 升级到 25.12 时
+
+1. 备份 `/etc/config` 和包列表（见 018）；
+2. 记录 24.10 的 `opkg list-installed`；
+3. 升级/重刷 25.12（见 019）；
+4. 用 `apk` 源重装插件；
+5. 恢复配置，验证 LuCI/服务/DNS；
+6. 不要尝试把 `.ipk` 转成 `.apk`，也不要直接复制旧包目录。
+
+本实验的 25.12 sysupgrade：配置保留，但包从 239 降到 182；SQM/OpenClash 需要重装。
+
+## 常见失败
+
+### `apk: not found`
+
+- 固件是 24.10 或更早，应该用 `opkg`；
+- 不是“装一个 apk 包管理器”能解决；先看固件版本。
+
+### `opkg: not found`
+
+- 固件是 25.12+，应该用 `apk`；
+- 旧教程/脚本里的 `opkg` 不能直接套用。
+
+### `.ipk` 装不上
+
+- 25.12 使用 `.apk`；
+- 改后缀不会改变包格式；
+- 找对应 release/target/arch 的 `.apk`，或重新编译。
+
+### 404/签名/依赖错误
+
+- release/target/arch/kmod hash 不匹配；
+- 混源；
+- 系统时间/证书；
+- 不要长期用 `--allow-untrusted` 绕过。
+
+### 升级后 LuCI 没菜单
+
+- 只装了主程序，没装 `luci-app-*`；
+- 旧插件未重装；
+- 浏览器缓存/需要重登；
+- 见 017。
+
+## E2 实测记录（2026-10-20）
+
+- 环境：OpenWrt 25.12.6 x86 VM 200；`apk`；官方源/TUNA。
+- 官方/TUNA `apk update`：均 11220 个包；`apk add sqm-scripts` 成功。
+- 25.12 `sysupgrade` 后：包 239→182；SQM/OpenClash 丢失，配置仍需重装程序。
+- 未执行：24.10 `opkg` 的 update/install/list、24.10→25.12 实际升级、跨架构包。
+- 配方：`tests/recipes/apk-vs-opkg.md`。
+
+## 来源与复核
+
+- 本页是 E2 partial：25.12 apk 实测；24.10 opkg 仅为官方等价命令，未在本次环境执行。
+- 不要把“命令对照”写成“迁移已验证”；真实迁移要先备份、在 VM 试。
+- 没有第二评审人；结论只限本次 25.12 x86 环境。
+
+<PageSources />

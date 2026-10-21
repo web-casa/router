@@ -1,0 +1,198 @@
+---
+title: "Choose an x86 image: combined, ext4, squashfs, EFI/BIOS"
+description: Distinguish x86/64 combined/rootfs, ext4/squashfs, EFI/BIOS and tar.gz images, choose for PVE or physical boot, and avoid writing the wrong disk or an unbootable image.
+pageType: install
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86/64 generic-ext4-combined (BIOS/SeaBIOS) imported into PVE VM 200; 13.0MB gz/120.5MB img; UEFI/squashfs/USB untested'
+testRecipe: 'tests/recipes/x86-image-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt x86 image', 'openwrt combined', 'openwrt ext4 squashfs', 'openwrt efi bios']
+symptoms: ['cannot choose x86 image', 'PVE import will not boot', 'UEFI boot fails', 'wrote the wrong disk']
+sources:
+  - label: OpenWrt x86 installation
+    url: https://openwrt.org/docs/guide-user/installation/openwrt_x86
+  - label: OpenWrt image types
+    url: https://openwrt.org/docs/guide-user/installation/generic.backup
+  - label: Proxmox VE importdisk
+    url: https://pve.proxmox.com/pve-docs/qm.1.html
+  - label: OpenWrt downloads x86/64
+    url: https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 / x86" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86/64 generic-ext4-combined (BIOS/SeaBIOS) imported into PVE VM 200; 13.0MB gz/120.5MB img; UEFI/squashfs/USB untested"
+  recipe="tests/recipes/x86-image-25.12.md"
+  result="E2 partial: generic-ext4-combined (BIOS) SHA-256 passed, qm importdisk + scsi0 booted 25.12.6; EFI/squashfs/physical USB untested"
+  date="2026-10-20"
+/>
+
+## One-line choice
+
+- **PVE default SeaBIOS**: prefer `generic-ext4-combined.img.gz` (tested here);
+- **UEFI/OVMF**: choose a combined image with `-efi`;
+- **factory-reset/read-only root + overlay**: choose squashfs combined;
+- **existing bootloader/partitions, replace rootfs only**: use a rootfs image;
+- **container/chroot**: `rootfs.tar.gz`, not a disk image.
+
+## Read the filename
+
+Main 25.12.6 x86/64 files:
+
+```text
+openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+openwrt-25.12.6-x86-64-generic-ext4-combined-efi.img.gz
+openwrt-25.12.6-x86-64-generic-squashfs-combined.img.gz
+openwrt-25.12.6-x86-64-generic-squashfs-combined-efi.img.gz
+openwrt-25.12.6-x86-64-generic-ext4-rootfs.img.gz
+openwrt-25.12.6-x86-64-generic-squashfs-rootfs.img.gz
+openwrt-25.12.6-x86-64-generic-kernel.bin
+openwrt-25.12.6-x86-64-generic-targz-rootfs.tar.gz
+openwrt-25.12.6-x86-64-rootfs.tar.gz
+```
+
+Three words matter:
+
+| Word | Meaning | If wrong |
+|---|---|---|
+| `combined` | whole-disk image with partition table/boot | using it as rootfs can overwrite partitions |
+| `rootfs` | filesystem only | no bootloader; cannot boot directly |
+| `ext4` / `squashfs` | writable root / read-only root + overlay | affects recovery/write behavior |
+| `-efi` | UEFI boot | legacy BIOS may not boot it |
+| `tar.gz` | rootfs archive | not a bootable disk image |
+
+## ext4 vs squashfs
+
+- **ext4 combined**: writable root; common for VMs/soft routers; behaves like a normal Linux install.
+- **squashfs combined**: read-only root, config in overlay; better factory reset/anti-mistake; different space/maintenance.
+- Both can boot in PVE; this lab only tested ext4. Do not skip backups because “squashfs is safer”.
+
+## BIOS vs UEFI
+
+- PVE default `SeaBIOS`: use a combined image without `-efi`;
+- PVE `OVMF (UEFI)`: use `-efi` combined and prepare an EFI disk;
+- Physical: check `UEFI/Legacy` in firmware and match;
+- Wrong choice: no boot entry, GRUB does not start, falls to PXE/BIOS.
+
+This lab: PVE VM 200, SeaBIOS + `generic-ext4-combined`; booted successfully.
+
+## Download and verify
+
+<Step where="client" title="Download image and sha256sums" expected="Official/TUNA source and checksum pass.">
+
+```sh
+curl -LO https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+curl -LO https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/sha256sums
+grep 'generic-ext4-combined.img.gz' sha256sums | sha256sum -c -
+```
+
+This lab: 13.0MB `.img.gz`, 120.5MB `.img` after decompression; SHA-256 matched.
+
+</Step>
+
+<Step where="client" title="Decompress" expected="A .img ready for import/write.">
+
+```sh
+gzip -dk openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+ls -lh openwrt-25.12.6-x86-64-generic-ext4-combined.img
+```
+
+`sysupgrade` and PVE `qm importdisk` use `.img`; do not write the `.gz` directly to disk.
+
+</Step>
+
+## Import into PVE
+
+<Step where="pve" title="Import disk and set boot order" expected="VM boots from the imported disk, not ISO/PXE.">
+
+```sh
+qm create 200 --name openwrt --memory 512 --cores 2 --cpu host \
+  --scsihw virtio-scsi-pci --ostype l26 --vga std --serial0 socket \
+  --net0 virtio,bridge=vmbr0
+
+qm importdisk 200 openwrt-25.12.6-x86-64-generic-ext4-combined.img local-lvm
+qm set 200 --scsi0 local-lvm:vm-200-disk-0
+qm set 200 --boot order=scsi0
+qm start 200
+```
+
+If PVE uses UEFI/OVMF, use the `-efi` image and an EFI disk; do not force a BIOS image onto UEFI.
+
+</Step>
+
+<Step where="pve" title="Verify boot" expected="Console shows OpenWrt and the correct version/target.">
+
+```sh
+qm terminal 200
+# or inside the VM
+ubus call system board
+cat /etc/openwrt_release
+```
+
+This lab booted 25.12.6 x86/64; default LAN `192.168.1.1`.
+
+</Step>
+
+## Physical disk write
+
+```sh
+# verify the target first; do not copy the wrong device name
+lsblk
+sudo dd if=openwrt-...-combined.img of=/dev/sdX bs=4M status=progress conv=fsync
+sync
+```
+
+- `dd` overwrites the whole target; disconnect unrelated disks/verify the device;
+- For UEFI, choose `-efi`;
+- Boot from that disk; do not let the ISO keep boot priority;
+- Physical NIC names may not match PVE `eth0/eth1`; identify by MAC/PCI.
+
+## Common failures
+
+### PVE import will not boot
+
+- boot order is not `scsi0`;
+- you chose rootfs instead of combined;
+- BIOS/UEFI image mismatch;
+- disk bus/controller mismatch;
+- serial console not configured, no boot log.
+
+### Physical UEFI boot fails
+
+- non-`-efi` image;
+- BIOS still in Legacy/CSM;
+- incomplete USB write;
+- Secure Boot/signature restrictions.
+
+### Original system disappeared after writing
+
+`dd` wrote the wrong disk. Back up, verify `lsblk` size/model, then write; do not test on a production machine.
+
+### rootfs image will not boot directly
+
+rootfs has no bootloader/partition table; use an existing bootloader or the appropriate container/virtualization path.
+
+## E2 lab run (2026-10-20)
+
+- Environment: PVE 9.2.2; OpenWrt 25.12.6 x86/64; `generic-ext4-combined.img.gz`; SeaBIOS.
+- Download: `.img.gz` 13.0MB; `.img` 120.5MB; SHA-256 matched official `sha256sums`.
+- PVE: `qm importdisk` → `scsi0` → `boot order=scsi0`; VM booted 25.12.6.
+- Not tested: `-efi`/OVMF, squashfs, physical USB, Secure Boot, 24.10 image differences.
+- Recipe: `tests/recipes/x86-image-25.12.md`.
+
+## Sources and review
+
+- This is E2 partial: BIOS/ext4 combined + PVE import were tested; UEFI/squashfs/physical write were not.
+- Image names/availability change per release; use the download page.
+- No independent reviewer; conclusions are limited to this PVE/VM environment.
+
+<PageSources />

@@ -34,6 +34,11 @@ const meta = {
           translations: { 'zh-CN': '固件下载核对' },
           slug: 'getting-started/firmware-download',
         },
+        {
+          label: 'x86 image',
+          translations: { 'zh-CN': 'x86 镜像选择' },
+          slug: 'getting-started/x86-image',
+        },
       ],
     },
     {
@@ -101,6 +106,11 @@ const meta = {
           label: 'Package sources',
           translations: { 'zh-CN': '软件源' },
           slug: 'software/package-sources',
+        },
+        {
+          label: 'apk vs opkg',
+          translations: { 'zh-CN': 'apk / opkg 对照' },
+          slug: 'software/apk-vs-opkg',
         },
       ],
     },

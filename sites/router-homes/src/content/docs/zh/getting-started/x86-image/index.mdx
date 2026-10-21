@@ -1,0 +1,198 @@
+---
+title: x86 镜像怎么选：combined、ext4、squashfs、EFI/BIOS
+description: 区分 x86/64 的 combined/rootfs、ext4/squashfs、EFI/BIOS 和 tar.gz，按 PVE 或物理机启动方式选镜像，避免写错盘或选了不能启动的镜像。
+pageType: install
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86/64 generic-ext4-combined（BIOS/SeaBIOS）导入 PVE VM 200；13.0MB gz/120.5MB img；未测 UEFI/squashfs/USB'
+testRecipe: 'tests/recipes/x86-image-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt x86 镜像', 'openwrt combined', 'openwrt ext4 squashfs', 'openwrt efi bios']
+symptoms: ['x86 镜像不会选', 'PVE 导入后不启动', 'UEFI 启动失败', '写盘写错']
+sources:
+  - label: OpenWrt x86 installation
+    url: https://openwrt.org/docs/guide-user/installation/openwrt_x86
+  - label: OpenWrt image types
+    url: https://openwrt.org/docs/guide-user/installation/generic.backup
+  - label: Proxmox VE importdisk
+    url: https://pve.proxmox.com/pve-docs/qm.1.html
+  - label: OpenWrt downloads x86/64
+    url: https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 / x86" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86/64 generic-ext4-combined（BIOS/SeaBIOS）导入 PVE VM 200；13.0MB gz/120.5MB img；未测 UEFI/squashfs/USB"
+  recipe="tests/recipes/x86-image-25.12.md"
+  result="E2 partial：generic-ext4-combined（BIOS）SHA-256 通过，qm importdisk + scsi0 启动成功，版本 25.12.6；未测 EFI/squashfs/物理 USB"
+  date="2026-10-20"
+/>
+
+## 一句话选择
+
+- **PVE 默认 SeaBIOS**：优先 `generic-ext4-combined.img.gz`（本次实测）；
+- **UEFI/OVMF**：选带 `-efi` 的 combined 镜像；
+- **想恢复出厂/只读根 + overlay**：选 squashfs combined；
+- **已经有引导/分区，只想换 rootfs**：才考虑 rootfs 镜像；
+- **容器/chroot**：`rootfs.tar.gz`，不要当磁盘镜像写。
+
+## 先看文件名
+
+25.12.6 x86/64 目录里的主要文件：
+
+```text
+openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+openwrt-25.12.6-x86-64-generic-ext4-combined-efi.img.gz
+openwrt-25.12.6-x86-64-generic-squashfs-combined.img.gz
+openwrt-25.12.6-x86-64-generic-squashfs-combined-efi.img.gz
+openwrt-25.12.6-x86-64-generic-ext4-rootfs.img.gz
+openwrt-25.12.6-x86-64-generic-squashfs-rootfs.img.gz
+openwrt-25.12.6-x86-64-generic-kernel.bin
+openwrt-25.12.6-x86-64-generic-targz-rootfs.tar.gz
+openwrt-25.12.6-x86-64-rootfs.tar.gz
+```
+
+看三个词：
+
+| 词 | 含义 | 选错会怎样 |
+|---|---|---|
+| `combined` | 含分区表/引导的整盘镜像 | 当 rootfs 用会覆盖分区 |
+| `rootfs` | 只含根文件系统 | 没有引导，直接写盘不能启动 |
+| `ext4` / `squashfs` | 可写根 / 只读根 + overlay | 影响恢复方式和写入行为 |
+| `-efi` | UEFI 引导 | 老 BIOS 机器可能不启动 |
+| `tar.gz` | 根文件系统归档 | 不是可启动磁盘镜像 |
+
+## ext4 vs squashfs
+
+- **ext4 combined**：根分区可直接写；VM/软路由常用；升级/恢复和普通 Linux 接近。
+- **squashfs combined**：根只读，配置在 overlay；恢复出厂/抗误改更好；空间和维护方式不同。
+- 两者都能在 PVE 启动；这次只实测 ext4。不要因为“squashfs 更安全”就忽略备份和恢复流程。
+
+## BIOS vs UEFI
+
+- PVE 默认 `SeaBIOS`：用不带 `-efi` 的 combined；
+- PVE `OVMF (UEFI)`：用 `-efi` combined，并准备 EFI 磁盘；
+- 物理机：进 BIOS 看 `UEFI/Legacy`，按启动模式选；
+- 选错常见现象：开机无启动项、GRUB 不进、直接掉到 PXE/BIOS。
+
+本次：PVE VM 200，SeaBIOS + `generic-ext4-combined`，启动成功。
+
+## 下载与校验
+
+<Step where="client" title="下载镜像和 sha256sums" expected="文件来自官方/TUNA，且校验通过。" >
+
+```sh
+curl -LO https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+curl -LO https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/sha256sums
+grep 'generic-ext4-combined.img.gz' sha256sums | sha256sum -c -
+```
+
+本实验：13.0MB `.img.gz`，解压后 120.5MB `.img`；SHA-256 与官方一致。
+
+</Step>
+
+<Step where="client" title="解压" expected="得到可导入/写盘的 .img。" >
+
+```sh
+gzip -dk openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+ls -lh openwrt-25.12.6-x86-64-generic-ext4-combined.img
+```
+
+`sysupgrade` 用 `.img`；PVE `qm importdisk` 也用 `.img`。不要把 `.gz` 直接写进磁盘。
+
+</Step>
+
+## PVE 导入
+
+<Step where="pve" title="导入磁盘并设置启动顺序" expected="VM 从导入的磁盘启动，不落到 ISO/PXE。" >
+
+```sh
+qm create 200 --name openwrt --memory 512 --cores 2 --cpu host \
+  --scsihw virtio-scsi-pci --ostype l26 --vga std --serial0 socket \
+  --net0 virtio,bridge=vmbr0
+
+qm importdisk 200 openwrt-25.12.6-x86-64-generic-ext4-combined.img local-lvm
+qm set 200 --scsi0 local-lvm:vm-200-disk-0
+qm set 200 --boot order=scsi0
+qm start 200
+```
+
+如果 PVE 是 UEFI/OVMF，换 `-efi` 镜像并加 EFI 盘；不要拿 BIOS 镜像硬套 UEFI。
+
+</Step>
+
+<Step where="pve" title="验证启动" expected="串口/控制台出现 OpenWrt，版本和 target 正确。" >
+
+```sh
+qm terminal 200
+# 或在 VM 内
+ubus call system board
+cat /etc/openwrt_release
+```
+
+本实验启动后为 25.12.6 x86/64；LAN 默认 `192.168.1.1`。
+
+</Step>
+
+## 物理机写盘
+
+```sh
+# 先确认目标盘，不要复制错设备名
+lsblk
+sudo dd if=openwrt-...-combined.img of=/dev/sdX bs=4M status=progress conv=fsync
+sync
+```
+
+- `dd` 会覆盖目标盘全部数据；先拔掉不相关磁盘/确认设备名；
+- UEFI 机器选 `-efi`；
+- 写完后从该盘启动，不要再用 ISO 抢启动顺序；
+- 物理机网口名和 PVE 的 `eth0/eth1` 不一定对应，按 MAC/PCI 识别。
+
+## 常见失败
+
+### PVE 导入后不启动
+
+- 启动顺序不是 `scsi0`；
+- 选了 rootfs 而非 combined；
+- BIOS/UEFI 镜像选错；
+- 磁盘总线/控制器与镜像不匹配；
+- 串口没配置，看不到启动日志。
+
+### 物理机 UEFI 启动失败
+
+- 用了非 `-efi` 镜像；
+- BIOS 仍是 Legacy/CSM；
+- USB 写入不完整；
+- 安全启动/签名限制。
+
+### 写盘后原系统没了
+
+`dd` 写错盘。先备份，确认 `lsblk` 的容量/型号，再执行；不要在生产机上试。
+
+### rootfs 镜像不能直接启动
+
+rootfs 只含文件系统；需要已有 bootloader/分区，或按你的虚拟化/容器方式使用。
+
+## E2 实测记录（2026-10-20）
+
+- 环境：PVE 9.2.2；OpenWrt 25.12.6 x86/64；`generic-ext4-combined.img.gz`；SeaBIOS。
+- 下载：`.img.gz` 13.0MB；解压 `.img` 120.5MB；SHA-256 与官方 `sha256sums` 一致。
+- PVE：`qm importdisk` → `scsi0` → `boot order=scsi0`；VM 启动成功，版本 25.12.6。
+- 未测：`-efi`/OVMF、squashfs、物理 USB、安全启动、24.10 镜像差异。
+- 配方：`tests/recipes/x86-image-25.12.md`。
+
+## 来源与复核
+
+- 本页是 E2 partial：BIOS/ext4 combined + PVE 导入已实测；UEFI/squashfs/物理写盘未测。
+- 镜像文件名和可用类型随 release 变化；下载页为准。
+- 没有第二评审人；结论只限本次 PVE/VM 环境。
+
+<PageSources />
