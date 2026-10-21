@@ -1,0 +1,229 @@
+---
+title: WireGuard 回家网络：服务端、Peer、防火墙与隧道验证
+description: 在 OpenWrt 25.12 上配置 WireGuard 服务端、Peer 和防火墙，验证握手/隧道 IP/HTTP；WAN 端口映射、DDNS 和真实手机漫游单独验证。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200 + PVE netns 客户端；wg0 10.10.0.1/24，UDP 51820；握手/ping/HTTP 成功；无 WAN 端口映射/DDNS/手机漫游'
+testRecipe: 'tests/recipes/wireguard-server-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt wireguard', 'openwrt wireguard 服务端', 'wireguard 回家', 'openwrt wg0']
+symptoms: ['wireguard 不握手', 'wg0 不存在', 'wireguard 连不上', '隧道 ping 不通']
+sources:
+  - label: OpenWrt WireGuard server
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/server
+  - label: WireGuard quick start
+    url: https://www.wireguard.com/quickstart/
+  - label: OpenWrt firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: WireGuard protocol
+    url: https://www.wireguard.com/protocol/
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 + PVE netns" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200 + PVE netns 客户端；wg0 10.10.0.1/24，UDP 51820；握手/ping/HTTP 成功；无 WAN 端口映射/DDNS/手机漫游"
+  recipe="tests/recipes/wireguard-server-25.12.md"
+  result="E2 partial：服务端 wg0 10.10.0.1/24、UDP 51820；客户端 10.10.0.2/24 握手成功，隧道 ping 4/4，HTTP 200；未测 WAN 端口映射、DDNS、真实手机/漫游、LAN 转发"
+  date="2026-10-20"
+/>
+
+## 目标与边界
+
+本页验证：
+
+- OpenWrt 上创建 WireGuard 服务端接口 `wg0`；
+- 添加一个客户端 Peer；
+- 防火墙把 `wg0` 放进 LAN zone；
+- 客户端能握手、ping 隧道 IP、通过隧道访问 LuCI。
+
+本页**不**验证：
+
+- 公网 WAN 的 UDP 端口映射/防火墙；
+- DDNS/域名；
+- 手机/Windows 客户端漫游；
+- 通过隧道访问整个 LAN 的转发/NAT。
+
+这些是部署环境相关，不能拿本次 LAN 实验冒充。
+
+## 拓扑
+
+```text
+客户端 192.168.1.251
+   │  vmbr5（实验 LAN）
+   ▼
+OpenWrt VM 200 192.168.1.2
+   wg0 10.10.0.1/24, UDP 51820
+   │
+   └── 隧道 10.10.0.0/24
+       客户端 wg0 10.10.0.2/24
+```
+
+真实回家网络时，客户端在公网，OpenWrt 的 WAN 需要 UDP 51820 映射/放行；本次是 LAN 侧实验。
+
+## 准备
+
+<Step where="router-shell" title="确认内核和工具" expected="wg 可用、wireguard 模块已加载。" >
+
+```sh
+apk add wireguard-tools kmod-wireguard
+wg --version
+cat /proc/modules | grep wireguard
+```
+
+本实验：`wireguard-tools v1.0.20260223`，`wireguard` 模块已加载。
+
+</Step>
+
+<Step where="router-shell" title="生成服务端密钥（不要贴到聊天/仓库）" expected="私钥只留在设备，公钥给客户端。" >
+
+```sh
+umask 077
+wg genkey > /tmp/wg-server.key
+wg pubkey < /tmp/wg-server.key > /tmp/wg-server.pub
+cat /tmp/wg-server.pub   # 只把公钥给客户端
+```
+
+客户端也生成自己的密钥对，**私钥永远不发给服务端**；服务端只需要客户端公钥。
+
+</Step>
+
+## 配置服务端
+
+<Step where="router-shell" title="创建 wg0 和 Peer" expected="netifd 识别 proto=wireguard，wg0 有地址。" >
+
+```sh
+uci set network.wg0=interface
+uci set network.wg0.proto='wireguard'
+uci set network.wg0.private_key='<server-private-key>'
+uci set network.wg0.listen_port='51820'
+uci set network.wg0.addresses='10.10.0.1/24'
+uci set network.wg0.auto='1'
+
+uci set network.wg0_client=wireguard_wg0
+uci set network.wg0_client.public_key='<client-public-key>'
+uci set network.wg0_client.allowed_ips='10.10.0.2/32'
+uci set network.wg0_client.persistent_keepalive='25'
+
+uci commit network
+/etc/init.d/network restart
+```
+
+关键命名：
+
+- 接口 section 用 `wg0`，Peer 类型用 `wireguard_wg0`，两者后缀要一致；
+- 本实验把接口命名为 `wg` 时，netifd 显示 `proto: none`、设备 `wg0` 不存在；改成 `wg0` 后正常。**建议直接用 wg0。**
+
+验证：
+
+```sh
+wg show
+ip -4 addr show wg0
+ubus call network.interface.wg0 status
+```
+
+</Step>
+
+<Step where="router-shell" title="防火墙：把 wg0 放进 LAN zone" expected="UDP 51820 可进，隧道 IP 可访问。" >
+
+```sh
+uci show firewall | grep -E "zone.*name|zone.*network"
+uci add_list firewall.@zone[0].network='wg0'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+`@zone[0]` 在本实验是 LAN zone；你的配置里索引可能不同，先看清 `name='lan'` 的 section。
+
+本实验 `wg0` 加入 LAN zone 后，客户端可 ping `10.10.0.1` 并访问 LuCI。
+
+</Step>
+
+## 客户端侧最小验证
+
+客户端配置见 022。服务端先看：
+
+```sh
+wg show
+```
+
+客户端握手后，服务端应出现：
+
+```text
+peer: <client-public-key>
+  endpoint: 192.168.1.251:44421
+  allowed ips: 10.10.0.2/32
+  latest handshake: ...
+  transfer: ...
+```
+
+本实验客户端输出：
+
+- handshake 3 秒前；
+- `transfer 124 B received, 180 B sent`；
+- ping `10.10.0.1` 4/4；
+- HTTP `http://10.10.0.1/` 返回 LuCI。
+
+## 真实 WAN 还需要什么
+
+- 公网 IP/端口映射：WAN UDP 51820 → OpenWrt；
+- 防火墙 WAN input 允许该 UDP；
+- DDNS/固定域名；
+- 客户端 `Endpoint` 用公网地址，不是 192.168.1.2；
+- 如果要访问整个 LAN，服务端 Peer 的 `allowed_ips` 和客户端 `AllowedIPs` 要包含 LAN 网段，并处理回程路由/NAT；
+- 不要把“隧道 IP 能 ping”写成“整个家庭 LAN 已可访问”。
+
+## 常见失败
+
+### wg0 不存在 / proto none
+
+- 接口 section 名和 Peer 类型后缀不一致；
+- `wireguard-tools`/`kmod-wireguard` 没装；
+- 网络没有 restart；
+- 先看 `wg show`、`ubus status`、`logread`。
+
+### 不握手
+
+- 客户端公钥/服务端公钥填反；
+- Endpoint/端口不对；
+- 防火墙没放行 UDP；
+- 私钥权限/内容错；
+- 两边系统时间不影响 WireGuard 握手，但别用错密钥。
+
+### 隧道 ping 不通
+
+- `allowed_ips` 不包含对方隧道 IP；
+- 接口没有地址/没 up；
+- 防火墙 zone；
+- 客户端路由把 Endpoint 也送进隧道，形成环路。
+
+### 能 ping 隧道 IP，访问不了 LAN
+
+- 客户端 AllowedIPs 没包含 LAN；
+- 服务端没有转发/NAT/回程路由；
+- 防火墙 forward 未放行；
+- 不要把隧道通当成 LAN 通。
+
+## E2 实测记录（2026-10-20）
+
+- 环境：OpenWrt 25.12.6 x86 VM 200；`wg0` `10.10.0.1/24`，UDP 51820；PVE netns 客户端 `10.10.0.2/24`。
+- 服务端：`wg show` 看到 Peer，handshake 成功，transfer 1.47 KiB/1.90 KiB；`wg0` 已 up。
+- 客户端：handshake、ping 隧道 4/4、HTTP 200（LuCI）。
+- 未测：WAN 端口映射/防火墙、DDNS、手机/Windows、LAN 网段转发、NAT/回程。
+- 配方：`tests/recipes/wireguard-server-25.12.md`。
+
+## 来源与复核
+
+- 本页是 E2 partial：LAN 侧服务端+隧道已验证；真实 WAN/移动客户端/LAN 转发未测。
+- 私钥只留设备；仓库/截图/聊天不要出现私钥。
+- 没有第二评审人；结论只限本次 VM/netns 环境。
+
+<PageSources />

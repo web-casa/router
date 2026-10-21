@@ -1,0 +1,229 @@
+---
+title: "WireGuard home access: server, peer, firewall and tunnel verification"
+description: Configure a WireGuard server, peer and firewall on OpenWrt 25.12, verify handshake/tunnel IP/HTTP; WAN port forwarding, DDNS and real phone roaming are separate checks.
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200 + PVE netns client; wg0 10.10.0.1/24, UDP 51820; handshake/ping/HTTP passed; no WAN port-forward/DDNS/phone roaming'
+testRecipe: 'tests/recipes/wireguard-server-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt wireguard', 'openwrt wireguard server', 'wireguard home access', 'openwrt wg0']
+symptoms: ['wireguard no handshake', 'wg0 missing', 'wireguard cannot connect', 'tunnel ping fails']
+sources:
+  - label: OpenWrt WireGuard server
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/server
+  - label: WireGuard quick start
+    url: https://www.wireguard.com/quickstart/
+  - label: OpenWrt firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: WireGuard protocol
+    url: https://www.wireguard.com/protocol/
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 + PVE netns" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200 + PVE netns client; wg0 10.10.0.1/24, UDP 51820; handshake/ping/HTTP passed; no WAN port-forward/DDNS/phone roaming"
+  recipe="tests/recipes/wireguard-server-25.12.md"
+  result="E2 partial: server wg0 10.10.0.1/24 on UDP 51820; client 10.10.0.2/24 handshook, tunnel ping 4/4, HTTP 200; WAN port-forward, DDNS, real phone/roaming and LAN forwarding untested"
+  date="2026-10-20"
+/>
+
+## Scope
+
+This page verifies:
+
+- creating a WireGuard server interface `wg0` on OpenWrt;
+- adding one client peer;
+- putting `wg0` in the LAN firewall zone;
+- handshake, tunnel-IP ping and LuCI over the tunnel.
+
+It does **not** verify:
+
+- public WAN UDP port forwarding/firewall;
+- DDNS/domain;
+- phone/Windows client roaming;
+- forwarding/NAT to the whole LAN.
+
+Those depend on the deployment environment; this LAN test is not a substitute.
+
+## Topology
+
+```text
+Client 192.168.1.251
+   │  vmbr5 (lab LAN)
+   ▼
+OpenWrt VM 200 192.168.1.2
+   wg0 10.10.0.1/24, UDP 51820
+   │
+   └── tunnel 10.10.0.0/24
+       client wg0 10.10.0.2/24
+```
+
+In real home access the client is on the internet; OpenWrt WAN needs UDP 51820 forwarded/allowed. This lab is LAN-side only.
+
+## Preparation
+
+<Step where="router-shell" title="Confirm kernel and tools" expected="wg exists and the wireguard module is loaded.">
+
+```sh
+apk add wireguard-tools kmod-wireguard
+wg --version
+cat /proc/modules | grep wireguard
+```
+
+This lab: `wireguard-tools v1.0.20260223`; `wireguard` module loaded.
+
+</Step>
+
+<Step where="router-shell" title="Generate server keys (never paste into chat/repo)" expected="Private key stays on the device; public key goes to the client.">
+
+```sh
+umask 077
+wg genkey > /tmp/wg-server.key
+wg pubkey < /tmp/wg-server.key > /tmp/wg-server.pub
+cat /tmp/wg-server.pub   # only the public key goes to the client
+```
+
+The client also generates its own keypair; **never send its private key to the server**. The server only needs the client public key.
+
+</Step>
+
+## Configure the server
+
+<Step where="router-shell" title="Create wg0 and the peer" expected="netifd sees proto=wireguard and wg0 has its address.">
+
+```sh
+uci set network.wg0=interface
+uci set network.wg0.proto='wireguard'
+uci set network.wg0.private_key='<server-private-key>'
+uci set network.wg0.listen_port='51820'
+uci set network.wg0.addresses='10.10.0.1/24'
+uci set network.wg0.auto='1'
+
+uci set network.wg0_client=wireguard_wg0
+uci set network.wg0_client.public_key='<client-public-key>'
+uci set network.wg0_client.allowed_ips='10.10.0.2/32'
+uci set network.wg0_client.persistent_keepalive='25'
+
+uci commit network
+/etc/init.d/network restart
+```
+
+Naming matters:
+
+- interface section `wg0`, peer type `wireguard_wg0`; suffixes must match;
+- in this lab, naming the interface `wg` made netifd report `proto: none` and device `wg0` missing; renaming to `wg0` fixed it. **Use wg0.**
+
+Verify:
+
+```sh
+wg show
+ip -4 addr show wg0
+ubus call network.interface.wg0 status
+```
+
+</Step>
+
+<Step where="router-shell" title="Firewall: put wg0 in the LAN zone" expected="UDP 51820 is reachable and tunnel IPs can communicate.">
+
+```sh
+uci show firewall | grep -E "zone.*name|zone.*network"
+uci add_list firewall.@zone[0].network='wg0'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+`@zone[0]` was the LAN zone in this lab; your index may differ—find the section with `name='lan'`.
+
+After adding `wg0` to LAN, the client could ping `10.10.0.1` and reach LuCI.
+
+</Step>
+
+## Minimal client check
+
+Client config is in 022. On the server:
+
+```sh
+wg show
+```
+
+After the client handshakes, the server should show:
+
+```text
+peer: <client-public-key>
+  endpoint: 192.168.1.251:44421
+  allowed ips: 10.10.0.2/32
+  latest handshake: ...
+  transfer: ...
+```
+
+This lab client:
+
+- handshake 3 seconds ago;
+- `transfer 124 B received, 180 B sent`;
+- ping `10.10.0.1` 4/4;
+- HTTP `http://10.10.0.1/` returned LuCI.
+
+## What real WAN still needs
+
+- Public IP/port forward: WAN UDP 51820 → OpenWrt;
+- WAN input firewall allows that UDP;
+- DDNS/fixed hostname;
+- client `Endpoint` uses the public address, not 192.168.1.2;
+- to access the whole LAN, server peer `allowed_ips` and client `AllowedIPs` must include the LAN prefix, plus return routing/NAT;
+- do not turn “tunnel IP pings” into “the whole home LAN is reachable”.
+
+## Common failures
+
+### wg0 missing / proto none
+
+- interface section name and peer type suffix do not match;
+- `wireguard-tools`/`kmod-wireguard` missing;
+- network was not restarted;
+- check `wg show`, `ubus status`, `logread`.
+
+### No handshake
+
+- client/server public keys swapped;
+- wrong endpoint/port;
+- firewall does not allow UDP;
+- private key permissions/content wrong;
+- WireGuard does not rely on clock sync for handshakes, but a wrong key still fails.
+
+### Tunnel ping fails
+
+- `allowed_ips` does not include the peer tunnel IP;
+- interface has no address / is down;
+- firewall zone;
+- client route sends the endpoint itself into the tunnel (loop).
+
+### Tunnel IP pings, LAN unreachable
+
+- client AllowedIPs lacks the LAN prefix;
+- server lacks forwarding/NAT/return route;
+- firewall forward not allowed;
+- do not equate a working tunnel with a working LAN.
+
+## E2 lab run (2026-10-20)
+
+- Environment: OpenWrt 25.12.6 x86 VM 200; `wg0` `10.10.0.1/24`, UDP 51820; PVE netns client `10.10.0.2/24`.
+- Server: `wg show` listed the peer, handshake succeeded, transfer 1.47 KiB/1.90 KiB; `wg0` up.
+- Client: handshake, tunnel ping 4/4, HTTP 200 (LuCI).
+- Not tested: WAN port-forward/firewall, DDNS, phone/Windows, LAN forwarding, NAT/return route.
+- Recipe: `tests/recipes/wireguard-server-25.12.md`.
+
+## Sources and review
+
+- This is E2 partial: LAN-side server + tunnel were tested; real WAN/mobile clients/LAN forwarding were not.
+- Private keys stay on devices; never put them in the repo/screenshots/chat.
+- No independent reviewer; conclusions are limited to this VM/netns environment.
+
+<PageSources />

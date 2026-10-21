@@ -78,6 +78,22 @@ const meta = {
       ],
     },
     {
+      label: 'Remote access',
+      translations: { 'zh-CN': '远程访问' },
+      items: [
+        {
+          label: 'WireGuard server',
+          translations: { 'zh-CN': 'WireGuard 服务端' },
+          slug: 'remote-access/wireguard-server',
+        },
+        {
+          label: 'WireGuard client',
+          translations: { 'zh-CN': 'WireGuard 客户端' },
+          slug: 'remote-access/wireguard-client',
+        },
+      ],
+    },
+    {
       label: 'Installation',
       translations: { 'zh-CN': '安装' },
       items: [

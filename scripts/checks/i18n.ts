@@ -41,6 +41,10 @@ await mustExist(path.join(dist, 'en/network/bypass-gateway/index.html'), '/en/ne
 await mustExist(path.join(dist, 'zh/network/bypass-gateway/index.html'), '/zh/network/bypass-gateway/');
 await mustExist(path.join(dist, 'en/network/ap-mode/index.html'), '/en/network/ap-mode/');
 await mustExist(path.join(dist, 'zh/network/ap-mode/index.html'), '/zh/network/ap-mode/');
+await mustExist(path.join(dist, 'en/remote-access/wireguard-server/index.html'), '/en/remote-access/wireguard-server/');
+await mustExist(path.join(dist, 'zh/remote-access/wireguard-server/index.html'), '/zh/remote-access/wireguard-server/');
+await mustExist(path.join(dist, 'en/remote-access/wireguard-client/index.html'), '/en/remote-access/wireguard-client/');
+await mustExist(path.join(dist, 'zh/remote-access/wireguard-client/index.html'), '/zh/remote-access/wireguard-client/');
 await mustExist(path.join(dist, 'en/installation/proxmox/index.html'), '/en/installation/proxmox/');
 await mustExist(path.join(dist, 'zh/installation/proxmox/index.html'), '/zh/installation/proxmox/');
 await mustExist(path.join(dist, 'en/software/adguard-home/index.html'), '/en/software/adguard-home/');

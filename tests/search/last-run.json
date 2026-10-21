@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-21T14:01:55.232Z",
-  "base": "http://127.0.0.1:44633",
+  "generatedAt": "2026-10-21T14:39:04.814Z",
+  "base": "http://127.0.0.1:43573",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -30,6 +30,11 @@
           {
             "url": "/zh/software/adguard-home/",
             "title": "AdGuard Home：从后台到终端过滤验证",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh/remote-access/wireguard-client/",
+            "title": "WireGuard 客户端：配置、AllowedIPs、DNS 与断线恢复",
             "excerpt": ""
           },
           {
@@ -634,13 +639,13 @@
             "excerpt": ""
           },
           {
-            "url": "/en/network/ipv6/",
-            "title": "IPv6 basics: verify ULA, RA/SLAAC, PD and DNS",
+            "url": "/en/remote-access/wireguard-client/",
+            "title": "WireGuard client: config, AllowedIPs, DNS and reconnect",
             "excerpt": ""
           },
           {
-            "url": "/en/software/adguard-home/",
-            "title": "AdGuard Home: from web UI to client filtering",
+            "url": "/en/network/ipv6/",
+            "title": "IPv6 basics: verify ULA, RA/SLAAC, PD and DNS",
             "excerpt": ""
           },
           {
