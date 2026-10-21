@@ -1,0 +1,212 @@
+---
+title: 有线/无线 AP 接入现有路由器：关 DHCP、改 LAN、接 LAN 口
+description: 把 OpenWrt 变成现有主路由下的 AP：只接 LAN、关 DHCP、LAN IP 放在池外，客户端继续从主路由拿地址；无线部分单独验证。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: '有线 AP E2：AP LAN 192.168.1.2/24，DHCP 关闭；上游 DHCP 192.168.1.1；客户端 192.168.1.136；无 WAN/无 Wi-Fi'
+testRecipe: 'tests/recipes/ap-mode-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt ap mode', 'openwrt 无线 ap', 'openwrt 关 dhcp', '路由器当 ap']
+symptoms: ['AP 下设备拿不到地址', 'AP 双重 DHCP', '接上 AP 后全网断']
+sources:
+  - label: OpenWrt network configuration
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP and DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt Wi-Fi configuration
+    url: https://openwrt.org/docs/guide-user/network/wifi/basic
+  - label: OpenWrt firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="有线 AP E2：AP LAN 192.168.1.2/24，DHCP 关闭；上游 DHCP 192.168.1.1；客户端 192.168.1.136；无 WAN/无 Wi-Fi"
+  recipe="tests/recipes/ap-mode-25.12.md"
+  result="E2 partial：AP LAN 改为 .2、DHCP ignore=1；客户端从上游 .1 拿到 192.168.1.136/24，网关 .1；AP .2 可管理，客户端可 ping AP/上游；本 AP-only 实验没有公网，未验证上游互联网与 Wi-Fi"
+  date="2026-10-20"
+/>
+
+## AP 模式的关键
+
+AP（接入点）不是“再开一个路由器”：
+
+- 只接 **LAN 口**，不接 WAN；
+- 关掉 AP 的 DHCP，让主路由继续发地址；
+- AP 的 LAN IP 放在主路由 DHCP 池外；
+- 不做 NAT/双重路由（除非你明确要二级路由）。
+
+本实验只验证 **有线 AP + 上游 DHCP**；无线 SSID/加密/漫游没有硬件，标 E1。
+
+## 拓扑
+
+```text
+主路由 192.168.1.1（DHCP）
+        │ LAN 口
+        │
+   OpenWrt AP
+   LAN br-lan 192.168.1.2/24
+   DHCP: ignore
+        │ LAN 口
+        │
+   客户端 192.168.1.136/24
+   gateway 192.168.1.1
+```
+
+- 客户端从主路由拿地址，网关是 `.1`，不是 AP `.2`；
+- AP `.2` 只用于管理；
+- 如果客户端网关变成 `.2`，说明还有第二个 DHCP 或配置错了。
+
+## 配置步骤
+
+<Step where="router-shell" title="备份并确认没有 WAN 依赖" expected="知道 LAN IP、DHCP 状态和 WAN 是否被使用。" >
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+uci show network.wan 2>/dev/null
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+AP 模式通常不需要 WAN；如果你还保留 WAN，确认它不会和 LAN 抢默认路由/NAT。
+
+</Step>
+
+<Step where="luci" title="改 LAN IP，关闭 DHCP" expected="AP 是 192.168.1.2/24，DHCP 不再发地址。" >
+
+**Network → Interfaces → LAN → Edit**：
+
+1. IPv4 address：`192.168.1.2/24`（放在主路由池外）；
+2. **DHCP Server → General → Ignore interface**；
+3. 保存并应用。
+
+CLI：
+
+```sh
+uci set network.lan.ipaddr='192.168.1.2/24'
+uci set dhcp.lan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+改完用 `192.168.1.2` 重新进 LuCI/SSH。
+
+</Step>
+
+<Step where="client" title="接到主路由 LAN 口" expected="客户端从主路由 DHCP 拿地址，网关是主路由。" >
+
+把 OpenWrt 的 **LAN 口**接到主路由的 **LAN 口**；不要接 WAN。
+
+客户端重新连网/续租：
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.1.1
+ping 192.168.1.2
+```
+
+本实验客户端拿到 `192.168.1.136/24`，网关 `192.168.1.1`；AP `.2` 可 ping。
+
+</Step>
+
+<Step where="client" title="确认 AP 没有发 DHCP" expected="DHCP  lease 的 server 是主路由，不是 AP。" >
+
+```sh
+# Linux 示例
+udhcpc -i eth0 -f -q -n -t 5
+```
+
+看输出里的 `server 192.168.1.1`；如果是 `192.168.1.2`，AP 的 DHCP 没关。
+
+本实验 AP-only 环境没有公网，所以 `ping 1.1.1.1` 失败是预期；真实环境是否能上网取决于主路由。
+
+</Step>
+
+## 无线 AP（E1）
+
+没有无线硬件，未验证：
+
+- SSID/密码/WPA2/WPA3；
+- 2.4G/5G 信道、频宽、发射功率；
+- 漫游/802.11r/弱信号剔除；
+- 无线客户端隔离；
+- 多 AP 同 SSID。
+
+配置原则：
+
+- AP 的 LAN 桥接到无线接口（通常 `br-lan`）；
+- 关 DHCP；
+- 无线安全用 WPA2/WPA3，不要开放；
+- 多 AP 时信道错开，统一 SSID/密码；
+- 先有线验证，再加无线，避免同时改两层。
+
+## 常见失败
+
+### 接上 AP 后全网断
+
+- AP 的 DHCP 没关，和主路由冲突；
+- AP 的 LAN IP 和主路由冲突；
+- 把 AP 的 WAN 口接进了主路由 LAN；
+- 主路由/AP 之间有环路。
+
+先断开 AP，恢复主路由，再逐项改。
+
+### 客户端拿不到地址
+
+- AP 没接到主路由 LAN；
+- AP 的 DHCP 关了，但主路由 DHCP 没开/池满；
+- VLAN/隔离端口；
+- 无线未桥接到 `br-lan`。
+
+### 客户端有地址但网关上错
+
+- 还有一个 DHCP 在发 `.2`；
+- 客户端保留了旧租约；
+- AP 的 LAN 接口跑了 DHCP 服务器；
+- 检查 `cat /tmp/dhcp.leases`（AP 上应该没有新租约）。
+
+### 无线能连但没网
+
+- 无线接口没加入 LAN 桥；
+- AP 防火墙把无线 zone 和 LAN 分开；
+- 上游主路由没放行；
+- 客户端隔离/访客网络。
+
+## 录屏演示（008 实验）
+
+<TerminalCast
+  src="/casts/008-ap.cast"
+  title="008 实验：有线 AP、关 DHCP、客户端从上游拿地址"
+  caption="真实 OpenWrt 25.12.6 VM：AP LAN .2、DHCP 关闭；客户端从上游 192.168.1.1 获得 192.168.1.136/24，网关 .1，能 ping AP 和上游。实验环境没有公网/Wi-Fi。"
+/>
+
+## E2 实测记录（2026-10-20）
+
+- 环境：OpenWrt 25.12.6 x86 VM 200；AP LAN `192.168.1.2/24`；`dhcp.lan.ignore=1`；上游 netns `192.168.1.1/24` + BusyBox udhcpd；客户端 `192.168.1.136/24`。
+- 客户端 DHCP：server `192.168.1.1`，lease 864000s；网关 `.1`。
+- 客户端 ping AP `.2`、上游 `.1` 正常；AP-only 环境无公网，`1.1.1.1` 失败。
+- 未测：真实主路由互联网、Wi-Fi/SSID/加密/漫游、Windows/手机客户端、IPv6/RA。
+- cast：`public/casts/008-ap.cast`；配方：`tests/recipes/ap-mode-25.12.md`。
+
+## 来源与复核
+
+- 本页是 E2 partial：有线 AP/L2/DHCP 已实测；无线和真实上游互联网未测。
+- 没有第二评审人；结论只限本次 VM/netns 环境。
+- AP 模式最重要的是“只接 LAN + 关 DHCP + LAN IP 在池外”，不是某个固定界面。
+
+<PageSources />

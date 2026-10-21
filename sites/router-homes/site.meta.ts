@@ -60,6 +60,11 @@ const meta = {
           translations: { 'zh-CN': '旁路网关' },
           slug: 'network/bypass-gateway',
         },
+        {
+          label: 'Wired/wireless AP',
+          translations: { 'zh-CN': '有线/无线 AP' },
+          slug: 'network/ap-mode',
+        },
       ],
     },
     {

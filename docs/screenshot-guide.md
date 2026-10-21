@@ -65,5 +65,5 @@ echo "screendump /tmp/vm200.ppm" | qm monitor 200
 - 录制用 `asciinema rec --idle-time-limit 2 --cols 100 --rows 30 --title ...`；裁掉长等待，单份控制在几十 KB。
 - 录制前确认终端不会打印密码、Token、MAC、公网 IP、订阅链接；录完检查 `.cast` JSON 再提交。
 - 双语页面分别写 `title`/`caption`；cast 本身保持命令语言中立。
-- 当前试点：`017-plugin-install.cast`（sqm-scripts → luci-app-sqm → 菜单出现 → 移除/重装）、`015-triage.cast`（DNS 停止 → WAN 断开 → 单终端默认路由删除）、`009-bypass.cast`（旁路 .2 → 关 DHCP → 客户端静态网关/DNS → 死网关恢复）。
+- 当前试点：`017-plugin-install.cast`（sqm-scripts → luci-app-sqm → 菜单出现 → 移除/重装）、`015-triage.cast`（DNS 停止 → WAN 断开 → 单终端默认路由删除）、`009-bypass.cast`（旁路 .2 → 关 DHCP → 客户端静态网关/DNS → 死网关恢复）、`008-ap.cast`（AP .2 → 关 DHCP → 客户端从上游 .1 拿地址）。
 - cast 内容不会被 Pagefind 索引；搜索/双语/无 JS 可读性依赖页面代码块。

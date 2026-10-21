@@ -1,0 +1,212 @@
+---
+title: "Wired/wireless AP under an existing router: DHCP off, new LAN IP, LAN port"
+description: "Turn OpenWrt into an AP under the main router: LAN-only, DHCP off, LAN IP outside the pool, clients still lease from the main router; Wi-Fi is verified separately."
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'Wired AP E2: AP LAN 192.168.1.2/24, DHCP off; upstream DHCP 192.168.1.1; client 192.168.1.136; no WAN/Wi-Fi'
+testRecipe: 'tests/recipes/ap-mode-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt ap mode', 'openwrt wireless ap', 'openwrt disable dhcp', 'router as ap']
+symptoms: ['AP clients get no address', 'double DHCP on AP', 'whole network dies after AP']
+sources:
+  - label: OpenWrt network configuration
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP and DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt Wi-Fi configuration
+    url: https://openwrt.org/docs/guide-user/network/wifi/basic
+  - label: OpenWrt firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+<TestRecord
+  status="partial"
+  environment="Wired AP E2: AP LAN 192.168.1.2/24, DHCP off; upstream DHCP 192.168.1.1; client 192.168.1.136; no WAN/Wi-Fi"
+  recipe="tests/recipes/ap-mode-25.12.md"
+  result="E2 partial: AP LAN changed to .2 and DHCP ignore=1; the client leased 192.168.1.136/24 from upstream .1 with gateway .1; AP .2 was reachable and the client could ping AP/upstream; this AP-only lab had no internet; upstream internet and Wi-Fi were not tested."
+  date="2026-10-20"
+/>
+
+## What AP mode really means
+
+An AP is not “another router”:
+
+- connect the **LAN port**, not WAN;
+- disable DHCP on the AP; the main router keeps leasing;
+- put the AP LAN IP outside the main DHCP pool;
+- do not NAT/double-route unless you intentionally want a second router.
+
+This lab verifies **wired AP + upstream DHCP** only; Wi-Fi SSID/encryption/roaming has no hardware and is E1.
+
+## Topology
+
+```text
+Main router 192.168.1.1 (DHCP)
+        │ LAN port
+        │
+   OpenWrt AP
+   LAN br-lan 192.168.1.2/24
+   DHCP: ignore
+        │ LAN port
+        │
+   Client 192.168.1.136/24
+   gateway 192.168.1.1
+```
+
+- The client leases from the main router; gateway is `.1`, not AP `.2`;
+- AP `.2` is for management only;
+- if the client gateway becomes `.2`, a second DHCP server or a wrong config exists.
+
+## Configuration
+
+<Step where="router-shell" title="Back up and confirm WAN is not required" expected="You know LAN IP, DHCP state and whether WAN is used.">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+uci show network.wan 2>/dev/null
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+AP mode usually does not need WAN; if WAN remains, ensure it does not steal the default route or NAT.
+
+</Step>
+
+<Step where="luci" title="Change LAN IP, disable DHCP" expected="AP is 192.168.1.2/24 and no longer leases addresses.">
+
+**Network → Interfaces → LAN → Edit**:
+
+1. IPv4 address: `192.168.1.2/24` (outside the main pool);
+2. **DHCP Server → General → Ignore interface**;
+3. Save and apply.
+
+CLI:
+
+```sh
+uci set network.lan.ipaddr='192.168.1.2/24'
+uci set dhcp.lan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+Then reopen LuCI/SSH at `192.168.1.2`.
+
+</Step>
+
+<Step where="client" title="Connect to the main router's LAN port" expected="The client leases from the main router with the main gateway.">
+
+Connect the OpenWrt **LAN port** to the main router's **LAN port**; do not use WAN.
+
+Reconnect/renew on the client:
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.1.1
+ping 192.168.1.2
+```
+
+This lab client got `192.168.1.136/24`, gateway `192.168.1.1`; AP `.2` was reachable.
+
+</Step>
+
+<Step where="client" title="Confirm the AP is not serving DHCP" expected="The DHCP server is the main router, not the AP.">
+
+```sh
+# Linux example
+udhcpc -i eth0 -f -q -n -t 5
+```
+
+Check `server 192.168.1.1`; if it says `192.168.1.2`, AP DHCP is still on.
+
+This AP-only lab had no internet, so `ping 1.1.1.1` failing is expected; real internet depends on the main router.
+
+</Step>
+
+## Wireless AP (E1)
+
+No wireless hardware, so not verified:
+
+- SSID/password/WPA2/WPA3;
+- 2.4/5 GHz channel, width, TX power;
+- roaming/802.11r/weak-signal kick;
+- wireless client isolation;
+- multiple APs with one SSID.
+
+Principles:
+
+- bridge the wireless interface into `br-lan`;
+- disable DHCP;
+- use WPA2/WPA3, never open;
+- stagger channels, reuse SSID/password across APs;
+- verify wired first, then add Wi-Fi, so you do not change two layers at once.
+
+## Common failures
+
+### Whole network dies after adding the AP
+
+- AP DHCP still on, conflicting with the main router;
+- AP LAN IP conflicts with the main router;
+- AP WAN port was connected to the main LAN;
+- a loop between main router and AP.
+
+Disconnect the AP, restore the main router, then change one item at a time.
+
+### Clients get no address
+
+- AP is not connected to the main LAN;
+- AP DHCP is off but the main DHCP is off/full;
+- VLAN/isolated port;
+- wireless interface is not bridged to `br-lan`.
+
+### Clients have an address but the wrong gateway
+
+- another DHCP server hands out `.2`;
+- client kept an old lease;
+- AP is still running a DHCP server;
+- check `cat /tmp/dhcp.leases` (the AP should have no new leases).
+
+### Wi-Fi connects but no internet
+
+- wireless interface is not in the LAN bridge;
+- firewall separates wireless and LAN zones;
+- upstream main router blocks it;
+- client isolation/guest network.
+
+## Recorded demo (008 lab)
+
+<TerminalCast
+  src="/casts/008-ap.cast"
+  title="008 lab: wired AP, DHCP off, client leases from upstream"
+  caption="Real OpenWrt 25.12.6 VM: AP LAN .2, DHCP disabled; the client leased 192.168.1.136/24 from upstream 192.168.1.1, gateway .1, and could ping AP/upstream. This lab has no internet/Wi-Fi."
+/>
+
+## E2 lab run (2026-10-20)
+
+- Environment: OpenWrt 25.12.6 x86 VM 200; AP LAN `192.168.1.2/24`; `dhcp.lan.ignore=1`; upstream netns `192.168.1.1/24` + BusyBox udhcpd; client `192.168.1.136/24`.
+- Client DHCP: server `192.168.1.1`, lease 864000s; gateway `.1`.
+- Client pinged AP `.2` and upstream `.1`; this AP-only lab had no public internet, so `1.1.1.1` failed.
+- Not tested: real main-router internet, Wi-Fi/SSID/encryption/roaming, Windows/phone clients, IPv6/RA.
+- Cast: `public/casts/008-ap.cast`; recipe: `tests/recipes/ap-mode-25.12.md`.
+
+## Sources and review
+
+- This is E2 partial: wired AP/L2/DHCP were tested; wireless and real upstream internet were not.
+- No independent reviewer; conclusions are limited to this VM/netns environment.
+- AP mode is “LAN-only + DHCP off + LAN IP outside the pool”, not a specific UI.
+
+<PageSources />

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-21T08:09:03.885Z",
-  "base": "http://127.0.0.1:41403",
+  "generatedAt": "2026-10-21T08:57:38.007Z",
+  "base": "http://127.0.0.1:45023",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -1190,6 +1190,11 @@
           {
             "url": "/en/network/bypass-gateway/",
             "title": "Bypass gateway: disable DHCP, set client gateway/DNS, and switch back",
+            "excerpt": ""
+          },
+          {
+            "url": "/en/network/ap-mode/",
+            "title": "Wired/wireless AP under an existing router: DHCP off, new LAN IP, LAN port",
             "excerpt": ""
           }
         ],
