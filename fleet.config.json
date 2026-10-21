@@ -13,7 +13,7 @@
       "minPages": 4,
       "approvalMode": "solo",
       "theme": "router",
-      "deploy": { "enabled": true, "project": "router-homes", "domainStatus": "placeholder-deployed" }
+      "deploy": { "enabled": true, "project": "router-homes", "domainStatus": "content-deployed-pages-dev" }
     }
   ]
 }
