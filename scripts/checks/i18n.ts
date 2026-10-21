@@ -41,6 +41,10 @@ await mustExist(path.join(dist, 'en/network/bypass-gateway/index.html'), '/en/ne
 await mustExist(path.join(dist, 'zh/network/bypass-gateway/index.html'), '/zh/network/bypass-gateway/');
 await mustExist(path.join(dist, 'en/network/ap-mode/index.html'), '/en/network/ap-mode/');
 await mustExist(path.join(dist, 'zh/network/ap-mode/index.html'), '/zh/network/ap-mode/');
+await mustExist(path.join(dist, 'en/wireless-vlan/dsa-vlan/index.html'), '/en/wireless-vlan/dsa-vlan/');
+await mustExist(path.join(dist, 'zh/wireless-vlan/dsa-vlan/index.html'), '/zh/wireless-vlan/dsa-vlan/');
+await mustExist(path.join(dist, 'en/wireless-vlan/guest-wifi/index.html'), '/en/wireless-vlan/guest-wifi/');
+await mustExist(path.join(dist, 'zh/wireless-vlan/guest-wifi/index.html'), '/zh/wireless-vlan/guest-wifi/');
 await mustExist(path.join(dist, 'en/remote-access/wireguard-server/index.html'), '/en/remote-access/wireguard-server/');
 await mustExist(path.join(dist, 'zh/remote-access/wireguard-server/index.html'), '/zh/remote-access/wireguard-server/');
 await mustExist(path.join(dist, 'en/remote-access/wireguard-client/index.html'), '/en/remote-access/wireguard-client/');

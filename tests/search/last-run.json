@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-21T14:39:04.814Z",
-  "base": "http://127.0.0.1:43573",
+  "generatedAt": "2026-10-21T14:54:05.117Z",
+  "base": "http://127.0.0.1:34751",
   "topK": 5,
   "positive": {
     "total": 43,
@@ -1123,6 +1123,11 @@
             "excerpt": ""
           },
           {
+            "url": "/en/wireless-vlan/guest-wifi/",
+            "title": "Guest Wi-Fi: separate SSID, VLAN, DHCP and isolation",
+            "excerpt": ""
+          },
+          {
             "url": "/en/network/bypass-gateway/",
             "title": "Bypass gateway: disable DHCP, set client gateway/DNS, and switch back",
             "excerpt": ""
@@ -1130,11 +1135,6 @@
           {
             "url": "/en/network/lan-address/",
             "title": "Change the LAN address and get back in: old/new subnet, DHCP and recovery",
-            "excerpt": ""
-          },
-          {
-            "url": "/en/software/adguard-home/",
-            "title": "AdGuard Home: from web UI to client filtering",
             "excerpt": ""
           }
         ]

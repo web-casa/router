@@ -1,0 +1,153 @@
+---
+title: "DSA VLAN: ports, PVID, tagged/untagged and rollback"
+description: Configure port VLANs with bridge-vlan under DSA, understand tagged/untagged/PVID and trunk, keep a management port and change one port at a time. Documentation only; not verified on real switching hardware.
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Compiled from OpenWrt 25.12 DSA/VLAN docs; not verified on real multi-port DSA hardware/switch'
+testRecipe: 'tests/recipes/dsa-vlan-25.12.md'
+aliases: ['openwrt dsa vlan', 'openwrt vlan setup', 'bridge-vlan', 'openwrt tagged untagged']
+symptoms: ['VLAN does not work', 'lost access after VLAN change', 'trunk not recognized', 'wrong port PVID']
+sources:
+  - label: OpenWrt DSA mini tutorial
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+  - label: OpenWrt VLAN configuration
+    url: https://openwrt.org/docs/guide-user/network/vlan/switch_configuration
+  - label: OpenWrt network configuration
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="DSA multi-port device (untested)" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="Compiled from OpenWrt 25.12 DSA/VLAN docs; not verified on real multi-port DSA hardware/switch"
+  recipe="tests/recipes/dsa-vlan-25.12.md"
+  result="E1: DSA ports, bridge-vlan, tagged/untagged/PVID and rollback documented; no real hardware validation and no “it works” claim"
+/>
+
+> **Status**: E1 documentation. VLAN config depends on the exact DSA port names, CPU port and switch peer; without real hardware, do not treat the example as verified.
+
+## DSA vs swconfig
+
+- Older devices often use `swconfig`: `switch0`, ports 0/1/2;
+- DSA exposes each port as `lan1`, `lan2`, `wan`, etc.;
+- Modern OpenWrt uses **bridge VLAN filtering**, not `swconfig` `vid/ports` syntax;
+- Port names differ by device: `ip -d link show`, `ls /sys/class/net`.
+
+## Record before changing
+
+<Step where="router-shell" title="Confirm DSA, port names and management entry" expected="Know which port is LAN/WAN and where you manage the device.">
+
+```sh
+ip -d link show
+ls /sys/class/net
+uci show network
+uci show firewall | grep -E 'zone.*name|zone.*network'
+bridge vlan show
+```
+
+- Does `br-lan` already have `bridge-vlan`?
+- Which physical port carries management?
+- Is the switch peer already configured as a trunk/tagged?
+- Back up: `cp /etc/config/network /etc/config/network.bak.$(date +%F)`.
+
+</Step>
+
+## bridge-vlan example
+
+Assume DSA ports `lan1`, `lan2`, `lan3`; make `lan1` a trunk (VLAN 1 + 20 tagged) and `lan2/lan3` VLAN 1 access:
+
+```uci
+config device
+    option name 'br-lan'
+    option type 'bridge'
+    list ports 'lan1'
+    list ports 'lan2'
+    list ports 'lan3'
+
+config bridge-vlan
+    option device 'br-lan'
+    option vlan '1'
+    list ports 'lan1:u*'
+    list ports 'lan2:u*'
+    list ports 'lan3:u*'
+
+config bridge-vlan
+    option device 'br-lan'
+    option vlan '20'
+    list ports 'lan1:t'
+```
+
+Key points:
+
+- `u*`: untagged and this port's PVID for the VLAN;
+- `t`: tagged, carried over a trunk;
+- an access port usually has only one untagged PVID;
+- both ends of a switch-to-switch trunk must be tagged and allow the same VLANs;
+- do not keep old `swconfig` config alongside this.
+
+> Replace port names/CPU port for your device; test on a spare port/device if unsure.
+
+## Apply and verify
+
+```sh
+uci commit network
+/etc/init.d/network reload
+bridge vlan show
+ip -d link show br-lan
+```
+
+Verify:
+
+- management still reaches LuCI/SSH;
+- an access client gets DHCP from the right VLAN;
+- the trunk peer sees tagged VLANs;
+- `bridge vlan show` matches the PVID/tagged design.
+
+## Recovery from lost access
+
+1. Use console/serial; do not rely only on the network;
+2. Restore `/etc/config/network.bak.*`;
+3. Or temporarily return the management port to untagged VLAN 1;
+4. Restart networking and confirm management;
+5. Add VLANs one port at a time.
+
+## Common failures
+
+### Lost access immediately
+
+- management port changed to tagged/wrong PVID;
+- trunk peer does not allow the VLAN;
+- CPU/uplink port changed all at once;
+- recover via console; do not factory-reset blindly.
+
+### VLAN 20 unreachable
+
+- tagged/untagged mismatch on the two ends;
+- PVID not set;
+- no interface/DHCP/firewall for that VLAN;
+- VLAN not created/allowed on the switch.
+
+### Address but no internet
+
+- guest/service VLAN lacks DHCP/DNS;
+- firewall zone/forward mismatch;
+- NAT/return route missing;
+- VLAN connectivity is not routing/NAT.
+
+## E1 status
+
+- Documentation only; not verified on real DSA hardware/switch; no “configured successfully” claim.
+- Real testing needs a multi-port DSA device, a managed switch, console access, rollback config and at least two clients.
+- Promote to E2 only after recording device model, port names, switch config and failure recovery.
+
+<PageSources />

@@ -1,0 +1,192 @@
+---
+title: 访客 Wi-Fi：独立 SSID、VLAN、DHCP 与隔离
+description: 用独立 SSID/网段/DHCP/firewall zone 隔离访客，只允许访客出公网、不允许访问主 LAN；无线和 VLAN 均未在真实硬件验证。
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: '基于 OpenWrt 25.12 Wi-Fi/VLAN/firewall 文档整理；无真实无线/交换机验证'
+testRecipe: 'tests/recipes/guest-wifi-25.12.md'
+aliases: ['openwrt 访客 wifi', 'openwrt guest wifi', 'openwrt 访客网络', 'openwrt wifi 隔离']
+symptoms: ['访客能访问内网', '访客没网', 'guest Wi-Fi 拿不到地址', 'VLAN 隔离不生效']
+sources:
+  - label: OpenWrt guest Wi-Fi
+    url: https://openwrt.org/docs/guide-user/network/wifi/guestwifi/guest-wlan
+  - label: OpenWrt Wi-Fi configuration
+    url: https://openwrt.org/docs/guide-user/network/wifi/basic
+  - label: OpenWrt firewall zones
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt DSA VLAN
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="无线 + DSA 设备（未实测）" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="基于 OpenWrt 25.12 Wi-Fi/VLAN/firewall 文档整理；无真实无线/交换机验证"
+  recipe="tests/recipes/guest-wifi-25.12.md"
+  result="E1：独立 SSID/网段/DHCP/firewall zone、隔离和 VLAN 方案已整理；未在真实无线/交换机验证"
+/>
+
+> **状态**：E1 文档页。访客隔离涉及 Wi-Fi、VLAN、DHCP 和 firewall 四层；没有真实无线硬件时不能写“已隔离”。
+
+## 目标
+
+- 访客连独立 SSID；
+- 访客拿独立网段地址；
+- 访客只能出公网，不能访问主 LAN/管理页面；
+- 主 LAN 设备不能主动进入访客网段（按需要）；
+- 出问题能快速关闭访客 SSID/zone。
+
+## 方案选择
+
+| 方案 | 隔离强度 | 需要 |
+|---|---|---|
+| 同 bridge + 独立 SSID/zone | 中 | Wi-Fi 支持多 SSID；靠 firewall |
+| 独立 VLAN + SSID | 较强 | DSA/交换机支持 VLAN；AP 打 tag |
+| 独立 AP/物理隔离 | 最强 | 独立设备/端口 |
+
+本页给“独立 SSID + 独立 guest zone”的基础配置，并说明如何用 VLAN 加强；VLAN 细节见 023。
+
+## 1. 建 guest 网段
+
+```sh
+uci set network.guest=interface
+uci set network.guest.proto='static'
+uci set network.guest.device='br-guest'
+uci set network.guest.ipaddr='192.168.50.1/24'
+uci set network.guest.ip6assign='60'
+uci commit network
+```
+
+`br-guest` 可以是独立 bridge（无线接口加入），也可以是 VLAN 接口；不要和 `br-lan` 混在一起却只靠 firewall 隔离。
+
+## 2. 给 guest 开 DHCP/DNS
+
+```sh
+uci set dhcp.guest=dhcp
+uci set dhcp.guest.interface='guest'
+uci set dhcp.guest.start='100'
+uci set dhcp.guest.limit='100'
+uci set dhcp.guest.leasetime='1h'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+```
+
+如果 guest 是独立 VLAN，DHCP 要绑定到该接口；不要让它发主 LAN 的地址池。
+
+## 3. firewall：只放行出公网
+
+```sh
+uci add firewall zone
+uci set firewall.@zone[-1].name='guest'
+uci set firewall.@zone[-1].input='REJECT'
+uci set firewall.@zone[-1].output='ACCEPT'
+uci set firewall.@zone[-1].forward='REJECT'
+uci add_list firewall.@zone[-1].network='guest'
+uci commit firewall
+
+uci add firewall forwarding
+uci set firewall.@forwarding[-1].src='guest'
+uci set firewall.@forwarding[-1].dest='wan'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+要点：
+
+- **不要**给 guest→lan 的 forwarding；
+- guest zone 到 wan 可以 forward，但是否 NAT 取决于 wan zone 的 masquerade；
+- 如果 DHCP/DNS 被 input REJECT 挡住，按需加“guest→路由器 53/67”规则，而不是把 input 改成 ACCEPT；
+- 主 LAN 默认不能主动进 guest；如果需要打印/投屏，单独放行。
+
+## 4. 加 guest SSID
+
+```sh
+uci set wireless.guest=wifi-iface
+uci set wireless.guest.device='radio0'
+uci set wireless.guest.network='guest'
+uci set wireless.guest.mode='ap'
+uci set wireless.guest.ssid='OpenWrt-Guest'
+uci set wireless.guest.encryption='psk2'
+uci set wireless.guest.key='<guest-password>'
+uci set wireless.guest.isolate='1'
+uci commit wireless
+wifi reload
+```
+
+- `network='guest'` 必须对应 guest 接口；
+- `isolate='1'` 是无线客户端隔离，不等于“不能访问主 LAN”，主 LAN 隔离仍靠 firewall/VLAN；
+- 2.4G/5G、信道、频宽按设备调整；
+- 多 AP 时 SSID/密码/安全方式一致，信道错开。
+
+## 5. 如果要用 VLAN
+
+- 在 DSA/交换机上给 guest 建独立 VLAN（例如 20）；
+- AP 的 guest SSID 桥接到该 VLAN；
+- 上游 trunk 两端 tagged，允许 VLAN 20；
+- guest 接口/ DHCP 绑定 VLAN 20；
+- 不要把 guest VLAN 的 untagged PVID 设成管理 VLAN。
+
+具体 `bridge-vlan` 语法见 023。
+
+## 验证（有硬件时）
+
+```sh
+iwinfo
+ip -4 addr show
+bridge vlan show
+```
+
+客户端：
+
+- 连 `OpenWrt-Guest`，拿到 `192.168.50.x`；
+- 能访问公网/DNS；
+- **不能**访问主 LAN `192.168.1.0/24`、LuCI 管理地址、NAS/打印机；
+- 主 LAN 设备不能主动访问 guest（按策略）；
+- 关闭 guest SSID 后，主 LAN 不受影响。
+
+没有无线/VLAN 硬件时，以上都不能标“已验证”。
+
+## 常见失败
+
+### 访客能访问主 LAN
+
+- 没有独立 zone/forwarding；
+- guest 和 lan 在同一个 bridge；
+- firewall 规则顺序/zone 配错；
+- VLAN 没隔离，只是换了 SSID。
+
+### 访客没地址
+
+- DHCP 没绑定 guest 接口；
+- guest 接口没 up；
+- VLAN tag/PVID 不对；
+- 防火墙挡了 DHCP/DNS。
+
+### 访客没公网
+
+- 没有 guest→wan forwarding；
+- WAN masquerade/NAT；
+- DNS 没放行；
+- 上游路由。
+
+### 关闭访客后主网也断
+
+- guest 和 lan 共用 bridge/VLAN；
+- 改了管理口的 PVID/tag；
+- 先控制台恢复，不要恢复出厂。
+
+## E1 状态
+
+- 本页只做文档整理，未在真实无线/DSA 硬件验证；不写“访客隔离已生效”。
+- 真实 E2 需要：支持多 SSID 的 AP、可配置 VLAN 的交换机/DSA 设备、两个客户端、控制台和回滚配置。
+- 测试通过后记录设备型号、VLAN/SSID、firewall zone、DHCP 和隔离结果。
+
+<PageSources />

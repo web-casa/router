@@ -78,6 +78,22 @@ const meta = {
       ],
     },
     {
+      label: 'Wireless & VLAN',
+      translations: { 'zh-CN': '无线与 VLAN' },
+      items: [
+        {
+          label: 'DSA VLAN',
+          translations: { 'zh-CN': 'DSA VLAN' },
+          slug: 'wireless-vlan/dsa-vlan',
+        },
+        {
+          label: 'Guest Wi-Fi',
+          translations: { 'zh-CN': '访客 Wi-Fi' },
+          slug: 'wireless-vlan/guest-wifi',
+        },
+      ],
+    },
+    {
       label: 'Remote access',
       translations: { 'zh-CN': '远程访问' },
       items: [

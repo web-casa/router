@@ -1,0 +1,192 @@
+---
+title: "Guest Wi-Fi: separate SSID, VLAN, DHCP and isolation"
+description: Isolate guests with a separate SSID/subnet/DHCP/firewall zone, allow internet only, and block access to the main LAN. Wi-Fi and VLAN are not verified on real hardware.
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Compiled from OpenWrt 25.12 Wi-Fi/VLAN/firewall docs; no real wireless/switch validation'
+testRecipe: 'tests/recipes/guest-wifi-25.12.md'
+aliases: ['openwrt guest wifi', 'openwrt guest network', 'openwrt wifi isolation', 'openwrt guest wi-fi']
+symptoms: ['guests can reach LAN', 'guest has no internet', 'guest Wi-Fi gets no address', 'VLAN isolation fails']
+sources:
+  - label: OpenWrt guest Wi-Fi
+    url: https://openwrt.org/docs/guide-user/network/wifi/guestwifi/guest-wlan
+  - label: OpenWrt Wi-Fi configuration
+    url: https://openwrt.org/docs/guide-user/network/wifi/basic
+  - label: OpenWrt firewall zones
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt DSA VLAN
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="Wireless + DSA device (untested)" tested={false} evidence="E1" />
+
+<TestRecord
+  status="planned"
+  environment="Compiled from OpenWrt 25.12 Wi-Fi/VLAN/firewall docs; no real wireless/switch validation"
+  recipe="tests/recipes/guest-wifi-25.12.md"
+  result="E1: separate SSID/subnet/DHCP/firewall zone, isolation and VLAN approach documented; not verified on real wireless/switch hardware"
+/>
+
+> **Status**: E1 documentation. Guest isolation spans Wi-Fi, VLAN, DHCP and firewall; without real wireless hardware, do not claim “isolated”.
+
+## Goals
+
+- guest uses a separate SSID;
+- guest gets a separate subnet;
+- guest can reach the internet, not the main LAN/management UI;
+- main LAN cannot initiate access to guest (per policy);
+- guest can be disabled quickly.
+
+## Options
+
+| Option | Isolation | Needs |
+|---|---|---|
+| same bridge + separate SSID/zone | medium | multiple SSIDs; firewall |
+| separate VLAN + SSID | stronger | DSA/switch VLAN; AP tags |
+| separate AP/physical isolation | strongest | separate device/port |
+
+This page covers “separate SSID + guest zone” and how VLAN strengthens it; VLAN details are in 023.
+
+## 1. Create the guest subnet
+
+```sh
+uci set network.guest=interface
+uci set network.guest.proto='static'
+uci set network.guest.device='br-guest'
+uci set network.guest.ipaddr='192.168.50.1/24'
+uci set network.guest.ip6assign='60'
+uci commit network
+```
+
+`br-guest` can be a separate bridge (wireless interface added) or a VLAN interface; do not mix it into `br-lan` and rely only on firewall.
+
+## 2. DHCP/DNS for guest
+
+```sh
+uci set dhcp.guest=dhcp
+uci set dhcp.guest.interface='guest'
+uci set dhcp.guest.start='100'
+uci set dhcp.guest.limit='100'
+uci set dhcp.guest.leasetime='1h'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+```
+
+If guest is a VLAN, bind DHCP to that interface; do not hand out the main LAN pool.
+
+## 3. Firewall: internet only
+
+```sh
+uci add firewall zone
+uci set firewall.@zone[-1].name='guest'
+uci set firewall.@zone[-1].input='REJECT'
+uci set firewall.@zone[-1].output='ACCEPT'
+uci set firewall.@zone[-1].forward='REJECT'
+uci add_list firewall.@zone[-1].network='guest'
+uci commit firewall
+
+uci add firewall forwarding
+uci set firewall.@forwarding[-1].src='guest'
+uci set firewall.@forwarding[-1].dest='wan'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+Key points:
+
+- **Do not** add guest→lan forwarding;
+- guest→wan forwarding is allowed; NAT depends on wan zone masquerade;
+- if DHCP/DNS are blocked by input REJECT, add guest→router 53/67 rules instead of making input ACCEPT;
+- main LAN cannot initiate guest by default; allow printing/casting separately if needed.
+
+## 4. Add the guest SSID
+
+```sh
+uci set wireless.guest=wifi-iface
+uci set wireless.guest.device='radio0'
+uci set wireless.guest.network='guest'
+uci set wireless.guest.mode='ap'
+uci set wireless.guest.ssid='OpenWrt-Guest'
+uci set wireless.guest.encryption='psk2'
+uci set wireless.guest.key='<guest-password>'
+uci set wireless.guest.isolate='1'
+uci commit wireless
+wifi reload
+```
+
+- `network='guest'` must match the guest interface;
+- `isolate='1'` isolates wireless clients, not the main LAN; LAN isolation still needs firewall/VLAN;
+- adjust 2.4/5G, channel, width for the device;
+- multiple APs: same SSID/password/security, staggered channels.
+
+## 5. If using VLAN
+
+- create a dedicated guest VLAN (e.g. 20) on DSA/switch;
+- bridge the guest SSID to that VLAN;
+- tag the trunk on both ends and allow VLAN 20;
+- bind guest interface/DHCP to VLAN 20;
+- do not set the guest VLAN as an untagged PVID on the management VLAN.
+
+See 023 for `bridge-vlan` syntax.
+
+## Verify (with hardware)
+
+```sh
+iwinfo
+ip -4 addr show
+bridge vlan show
+```
+
+Client:
+
+- joins `OpenWrt-Guest`, gets `192.168.50.x`;
+- reaches the internet/DNS;
+- **cannot** reach main LAN `192.168.1.0/24`, LuCI management, NAS/printer;
+- main LAN cannot initiate guest (per policy);
+- disabling guest SSID does not break the main LAN.
+
+Without wireless/VLAN hardware, none of this is “verified”.
+
+## Common failures
+
+### Guests can reach the main LAN
+
+- no separate zone/forwarding;
+- guest and lan share one bridge;
+- firewall rule/order/zone wrong;
+- VLAN is not isolated, only the SSID changed.
+
+### Guest gets no address
+
+- DHCP not bound to the guest interface;
+- guest interface down;
+- wrong VLAN tag/PVID;
+- firewall blocks DHCP/DNS.
+
+### Guest has no internet
+
+- no guest→wan forwarding;
+- WAN masquerade/NAT;
+- DNS not allowed;
+- upstream route.
+
+### Disabling guest breaks the main LAN
+
+- guest and lan share a bridge/VLAN;
+- management port PVID/tag changed;
+- recover via console; do not factory-reset.
+
+## E1 status
+
+- Documentation only; not verified on real wireless/DSA hardware; no “guest isolation is active” claim.
+- Real E2 needs: AP with multiple SSIDs, VLAN-capable switch/DSA device, two clients, console and rollback config.
+- After testing, record device model, VLAN/SSID, firewall zone, DHCP and isolation result.
+
+<PageSources />
