@@ -40,6 +40,7 @@
 | ADR-016 | 搜索 | Pagefind extended + 查询扩展层；不用 `addCustomRecord` 造别名重复；40 查询 JSON 契约 |
 | ADR-017 | 内容模型 | base 必填 + `pageType` 判别式模块；manifest 只驱动导航/索引，URL 由 Starlight 路由生成 |
 | ADR-018 | 研究数据 | `readable | index-only | reproduced`；index-only 只能选题，不能当证据/引述 |
+| ADR-019 | 多语言扩展 | 在 en/zh 之外分批新增 `zh-hant`、`ja`、`es`、`de`、`fr`；英文为唯一翻译源；LLM 翻译 + 抽检；整语言全量配对才开放；`sourceHash` 过期由 CI 拦截；UI 术语对齐 LuCI 官方 `.po` |
 
 **Codex v0.5 的 10 条 P0/P1** 仍保留：审核绑定、MDX/执行安全、claims/evidence、CI、隔离边界、页面级索引、dedup 校准、canary、部署回滚、门禁/工期。v0.8 只调整范围、i18n/搜索/部署状态与风险分级。
 
@@ -180,6 +181,30 @@ starlight({
 - 页面 URL：`/en/docs/installation/proxmox/`、`/zh/docs/installation/proxmox/`。
 - 中英各自自指 canonical；双向 hreflang `en`、`zh-Hans`，可选 `x-default` 指向英文。
 - 缺译不生成 sitemap/hreflang；语言切换只链接真实存在的对应页。
+
+### 3.2.1 多语言扩展（ADR-019）
+
+**语言与 URL**
+
+| locale | URL | hreflang | 说明 |
+|---|---|---|---|
+| `en` | `/en/` | `en` | 默认语言，**唯一翻译源** |
+| `zh` | `/zh/` | `zh-CN` | 已发布，不改路径；`/zh-hans/*` 301 到 `/zh/*`（预留入口，防止外链写错） |
+| `zh-hant` | `/zh-hant/` | `zh-Hant` | 从英文翻译，不从简中转换 |
+| `ja` `es` `de` `fr` | `/ja/` 等 | 同 locale | 按语言不按地区 |
+
+**状态（2026-10-22）**：已开放 `en`、`zh`、`zh-hant`、`es`、`de`、`fr`、`ja`（共 7 种，260 页）；`i18n.planned` 为空。
+
+**规则**
+
+- `fleet.config.json` 中 `locales` 只列**已开放**语言；`i18n.planned` 列计划中的语言；`i18n.hashExempt` 列不要求 `sourceHash` 的历史语言（`zh`）。
+- **整语言全量配对才开放**（沿用 ADR-013/015）：翻译中的文件放 `content/translations/<locale>/`，不进 `src/content/docs`，因此不会生成 fallback 页、hreflang 或 sitemap。`pnpm i18n promote <locale>` 在该语言覆盖全部英文页且无过期译文后，才把文件移入 `src/content/docs/<locale>/` 并把 locale 写入 `locales`。
+- 仍禁止任何 `i18n.fallback`；`validate` 对 `locales` 中**每一种**语言做与默认语言的双向配对校验。
+- **同步**：译文 frontmatter 记录 `sourceHash`（英文源文件规范化后的 SHA-256 前 16 位）。英文源变化而译文 hash 不同 → `pnpm check` 失败，须同批重译并 `pnpm i18n stamp`。
+- **UI 术语**：菜单、按钮、选项名对齐 LuCI 官方译名。术语表 `docs/i18n/glossary/<locale>.json` 由 `pnpm i18n glossary` 从 LuCI `.po` 抽取，官方缺译的条目保留英文并标 `official: false`。
+- **不翻译**：代码块、命令、路径、配置键、包名、`claims`/`sources` 的 URL、MDX 组件名与属性名。
+- **产出方式**：Claude Code 会话手动翻译，翻译前必须读取本语言术语表；人工抽检关键页（R1/R2 页、含命令的恢复页）。
+- **开放新语言前还需完成**：站点 UI 组件文案（Home/Hero/Footer/Step/TestRecord 等）、侧边栏 `translations`、40 查询契约中该语言的 `queries.<locale>.json`、Pagefind 分词验证（`ja`）。截图策略待定。
 
 ### 3.3 内容模型与组件
 
@@ -335,6 +360,7 @@ docs-fleet/
 ### 5.2 i18n、URL 与搜索验收
 
 - **缺译规则**：单语页不进 `src/content/docs`；prebuild 配对校验；Phase 0 已确认移除夹具后 `/zh/only-en/` 为真实 404，无 canonical/hreflang/sitemap，且 Pages dev 返回 404。
+- **多语言**：`locales` 中每种语言必须与 `en` 页面集合完全一致；每页 canonical 自指、hreflang 覆盖全部已开放语言；`sourceHash` 全部匹配；`/zh-hans/*` 301 到 `/zh/*`；侧边栏每个标签在每种已开放语言下都有 `translations`。
 - **根 301**：`curl -sSI https://host/` 必须单跳 301、`Location: /en/`；`/en/`、`/zh/` 200；产物不得有根 `index.html`；若用 Pages Functions，删除对应 `_redirects`，避免双重实现。
 - **URL 集合一致**：构建 HTML 可索引 URL = sitemap URL = manifest URL；三方不等即失败。manifest 只驱动导航/索引，不生成 canonical/hreflang/sitemap。
 - **40 查询契约**：`{ locale, query, expectedUrls, minRank, forbiddenLocales, aliasCase }`，每条只允许一个主预期 URL。阈值：40/40 非空；40/40 首屏结果语种正确；别名 100% Top 1；其余预期 URL Top 3 ≥95%；不得出现另一语言 URL。

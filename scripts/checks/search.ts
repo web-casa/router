@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { access, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright-core';
+import { exists, loadSite } from '../lib/i18n.ts';
 
 const root = path.resolve('sites/router-homes/dist');
 const contractPath = path.resolve('tests/search/queries.json');
@@ -11,7 +12,7 @@ const executablePath = process.env.CHROME_PATH || '/usr/bin/chromium';
 
 interface QueryCase {
   id: string;
-  locale: 'zh' | 'en';
+  locale: string;
   query: string;
   expectedUrls: string[];
   category: string;
@@ -26,7 +27,7 @@ interface Contract {
 
 interface NegativeCase {
   id: string;
-  locale: 'zh' | 'en';
+  locale: string;
   query: string;
   category: string;
   expectEmpty: boolean;
@@ -45,14 +46,25 @@ interface NegativeResult extends NegativeCase {
   passed: boolean;
 }
 
+const site = await loadSite();
+const localeSet = new Set(site.locales);
 const contract = JSON.parse(await readFile(contractPath, 'utf8')) as Contract;
+// Locales beyond the base en/zh contract bring their own file (ADR-019); a published locale without one fails.
+for (const locale of site.locales.filter((item) => item !== 'en' && item !== 'zh')) {
+  const file = path.resolve(`tests/search/queries.${locale}.json`);
+  if (!(await exists(file))) throw new Error(`published locale ${locale} has no ${path.relative('.', file)}`);
+  const extra = JSON.parse(await readFile(file, 'utf8')) as Contract;
+  if (extra.queries.length < 15) throw new Error(`${locale}: expected at least 15 queries, got ${extra.queries.length}`);
+  for (const q of extra.queries) if (q.locale !== locale) throw new Error(`${q.id}: expected locale ${locale}`);
+  contract.queries.push(...extra.queries);
+}
 if (contract.version !== 1) throw new Error(`unsupported contract version: ${contract.version}`);
 if (contract.queries.length < 40) throw new Error(`expected at least 40 queries, got ${contract.queries.length}`);
 if (new Set(contract.queries.map((q) => q.id)).size !== contract.queries.length) {
   throw new Error('query ids must be unique');
 }
 for (const q of contract.queries) {
-  if (!['zh', 'en'].includes(q.locale)) throw new Error(`${q.id}: bad locale`);
+  if (!localeSet.has(q.locale)) throw new Error(`${q.id}: bad locale ${q.locale}`);
   if (!q.expectedUrls.length) throw new Error(`${q.id}: expectedUrls empty`);
 }
 
@@ -63,7 +75,7 @@ if (new Set(negativeContract.queries.map((q) => q.id)).size !== negativeContract
   throw new Error('negative query ids must be unique');
 }
 for (const q of negativeContract.queries) {
-  if (!['zh', 'en'].includes(q.locale)) throw new Error(`${q.id}: bad locale`);
+  if (!localeSet.has(q.locale)) throw new Error(`${q.id}: bad locale ${q.locale}`);
   if (!q.expectEmpty && !q.forbiddenUrls.length) {
     throw new Error(`${q.id}: negative query needs expectEmpty or forbiddenUrls`);
   }
@@ -72,7 +84,7 @@ if (new Set(contract.queries.map((q) => q.id)).size !== contract.queries.length)
   throw new Error('query ids must be unique');
 }
 for (const q of contract.queries) {
-  if (!['zh', 'en'].includes(q.locale)) throw new Error(`${q.id}: bad locale`);
+  if (!localeSet.has(q.locale)) throw new Error(`${q.id}: bad locale ${q.locale}`);
   if (!q.expectedUrls.length) throw new Error(`${q.id}: expectedUrls empty`);
 }
 
@@ -164,6 +176,26 @@ interface CaseResult {
   results: RawResult[];
 }
 
+
+/** Wait until the Pagefind UI stops changing: two identical snapshots in a row (or 6s). */
+async function settle(page: Page) {
+  const snapshot = () =>
+    page.evaluate(() => {
+      const links = [...document.querySelectorAll('.pagefind-ui__result-link')].map((el) => el.getAttribute('href'));
+      const message = document.querySelector('.pagefind-ui__message')?.textContent ?? '';
+      return `${links.join('|')}#${message.trim()}`;
+    });
+  await page.waitForTimeout(500);
+  let previous = await snapshot();
+  const deadline = Date.now() + 6000;
+  while (Date.now() < deadline) {
+    await page.waitForTimeout(250);
+    const current = await snapshot();
+    if (current === previous) return;
+    previous = current;
+  }
+}
+
 let browser: Browser | null = null;
 const results: CaseResult[] = [];
 const negativeResults: NegativeResult[] = [];
@@ -179,11 +211,11 @@ try {
   browser = await chromium.launch({
     executablePath,
     headless: true,
-    args: ['--no-sandbox', '--disable-gpu'],
+    args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
   });
 
   const pages = new Map<string, Page>();
-  for (const locale of ['zh', 'en']) {
+  for (const locale of site.locales) {
     const page = await browser.newPage();
     await page.goto(`${base}/${locale}/`, { waitUntil: 'domcontentloaded' });
     pages.set(locale, page);
@@ -203,7 +235,7 @@ try {
     await input.fill('');
     await page.waitForTimeout(80);
     await input.fill(q.query);
-    await page.waitForTimeout(700);
+    await settle(page);
 
     const raw = await page.locator('.pagefind-ui__result-link').evaluateAll((els) =>
       els.map((el) => ({
@@ -254,7 +286,7 @@ try {
     await input.fill('');
     await page.waitForTimeout(80);
     await input.fill(q.query);
-    await page.waitForTimeout(700);
+    await settle(page);
 
     const raw = await page.locator('.pagefind-ui__result-link').evaluateAll((els) =>
       els.map((el) => ({

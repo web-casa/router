@@ -1,0 +1,16 @@
+[
+  "Network", "Interfaces", "DHCP and DNS", "Hostnames", "Static Routes", "Firewall", "Wireless", "Diagnostics", "Devices",
+  "System", "Administration", "Software", "Startup", "Scheduled Tasks", "Backup / Flash Firmware", "Reboot", "Language and Style", "Language", "Theme",
+  "Status", "Overview", "Services", "Logout", "Terminal",
+  "General Settings", "Advanced Settings", "Physical Settings", "Firewall Settings", "IPv6 Settings", "DHCP Server", "Protocol",
+  "Ignore interface", "Use DHCP gateway", "Use custom DNS servers", "DNS forwardings", "DNS server", "Bridge", "Static address", "DHCP client", "PPPoE", "Unmanaged",
+  "IPv4 address", "IPv4 netmask", "IPv4 gateway", "IPv6 address", "Router Advertisement-Service", "DHCPv6-Service", "RA-Service", "SLAAC",
+  "Zone", "Zones", "Input", "Output", "Forward", "Accept", "Reject", "Drop", "Masquerading", "Port Forwards", "Traffic Rules",
+  "Edit", "Add", "Delete", "Save", "Save & Apply", "Apply", "Apply unchecked", "Revert", "Reset", "Restart", "Enable", "Disable", "Enabled", "Disabled", "Dismiss",
+  "Generate archive", "Perform reset", "Upload archive...", "Flash image...", "Keep settings and retain the current configuration",
+  "SSH Access", "SSH-Keys", "Router Password", "Dropbear Instance",
+  "Update lists", "Available", "Installed", "Download and install package", "Filter",
+  "Wi-Fi", "SSID", "Encryption", "Channel", "Mode", "Access Point", "Client", "Network isolation", "Isolate Clients",
+  "Hostname", "MAC address", "Lease time", "Active DHCP Leases", "Static Leases",
+  "VLAN", "Bridge VLAN filtering", "VLAN ID", "Untagged", "Tagged", "Primary VLAN ID", "Local", "Port"
+]

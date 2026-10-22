@@ -1,0 +1,652 @@
+{
+  "locale": "zh-hant",
+  "luciPo": "zh_Hant",
+  "entries": [
+    {
+      "en": "Network",
+      "tr": "網路",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Interfaces",
+      "tr": "介面",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "DHCP and DNS",
+      "tr": "DHCP與DNS",
+      "official": true,
+      "verify": true,
+      "source": "base.po (obsolete entry)"
+    },
+    {
+      "en": "Hostnames",
+      "tr": "主機名稱",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Static Routes",
+      "tr": "Static Routes",
+      "official": false
+    },
+    {
+      "en": "Firewall",
+      "tr": "防火牆",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Wireless",
+      "tr": "無線",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Diagnostics",
+      "tr": "診斷",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Devices",
+      "tr": "裝置",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "System",
+      "tr": "系統",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Administration",
+      "tr": "管理",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Software",
+      "tr": "Software",
+      "official": false
+    },
+    {
+      "en": "Startup",
+      "tr": "啟動項目",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Scheduled Tasks",
+      "tr": "排程任務",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Backup / Flash Firmware",
+      "tr": "備份/更新韌體",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Reboot",
+      "tr": "重新啟動",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Language and Style",
+      "tr": "語言與樣式",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Language",
+      "tr": "語言",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Theme",
+      "tr": "Theme",
+      "official": false
+    },
+    {
+      "en": "Status",
+      "tr": "狀態",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Overview",
+      "tr": "概覽",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Services",
+      "tr": "服務",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Logout",
+      "tr": "Logout",
+      "official": false
+    },
+    {
+      "en": "Terminal",
+      "tr": "Terminal",
+      "official": false
+    },
+    {
+      "en": "General Settings",
+      "tr": "一般設定",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Advanced Settings",
+      "tr": "進階設定",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Physical Settings",
+      "tr": "實體設定",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Firewall Settings",
+      "tr": "防火牆設定",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "IPv6 Settings",
+      "tr": "IPv6 設定",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "DHCP Server",
+      "tr": "DHCP 伺服器",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Protocol",
+      "tr": "協定",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Ignore interface",
+      "tr": "忽略介面",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Use DHCP gateway",
+      "tr": "使用 DHCP 閘道",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Use custom DNS servers",
+      "tr": "使用自訂 DNS 伺服器",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "DNS forwardings",
+      "tr": "DNS forwardings",
+      "official": false
+    },
+    {
+      "en": "DNS server",
+      "tr": "DNS server",
+      "official": false
+    },
+    {
+      "en": "Bridge",
+      "tr": "橋接",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Static address",
+      "tr": "靜態位址",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "DHCP client",
+      "tr": "DHCP 用戶端",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "PPPoE",
+      "tr": "PPPoE",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Unmanaged",
+      "tr": "未配置",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "IPv4 address",
+      "tr": "IPv4 位址",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "IPv4 netmask",
+      "tr": "IPv4 網路遮罩",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "IPv4 gateway",
+      "tr": "IPv4 閘道",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "IPv6 address",
+      "tr": "IPv6 位址",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Router Advertisement-Service",
+      "tr": "Router Advertisement-Service",
+      "official": false
+    },
+    {
+      "en": "DHCPv6-Service",
+      "tr": "DHCPv6 服務",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "RA-Service",
+      "tr": "RA-Service",
+      "official": false
+    },
+    {
+      "en": "SLAAC",
+      "tr": "SLAAC",
+      "official": false
+    },
+    {
+      "en": "Zone",
+      "tr": "Zone",
+      "official": false
+    },
+    {
+      "en": "Zones",
+      "tr": "區域",
+      "official": true,
+      "source": "firewall.po"
+    },
+    {
+      "en": "Input",
+      "tr": "傳入",
+      "official": true,
+      "verify": true,
+      "source": "firewall.po (obsolete entry)"
+    },
+    {
+      "en": "Output",
+      "tr": "傳出",
+      "official": true,
+      "verify": true,
+      "source": "firewall.po (obsolete entry)"
+    },
+    {
+      "en": "Forward",
+      "tr": "轉送",
+      "official": true,
+      "verify": true,
+      "source": "firewall.po (obsolete entry)"
+    },
+    {
+      "en": "Accept",
+      "tr": "Accept",
+      "official": false
+    },
+    {
+      "en": "Reject",
+      "tr": "Reject",
+      "official": false
+    },
+    {
+      "en": "Drop",
+      "tr": "Drop",
+      "official": false
+    },
+    {
+      "en": "Masquerading",
+      "tr": "Masquerading",
+      "official": false
+    },
+    {
+      "en": "Port Forwards",
+      "tr": "連接埠轉送",
+      "official": true,
+      "source": "firewall.po"
+    },
+    {
+      "en": "Traffic Rules",
+      "tr": "流量規則",
+      "official": true,
+      "source": "firewall.po"
+    },
+    {
+      "en": "Edit",
+      "tr": "編輯",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Add",
+      "tr": "新增",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Delete",
+      "tr": "刪除",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Save",
+      "tr": "儲存",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Save & Apply",
+      "tr": "儲存並套用",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Apply",
+      "tr": "Apply",
+      "official": false
+    },
+    {
+      "en": "Apply unchecked",
+      "tr": "強制套用",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Revert",
+      "tr": "恢復",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Reset",
+      "tr": "重設",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Restart",
+      "tr": "重新啟動",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Enable",
+      "tr": "啟用",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Disable",
+      "tr": "停用",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Enabled",
+      "tr": "已啟用",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Disabled",
+      "tr": "已停用",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Dismiss",
+      "tr": "關閉",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Generate archive",
+      "tr": "產生存檔",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Perform reset",
+      "tr": "執行重設",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Upload archive...",
+      "tr": "上傳存檔...",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Flash image...",
+      "tr": "更新映像檔...",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Keep settings and retain the current configuration",
+      "tr": "保留當前設定",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "SSH Access",
+      "tr": "SSH 存取",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "SSH-Keys",
+      "tr": "SSH 金鑰",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Router Password",
+      "tr": "路由器密碼",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Dropbear Instance",
+      "tr": "Dropbear 實例",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Update lists",
+      "tr": "Update lists",
+      "official": false
+    },
+    {
+      "en": "Available",
+      "tr": "可用",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Installed",
+      "tr": "Installed",
+      "official": false
+    },
+    {
+      "en": "Download and install package",
+      "tr": "Download and install package",
+      "official": false
+    },
+    {
+      "en": "Filter",
+      "tr": "篩選",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Wi-Fi",
+      "tr": "Wi-Fi",
+      "official": false
+    },
+    {
+      "en": "SSID",
+      "tr": "SSID",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Encryption",
+      "tr": "加密",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Channel",
+      "tr": "頻道",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Mode",
+      "tr": "模式",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Access Point",
+      "tr": "存取點",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Client",
+      "tr": "用戶端",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Network isolation",
+      "tr": "Network isolation",
+      "official": false
+    },
+    {
+      "en": "Isolate Clients",
+      "tr": "隔離用戶端",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Hostname",
+      "tr": "主機名稱",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "MAC address",
+      "tr": "MAC 位址",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Lease time",
+      "tr": "租約時間",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Active DHCP Leases",
+      "tr": "Active DHCP Leases",
+      "official": false
+    },
+    {
+      "en": "Static Leases",
+      "tr": "靜態租約",
+      "official": true,
+      "verify": true,
+      "source": "base.po (obsolete entry)"
+    },
+    {
+      "en": "VLAN",
+      "tr": "VLAN",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Bridge VLAN filtering",
+      "tr": "橋接 VLAN 篩選",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "VLAN ID",
+      "tr": "VLAN ID",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Untagged",
+      "tr": "Untagged",
+      "official": false
+    },
+    {
+      "en": "Tagged",
+      "tr": "Tagged",
+      "official": false
+    },
+    {
+      "en": "Primary VLAN ID",
+      "tr": "Primary VLAN ID",
+      "official": false
+    },
+    {
+      "en": "Local",
+      "tr": "本地",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Port",
+      "tr": "連接埠",
+      "official": true,
+      "source": "base.po"
+    }
+  ]
+}

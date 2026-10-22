@@ -13,6 +13,8 @@ const extended = z.object({
   aliases: z.array(z.string()).default([]),
   symptoms: z.array(z.string()).default([]),
   heroVariant: z.enum(['signal', 'console', 'release', 'panel', 'rings', 'download']).optional(),
+  // Translations only: fingerprint of the default-locale page this file was translated from (see `pnpm i18n stamp`).
+  sourceHash: z.string().regex(/^[0-9a-f]{16}$/).optional(),
   sources: z.array(z.object({ label: z.string(), url: z.string().url() })).default([]),
 });
 

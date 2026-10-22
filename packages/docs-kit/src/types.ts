@@ -3,7 +3,14 @@ import { z } from 'zod';
 export const DeploySchema = z.object({
   enabled: z.boolean().default(false),
   project: z.string().min(1),
-  domainStatus: z.enum(['unbound', 'placeholder-deployed', 'binding', 'verified', 'live', 'redirected-hosts']).default('unbound'),
+  domainStatus: z.enum(['unbound', 'placeholder-deployed', 'content-deployed-pages-dev', 'binding', 'verified', 'live', 'redirected-hosts']).default('unbound'),
+});
+
+export const I18nSchema = z.object({
+  /** Locales being translated; their files live in content/translations/ until promoted. */
+  planned: z.array(z.string()).default([]),
+  /** Locales that do not carry a `sourceHash` (written before hash tracking existed). */
+  hashExempt: z.array(z.string()).default([]),
 });
 
 export const SiteConfigSchema = z.object({
@@ -12,7 +19,9 @@ export const SiteConfigSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
   defaultLocale: z.string().default('en'),
+  /** Published locales only; a locale is added once its translation covers every source page. */
   locales: z.array(z.string()).min(1).default(['en', 'zh']),
+  i18n: I18nSchema.default({}),
   audience: z.string().min(1),
   angle: z.string().min(1),
   minPages: z.number().int().positive().default(4),

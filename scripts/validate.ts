@@ -42,18 +42,21 @@ for (const site of config.sites) {
   // Starlight generates a fallback page for an unpaired entry, so unpaired
   // pages must stay in content/drafts/ instead of the built content tree.
   const docsDir = path.join(siteDir, 'src/content/docs');
-  const [primary, secondary] = site.locales;
+  const primary = site.defaultLocale;
+  if (!site.locales.includes(primary)) errors.push(`${site.id}: defaultLocale ${primary} is not in locales`);
   try {
     const primaryFiles = new Set(await collectMarkdown(path.join(docsDir, primary)));
-    const secondaryFiles = new Set(await collectMarkdown(path.join(docsDir, secondary)));
-    for (const file of primaryFiles) {
-      if (!secondaryFiles.has(file)) errors.push(`${site.id}: missing ${secondary} pair for ${primary}/${file}`);
-    }
-    for (const file of secondaryFiles) {
-      if (!primaryFiles.has(file)) errors.push(`${site.id}: missing ${primary} pair for ${secondary}/${file}`);
+    for (const secondary of site.locales.filter((locale) => locale !== primary)) {
+      const secondaryFiles = new Set(await collectMarkdown(path.join(docsDir, secondary)));
+      for (const file of primaryFiles) {
+        if (!secondaryFiles.has(file)) errors.push(`${site.id}: missing ${secondary} pair for ${primary}/${file}`);
+      }
+      for (const file of secondaryFiles) {
+        if (!primaryFiles.has(file)) errors.push(`${site.id}: missing ${primary} pair for ${secondary}/${file}`);
+      }
     }
   } catch {
-    errors.push(`${site.id}: missing locale content directories ${primary}/ and ${secondary}/`);
+    errors.push(`${site.id}: missing locale content directories for ${site.locales.join(', ')}`);
   }
 }
 

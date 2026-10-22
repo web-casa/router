@@ -11,8 +11,9 @@
     "build": "pnpm build:kit && pnpm --filter @fleet/site-router-homes build",
     "dev": "pnpm --filter @fleet/site-router-homes dev",
     "validate": "pnpm build:kit && tsx scripts/validate.ts",
-    "check": "pnpm validate && pnpm --filter @fleet/site-router-homes check && pnpm --filter @fleet/site-router-homes build && tsx scripts/checks/i18n.ts",
+    "check": "pnpm validate && pnpm --filter @fleet/site-router-homes check && pnpm --filter @fleet/site-router-homes build && tsx scripts/checks/i18n.ts && tsx scripts/checks/translations.ts",
     "fleet": "tsx scripts/fleet.ts",
+    "i18n": "tsx scripts/i18n.ts",
     "test:search": "pnpm --filter @fleet/site-router-homes build && tsx scripts/checks/search.ts",
     "test:search:only": "tsx scripts/checks/search.ts"
   },

@@ -1,0 +1,651 @@
+{
+  "locale": "de",
+  "luciPo": "de",
+  "entries": [
+    {
+      "en": "Network",
+      "tr": "Netzwerk",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Interfaces",
+      "tr": "Schnittstellen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "DHCP and DNS",
+      "tr": "DHCP und DNS",
+      "official": true,
+      "verify": true,
+      "source": "base.po (obsolete entry)"
+    },
+    {
+      "en": "Hostnames",
+      "tr": "Rechnernamen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Static Routes",
+      "tr": "Static Routes",
+      "official": false
+    },
+    {
+      "en": "Firewall",
+      "tr": "Firewall",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Wireless",
+      "tr": "WLAN",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Diagnostics",
+      "tr": "Diagnosen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Devices",
+      "tr": "Geräte",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "System",
+      "tr": "System",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Administration",
+      "tr": "Administration",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Software",
+      "tr": "Software",
+      "official": false
+    },
+    {
+      "en": "Startup",
+      "tr": "Systemstart",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Scheduled Tasks",
+      "tr": "Geplante Aufgaben",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Backup / Flash Firmware",
+      "tr": "Backup / Firmware Update",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Reboot",
+      "tr": "Neu Starten",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Language and Style",
+      "tr": "Sprache und Aussehen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Language",
+      "tr": "Sprache",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Theme",
+      "tr": "Theme",
+      "official": false
+    },
+    {
+      "en": "Status",
+      "tr": "Status",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Overview",
+      "tr": "Übersicht",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Services",
+      "tr": "Dienste",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Logout",
+      "tr": "Logout",
+      "official": false
+    },
+    {
+      "en": "Terminal",
+      "tr": "Terminal",
+      "official": false
+    },
+    {
+      "en": "General Settings",
+      "tr": "Allgemeine Einstellungen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Advanced Settings",
+      "tr": "Erweiterte Einstellungen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Physical Settings",
+      "tr": "Physische Einstellungen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Firewall Settings",
+      "tr": "Firewall Einstellungen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "IPv6 Settings",
+      "tr": "IPv6 Einstellungen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "DHCP Server",
+      "tr": "DHCP-Server",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Protocol",
+      "tr": "Protokoll",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Ignore interface",
+      "tr": "Schnittstelle ignorieren",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Use DHCP gateway",
+      "tr": "Benutze DHCP-Gateway",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Use custom DNS servers",
+      "tr": "Benutze eigene DNS-Server",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "DNS forwardings",
+      "tr": "DNS forwardings",
+      "official": false
+    },
+    {
+      "en": "DNS server",
+      "tr": "DNS server",
+      "official": false
+    },
+    {
+      "en": "Bridge",
+      "tr": "Bridge",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Static address",
+      "tr": "Statische Adresse",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "DHCP client",
+      "tr": "DHCP Client",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "PPPoE",
+      "tr": "PPPoE",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Unmanaged",
+      "tr": "Nicht verwaltet",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "IPv4 address",
+      "tr": "IPv4 Adresse",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "IPv4 netmask",
+      "tr": "IPv4 Netzmaske",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "IPv4 gateway",
+      "tr": "IPv4 Gateway",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "IPv6 address",
+      "tr": "IPv6 Adresse",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Router Advertisement-Service",
+      "tr": "Router Advertisement-Service",
+      "official": false
+    },
+    {
+      "en": "DHCPv6-Service",
+      "tr": "DHCPv6-Dienst",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "RA-Service",
+      "tr": "RA-Service",
+      "official": false
+    },
+    {
+      "en": "SLAAC",
+      "tr": "SLAAC",
+      "official": false
+    },
+    {
+      "en": "Zone",
+      "tr": "Zone",
+      "official": false
+    },
+    {
+      "en": "Zones",
+      "tr": "Zonen",
+      "official": true,
+      "source": "firewall.po"
+    },
+    {
+      "en": "Input",
+      "tr": "Eingehend",
+      "official": true,
+      "verify": true,
+      "source": "firewall.po (obsolete entry)"
+    },
+    {
+      "en": "Output",
+      "tr": "Ausgabe",
+      "official": true,
+      "verify": true,
+      "source": "firewall.po (obsolete entry)"
+    },
+    {
+      "en": "Forward",
+      "tr": "Weiterleitung",
+      "official": true,
+      "verify": true,
+      "source": "firewall.po (obsolete entry)"
+    },
+    {
+      "en": "Accept",
+      "tr": "Accept",
+      "official": false
+    },
+    {
+      "en": "Reject",
+      "tr": "Reject",
+      "official": false
+    },
+    {
+      "en": "Drop",
+      "tr": "Drop",
+      "official": false
+    },
+    {
+      "en": "Masquerading",
+      "tr": "Masquerading",
+      "official": false
+    },
+    {
+      "en": "Port Forwards",
+      "tr": "Portweiterleitungen",
+      "official": true,
+      "source": "firewall.po"
+    },
+    {
+      "en": "Traffic Rules",
+      "tr": "Traffic-Regeln",
+      "official": true,
+      "source": "firewall.po"
+    },
+    {
+      "en": "Edit",
+      "tr": "Bearbeitung",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Add",
+      "tr": "Hinzufügen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Delete",
+      "tr": "Löschen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Save",
+      "tr": "Speichern",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Save & Apply",
+      "tr": "Speichern & Anwenden",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Apply",
+      "tr": "Apply",
+      "official": false
+    },
+    {
+      "en": "Apply unchecked",
+      "tr": "Ungeprüft übernehmen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Revert",
+      "tr": "Verwerfen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Reset",
+      "tr": "Zurücksetzen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Restart",
+      "tr": "Neustart",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Enable",
+      "tr": "Aktivieren",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Disable",
+      "tr": "Deaktivieren",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Enabled",
+      "tr": "Aktiviert",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Disabled",
+      "tr": "Deaktiviert",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Dismiss",
+      "tr": "Verwerfen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Generate archive",
+      "tr": "Sicherung erstellen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Perform reset",
+      "tr": "Reset durchführen",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Upload archive...",
+      "tr": "Backup wiederherstellen...",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Flash image...",
+      "tr": "Firmware aktualisieren...",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Keep settings and retain the current configuration",
+      "tr": "Einstellungen beibehalten und die aktuelle Konfiguration sichern",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "SSH Access",
+      "tr": "SSH-Zugriff",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "SSH-Keys",
+      "tr": "SSH-Schlüssel",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Router Password",
+      "tr": "Routerpasswort",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Dropbear Instance",
+      "tr": "Dropbear Instanz",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Update lists",
+      "tr": "Update lists",
+      "official": false
+    },
+    {
+      "en": "Available",
+      "tr": "Verfügbar",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Installed",
+      "tr": "Installed",
+      "official": false
+    },
+    {
+      "en": "Download and install package",
+      "tr": "Download and install package",
+      "official": false
+    },
+    {
+      "en": "Filter",
+      "tr": "Filter",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Wi-Fi",
+      "tr": "Wi-Fi",
+      "official": false
+    },
+    {
+      "en": "SSID",
+      "tr": "SSID",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Encryption",
+      "tr": "Verschlüsselung",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Channel",
+      "tr": "Kanal",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Mode",
+      "tr": "Modus",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Access Point",
+      "tr": "Zugangspunkt",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Client",
+      "tr": "Client",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Network isolation",
+      "tr": "Network isolation",
+      "official": false
+    },
+    {
+      "en": "Isolate Clients",
+      "tr": "Clients isolieren",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Hostname",
+      "tr": "Hostname",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "MAC address",
+      "tr": "MAC-Adresse",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Lease time",
+      "tr": "Lease-Zeit",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Active DHCP Leases",
+      "tr": "Active DHCP Leases",
+      "official": false
+    },
+    {
+      "en": "Static Leases",
+      "tr": "Statische Einträge",
+      "official": true,
+      "verify": true,
+      "source": "base.po (obsolete entry)"
+    },
+    {
+      "en": "VLAN",
+      "tr": "VLAN",
+      "official": false
+    },
+    {
+      "en": "Bridge VLAN filtering",
+      "tr": "Netzwerkbrücken-VLAN-Filter",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "VLAN ID",
+      "tr": "VLAN-ID",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Untagged",
+      "tr": "Untagged",
+      "official": false
+    },
+    {
+      "en": "Tagged",
+      "tr": "Tagged",
+      "official": false
+    },
+    {
+      "en": "Primary VLAN ID",
+      "tr": "Primary VLAN ID",
+      "official": false
+    },
+    {
+      "en": "Local",
+      "tr": "Lokal",
+      "official": true,
+      "source": "base.po"
+    },
+    {
+      "en": "Port",
+      "tr": "Port",
+      "official": true,
+      "source": "base.po"
+    }
+  ]
+}

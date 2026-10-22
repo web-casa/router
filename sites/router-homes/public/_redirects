@@ -1,1 +1,3 @@
 / /en/ 301
+/zh-hans /zh/ 301
+/zh-hans/* /zh/:splat 301

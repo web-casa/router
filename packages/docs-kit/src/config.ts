@@ -1,5 +1,6 @@
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
+import { starlightLocales } from './locales.js';
 import type { SiteMeta } from './types.js';
 
 export interface CreateDocsConfigOptions {
@@ -16,10 +17,7 @@ export function createDocsConfig(meta: SiteMeta, options: CreateDocsConfigOption
         title: meta.title,
         description: meta.description,
         defaultLocale: meta.defaultLocale,
-        locales: {
-          en: { label: 'English' },
-          zh: { label: '简体中文', lang: 'zh-CN' },
-        },
+        locales: starlightLocales(meta.locales),
         sidebar: meta.sidebar as any,
         customCss: meta.customCss ?? ['./src/styles/theme.css'],
         social: [],
