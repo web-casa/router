@@ -1,0 +1,199 @@
+---
+title: "Elige una imagen x86: combined, ext4, squashfs, EFI/BIOS"
+description: Distingue las imágenes x86/64 combined/rootfs, ext4/squashfs, EFI/BIOS y tar.gz, elige según PVE o arranque físico y evita escribir en el disco equivocado o crear una imagen que no arranca.
+pageType: install
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86/64 generic-ext4-combined (BIOS/SeaBIOS) importado en la VM 200 de PVE; 13,0 MB gz / 120,5 MB img; UEFI/squashfs/USB sin probar'
+testRecipe: 'tests/recipes/x86-image-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt x86 image', 'openwrt combined', 'openwrt ext4 squashfs', 'openwrt efi bios', 'imagen x86 openwrt', 'openwrt proxmox', 'openwrt uefi no arranca']
+symptoms: ['no puedo elegir la imagen x86', 'la importación en PVE no arranca', 'falla el arranque UEFI', 'escribí en el disco equivocado']
+sources:
+  - label: Instalación de OpenWrt en x86
+    url: https://openwrt.org/docs/guide-user/installation/openwrt_x86
+  - label: Tipos de imagen de OpenWrt
+    url: https://openwrt.org/docs/guide-user/installation/generic.backup
+  - label: importdisk de Proxmox VE
+    url: https://pve.proxmox.com/pve-docs/qm.1.html
+  - label: Descargas de OpenWrt x86/64
+    url: https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/
+sourceHash: '129e616812c48fb6'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 / x86" tested={true} evidence="E2" />
+
+## Elección en una línea
+
+- **PVE con SeaBIOS por defecto**: prefiere `generic-ext4-combined.img.gz` (probado aquí);
+- **UEFI/OVMF**: elige una imagen combined con `-efi`;
+- **restablecimiento de fábrica / root de solo lectura + overlay**: elige squashfs combined;
+- **bootloader y particiones existentes, reemplazar solo el rootfs**: usa una imagen rootfs;
+- **contenedor/chroot**: `rootfs.tar.gz`, no una imagen de disco.
+
+## Lee el nombre del archivo
+
+Archivos principales de x86/64 en 25.12.6:
+
+```text
+openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+openwrt-25.12.6-x86-64-generic-ext4-combined-efi.img.gz
+openwrt-25.12.6-x86-64-generic-squashfs-combined.img.gz
+openwrt-25.12.6-x86-64-generic-squashfs-combined-efi.img.gz
+openwrt-25.12.6-x86-64-generic-ext4-rootfs.img.gz
+openwrt-25.12.6-x86-64-generic-squashfs-rootfs.img.gz
+openwrt-25.12.6-x86-64-generic-kernel.bin
+openwrt-25.12.6-x86-64-generic-targz-rootfs.tar.gz
+openwrt-25.12.6-x86-64-rootfs.tar.gz
+```
+
+Tres palabras importan:
+
+| Palabra | Significado | Si te equivocas |
+|---|---|---|
+| `combined` | imagen de disco completo con tabla de particiones y arranque | usarla como rootfs puede sobrescribir particiones |
+| `rootfs` | solo el sistema de archivos | sin bootloader; no puede arrancar directamente |
+| `ext4` / `squashfs` | root escribible / root de solo lectura + overlay | afecta a la recuperación y al comportamiento de escritura |
+| `-efi` | arranque UEFI | puede que el BIOS legacy no la arranque |
+| `tar.gz` | archivo comprimido del rootfs | no es una imagen de disco arrancable |
+
+## ext4 frente a squashfs
+
+- **ext4 combined**: root escribible; habitual en VM y soft routers; se comporta como una instalación normal de Linux.
+- **squashfs combined**: root de solo lectura, configuración en el overlay; mejor para el restablecimiento de fábrica y para evitar errores; el espacio y el mantenimiento son distintos.
+- Ambas pueden arrancar en PVE; este laboratorio solo probó ext4. No te saltes las copias de seguridad porque «squashfs es más seguro».
+
+## BIOS frente a UEFI
+
+- PVE con `SeaBIOS` por defecto: usa una imagen combined sin `-efi`;
+- PVE con `OVMF (UEFI)`: usa combined `-efi` y prepara un disco EFI;
+- Físico: comprueba `UEFI/Legacy` en el firmware y haz que coincidan;
+- Elección equivocada: sin entrada de arranque, GRUB no se inicia, cae a PXE/BIOS.
+
+Este laboratorio: VM 200 de PVE, SeaBIOS + `generic-ext4-combined`; arrancó correctamente.
+
+## Descarga y verificación
+
+<Step where="client" title="Descarga la imagen y sha256sums" expected="La fuente oficial/TUNA y el checksum son correctos.">
+
+```sh
+curl -LO https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+curl -LO https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/sha256sums
+grep 'generic-ext4-combined.img.gz' sha256sums | sha256sum -c -
+```
+
+Este laboratorio: `.img.gz` de 13,0 MB, `.img` de 120,5 MB tras descomprimir; el SHA-256 coincidió.
+
+</Step>
+
+<Step where="client" title="Descomprime" expected="Un .img listo para importar o escribir.">
+
+```sh
+gzip -dk openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+ls -lh openwrt-25.12.6-x86-64-generic-ext4-combined.img
+```
+
+`sysupgrade` y `qm importdisk` de PVE usan `.img`; no escribas el `.gz` directamente en el disco.
+
+</Step>
+
+## Importar en PVE
+
+<Step where="pve" title="Importa el disco y define el orden de arranque" expected="La VM arranca desde el disco importado, no desde ISO/PXE.">
+
+```sh
+qm create 200 --name openwrt --memory 512 --cores 2 --cpu host \
+  --scsihw virtio-scsi-pci --ostype l26 --vga std --serial0 socket \
+  --net0 virtio,bridge=vmbr0
+
+qm importdisk 200 openwrt-25.12.6-x86-64-generic-ext4-combined.img local-lvm
+qm set 200 --scsi0 local-lvm:vm-200-disk-0
+qm set 200 --boot order=scsi0
+qm start 200
+```
+
+Si PVE usa UEFI/OVMF, utiliza la imagen `-efi` y un disco EFI; no fuerces una imagen BIOS en UEFI.
+
+</Step>
+
+<Step where="pve" title="Verifica el arranque" expected="La consola muestra OpenWrt y la versión y el target correctos.">
+
+```sh
+qm terminal 200
+# or inside the VM
+ubus call system board
+cat /etc/openwrt_release
+```
+
+Este laboratorio arrancó 25.12.6 x86/64; LAN por defecto `192.168.1.1`.
+
+</Step>
+
+## Escritura en disco físico
+
+```sh
+# verify the target first; do not copy the wrong device name
+lsblk
+sudo dd if=openwrt-...-combined.img of=/dev/sdX bs=4M status=progress conv=fsync
+sync
+```
+
+- `dd` sobrescribe todo el destino; desconecta los discos no relacionados y verifica el dispositivo;
+- Para UEFI, elige `-efi`;
+- Arranca desde ese disco; no dejes que el ISO mantenga la prioridad de arranque;
+- Los nombres de las NIC físicas pueden no coincidir con `eth0/eth1` de PVE; identifícalas por MAC/PCI.
+
+## Fallos comunes
+
+### La importación en PVE no arranca
+
+- el orden de arranque no es `scsi0`;
+- elegiste rootfs en lugar de combined;
+- la imagen BIOS/UEFI no coincide;
+- el bus o controlador de disco no coincide;
+- la consola serie no está configurada, por lo que no hay registro de arranque.
+
+### Falla el arranque UEFI en hardware físico
+
+- imagen sin `-efi`;
+- el BIOS sigue en Legacy/CSM;
+- escritura incompleta en el USB;
+- restricciones de Secure Boot o de firma.
+
+### El sistema original desapareció tras escribir
+
+`dd` escribió en el disco equivocado. Haz una copia de seguridad, verifica el tamaño y el modelo con `lsblk` y luego escribe; no pruebes en una máquina de producción.
+
+### La imagen rootfs no arranca directamente
+
+rootfs no tiene bootloader ni tabla de particiones; usa un bootloader existente o la vía adecuada de contenedor o virtualización.
+
+## Prueba de laboratorio E2 (2026-10-20)
+
+- Entorno: PVE 9.2.2; OpenWrt 25.12.6 x86/64; `generic-ext4-combined.img.gz`; SeaBIOS.
+- Descarga: `.img.gz` de 13,0 MB; `.img` de 120,5 MB; el SHA-256 coincidió con el `sha256sums` oficial.
+- PVE: `qm importdisk` → `scsi0` → `boot order=scsi0`; la VM arrancó 25.12.6.
+- No probado: `-efi`/OVMF, squashfs, USB físico, Secure Boot, diferencias de la imagen de 24.10.
+- Receta: `tests/recipes/x86-image-25.12.md`.
+
+## Fuentes y revisión
+
+- Esto es E2 parcial: se probaron BIOS/ext4 combined + importación en PVE; no se probaron UEFI, squashfs ni la escritura física.
+- Los nombres y la disponibilidad de las imágenes cambian con cada versión; usa la página de descargas.
+- No hay revisor independiente; las conclusiones se limitan a este entorno PVE/VM.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86/64 generic-ext4-combined (BIOS/SeaBIOS) importado en la VM 200 de PVE; 13,0 MB gz / 120,5 MB img; UEFI/squashfs/USB sin probar"
+  recipe="tests/recipes/x86-image-25.12.md"
+  result="E2 parcial: el SHA-256 de generic-ext4-combined (BIOS) fue correcto, qm importdisk + scsi0 arrancó 25.12.6; EFI/squashfs/USB físico sin probar"
+  date="2026-10-20"
+/>
+
+<PageSources />

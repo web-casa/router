@@ -1,0 +1,176 @@
+---
+title: "¿Qué OpenWrt es este? OpenWrt oficial, ImmortalWrt, iStoreOS o firmware del fabricante"
+description: Lee la distribución, la versión, el target, el gestor de paquetes y el modelo de hardware con comandos de solo lectura, para elegir la imagen y los feeds correctos.
+pageType: troubleshoot
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Captura de dispositivo pendiente; los comandos son de solo lectura y no dependen del laboratorio'
+testRecipe: 'tests/recipes/which-openwrt.md'
+aliases: ['openwrt version', 'immortalwrt vs openwrt', 'istoreos openwrt', 'openwrt firmware identify', 'qué versión de openwrt tengo', 'identificar firmware openwrt']
+symptoms: ['no sé qué imagen instalar', 'el paquete no se instala', 'origen del firmware desconocido']
+sources:
+  - label: Notas de la versión OpenWrt 25.12
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: Selector de firmware de OpenWrt
+    url: https://firmware-selector.openwrt.org/
+  - label: Gestor de paquetes de OpenWrt (apk)
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: ImmortalWrt
+    url: https://immortalwrt.org/
+  - label: iStoreOS
+    url: https://www.istoreos.com/
+sourceHash: 'c81d8dfe3c689c0e'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="unknown" version="—" packageManager="—" device="cualquier dispositivo similar a OpenWrt" tested={false} evidence="E1" />
+
+## Resultado
+
+- Sabrás si el dispositivo ejecuta **OpenWrt oficial, ImmortalWrt, iStoreOS o firmware del fabricante**.
+- Leerás la distribución, la versión, la revisión, el target, la arquitectura y el modelo de hardware.
+- Sabrás si el gestor de paquetes es `apk` o `opkg`, y qué feeds le corresponden.
+- Elegirás la imagen correcta de sysupgrade o del fabricante en lugar de instalar una equivocada.
+
+## Empieza con tres comandos de solo lectura
+
+<Step where="router-shell" title="Lee los datos de la placa del sistema" expected="Ves la distribución, la versión, el target y el modelo.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+```
+
+Los cuatro campos clave son `release.distribution`, `release.version`, `release.target` y `model`.
+
+</Step>
+
+<Step where="router-shell" title="Lee el gestor de paquetes y la arquitectura" expected="Sabes si es apk u opkg, y la arquitectura de la CPU.">
+
+```sh
+command -v apk
+command -v opkg
+cat /etc/apk/arch 2>/dev/null
+opkg print-architecture 2>/dev/null
+uname -a
+```
+
+No deduzcas el gestor de paquetes por el número de versión: la 25.12 oficial suele usar `apk` y la 24.10 usa `opkg`, pero los forks y las imágenes de fabricante pueden diferir. Confía en el comando que exista.
+
+</Step>
+
+<Step where="router-shell" title="Lee el modelo y la revisión de hardware" expected="El modelo y el nombre de la placa coinciden con la etiqueta del dispositivo.">
+
+x86:
+
+```sh
+cat /sys/class/dmi/id/sys_vendor
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/board_version
+cat /sys/class/dmi/id/bios_version
+```
+
+ARM/router:
+
+```sh
+cat /tmp/sysinfo/model
+cat /tmp/sysinfo/board_name
+```
+
+`model` no es la revisión de hardware; un mismo modelo puede tener varias revisiones. Antes de instalar, usa la etiqueta, `board_name` y la página de descargas del fabricante.
+
+</Step>
+
+## Tabla de decisión
+
+| Campo/indicio | OpenWrt oficial | ImmortalWrt | iStoreOS | Firmware del fabricante |
+|---|---|---|---|---|
+| `release.distribution` | `OpenWrt` | normalmente `ImmortalWrt` | normalmente `iStoreOS`/fabricante | fabricante |
+| Feeds | `downloads.openwrt.org` | feeds de ImmortalWrt | feeds de iStoreOS | tienda del fabricante |
+| Gestor de paquetes | `apk` (25.12) u `opkg` (24.10) | comprueba el comando | normalmente `opkg` | puede no existir o estar restringido |
+| Interfaz web | LuCI | LuCI + personalizaciones | interfaz de iStoreOS | interfaz del fabricante |
+| Imagen de actualización | sysupgrade de OpenWrt | imagen de ImmortalWrt | imagen de iStoreOS | firmware del fabricante |
+| Soporte | comunidad de OpenWrt | comunidad de ImmortalWrt | comunidad de iStoreOS | fabricante |
+
+**No mezcles** los feeds oficiales de OpenWrt en ImmortalWrt/iStoreOS ni instales el sysupgrade de otro modelo; la ABI, el kernel y la distribución de particiones pueden no coincidir.
+
+## Por qué la página “Acerca de” no basta
+
+- Algunas imágenes de fabricante cambian el aspecto de LuCI pero por debajo no son OpenWrt oficial.
+- `DISTRIB_DESCRIPTION` se puede personalizar y no es suficiente por sí solo.
+- El mismo número de versión no implica el mismo target/perfil.
+- Lo que realmente importa al instalar plugins es el gestor de paquetes y los feeds.
+
+Contrasta `ubus call system board`, `/etc/openwrt_release` y el gestor de paquetes.
+
+## Elige la imagen de actualización
+
+<Step where="router-shell" title="Anota el target y board_name" expected="Puedes encontrar una coincidencia exacta en el selector de firmware o en la página del fabricante.">
+
+```sh
+ubus call system board
+```
+
+Fíjate en:
+
+- `release.target` (p. ej. `x86/64`, `mediatek/filogic`);
+- `board_name`;
+- `model`;
+- versión/revisión actual.
+
+Para dispositivos oficiales, usa el [Selector de firmware de OpenWrt](https://firmware-selector.openwrt.org/) con el target/modelo exacto. Los dispositivos con ImmortalWrt/iStoreOS/firmware de fabricante usan sus propias páginas de descarga. **Nunca instales a la fuerza un sysupgrade de otro modelo o target.**
+
+</Step>
+
+<Step where="router-shell" title="Confirma el tipo de imagen" expected="Sabes si es sysupgrade o una imagen factory/del fabricante.">
+
+- Actualizar un OpenWrt existente normalmente usa `sysupgrade`.
+- La primera instalación desde firmware del fabricante normalmente usa una imagen de transición `factory`/del fabricante.
+- x86 puede usar imágenes combined/ext4 que se escriben de otra forma.
+- Si tienes dudas, lee la página del dispositivo; no lo adivines por el nombre del archivo.
+
+</Step>
+
+## Ramas de fallo y recuperación
+
+### `ubus` no existe o falla
+
+Puede ser firmware del fabricante o un sistema que no es OpenWrt. Revisa “Acerca de/Sistema” en la interfaz web y la etiqueta del dispositivo; no instales OpenWrt a ciegas.
+
+### Solo interfaz web, sin SSH
+
+El firmware del fabricante puede desactivar SSH. Consulta primero la documentación del fabricante y la garantía; no instales solo para obtener root. Si necesitas funciones del fabricante, usa su vía de actualización.
+
+### Los paquetes no se instalan
+
+- El gestor de paquetes no coincide con el firmware (`apk` frente a `opkg`);
+- la arquitectura o versión del feed no coincide;
+- la ABI de los módulos del kernel no coincide;
+- se mezclaron feeds de otro fork.
+
+Vuelve a `ubus call system board` y al gestor de paquetes, confirma el origen y después depura.
+
+### Imagen equivocada / dispositivo brickeado
+
+Deja de instalar. Usa el modo failsafe del dispositivo, TFTP o el procedimiento de recuperación del fabricante. Si no tienes vía de recuperación, no pruebes “una imagen más”.
+
+## Estado E1 y fuentes
+
+- Esto es E1: los campos, la tabla de decisión y el método de selección de imagen se basan en documentación pública; no se capturó ningún dispositivo en este entorno.
+- Los forks y las salidas del fabricante pueden diferir; ejecuta `tests/recipes/which-openwrt.md` en un dispositivo real, registra los campos y las capturas de pantalla, y luego pasa a E2.
+- Esta página solo identifica el firmware; no ofrece instalación entre modelos ni formas de saltarse las restricciones del fabricante.
+
+<TestRecord
+  status="planned"
+  environment="Captura de dispositivo pendiente; comandos de solo lectura, sin dependencia del laboratorio"
+  recipe="tests/recipes/which-openwrt.md"
+  result="E1: se documentan los campos, la tabla de decisión y el método de selección de imagen; aún sin captura de dispositivo"
+/>
+
+<PageSources />

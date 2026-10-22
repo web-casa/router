@@ -1,0 +1,193 @@
+---
+title: "Wi-Fi para invitados: SSID separado, VLAN, DHCP y aislamiento"
+description: Aísla a los invitados con un SSID, subred, DHCP y zona de cortafuegos separados, permite solo internet y bloquea el acceso a la LAN principal. Wi-Fi y VLAN no están verificados en hardware real.
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Compilado a partir de la documentación de Wi-Fi/VLAN/cortafuegos de OpenWrt 25.12; sin validación en hardware inalámbrico ni switch reales'
+testRecipe: 'tests/recipes/guest-wifi-25.12.md'
+aliases: ['openwrt guest wifi', 'openwrt guest network', 'openwrt wifi isolation', 'openwrt guest wi-fi', 'wifi de invitados openwrt', 'red de invitados openwrt']
+symptoms: ['los invitados pueden acceder a la LAN', 'los invitados no tienen internet', 'el Wi-Fi de invitados no recibe dirección', 'falla el aislamiento VLAN']
+sources:
+  - label: Wi-Fi para invitados de OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/wifi/guestwifi/guest-wlan
+  - label: Configuración de Wi-Fi de OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/wifi/basic
+  - label: Zonas del cortafuegos de OpenWrt
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: VLAN DSA de OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+sourceHash: 'b918dd049823d2a8'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="Dispositivo inalámbrico + DSA (sin probar)" tested={false} evidence="E1" />
+
+> **Estado**: documentación E1. El aislamiento de invitados abarca Wi-Fi, VLAN, DHCP y cortafuegos; sin hardware inalámbrico real, no afirmes que está «aislado».
+
+## Objetivos
+
+- los invitados usan un SSID separado;
+- los invitados reciben una subred separada;
+- los invitados pueden llegar a internet, no a la LAN principal ni a la interfaz de administración;
+- la LAN principal no puede iniciar acceso a los invitados (según la política);
+- el acceso de invitados se puede desactivar rápidamente.
+
+## Opciones
+
+| Opción | Aislamiento | Requiere |
+|---|---|---|
+| mismo puente + SSID/zona separados | medio | varios SSID; cortafuegos |
+| VLAN + SSID separados | más fuerte | VLAN DSA/switch; AP con etiquetas |
+| AP separado/aislamiento físico | el más fuerte | dispositivo/puerto separado |
+
+Esta página cubre «SSID separado + zona de invitados» y cómo la VLAN lo refuerza; los detalles de VLAN están en 023.
+
+## 1. Crea la subred de invitados
+
+```sh
+uci set network.guest=interface
+uci set network.guest.proto='static'
+uci set network.guest.device='br-guest'
+uci set network.guest.ipaddr='192.168.50.1/24'
+uci set network.guest.ip6assign='60'
+uci commit network
+```
+
+`br-guest` puede ser un puente separado (con la interfaz inalámbrica añadida) o una interfaz VLAN; no lo mezcles en `br-lan` confiando solo en el cortafuegos.
+
+## 2. DHCP/DNS para invitados
+
+```sh
+uci set dhcp.guest=dhcp
+uci set dhcp.guest.interface='guest'
+uci set dhcp.guest.start='100'
+uci set dhcp.guest.limit='100'
+uci set dhcp.guest.leasetime='1h'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+```
+
+Si los invitados van en una VLAN, enlaza el DHCP a esa interfaz; no entregues el rango de la LAN principal.
+
+## 3. Cortafuegos: solo internet
+
+```sh
+uci add firewall zone
+uci set firewall.@zone[-1].name='guest'
+uci set firewall.@zone[-1].input='REJECT'
+uci set firewall.@zone[-1].output='ACCEPT'
+uci set firewall.@zone[-1].forward='REJECT'
+uci add_list firewall.@zone[-1].network='guest'
+uci commit firewall
+
+uci add firewall forwarding
+uci set firewall.@forwarding[-1].src='guest'
+uci set firewall.@forwarding[-1].dest='wan'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+Puntos clave:
+
+- **No** añadas reenvío guest→lan;
+- el reenvío guest→wan está permitido; el NAT depende del masquerading de la zona wan;
+- si el DHCP/DNS queda bloqueado por input REJECT, añade reglas guest→router para los puertos 53/67 en lugar de poner input en ACCEPT;
+- por defecto la LAN principal no puede iniciar conexiones hacia los invitados; permite por separado la impresión o el casting si lo necesitas.
+
+## 4. Añade el SSID de invitados
+
+```sh
+uci set wireless.guest=wifi-iface
+uci set wireless.guest.device='radio0'
+uci set wireless.guest.network='guest'
+uci set wireless.guest.mode='ap'
+uci set wireless.guest.ssid='OpenWrt-Guest'
+uci set wireless.guest.encryption='psk2'
+uci set wireless.guest.key='<guest-password>'
+uci set wireless.guest.isolate='1'
+uci commit wireless
+wifi reload
+```
+
+- `network='guest'` debe coincidir con la interfaz de invitados;
+- `isolate='1'` aísla entre sí a los clientes inalámbricos, no de la LAN principal; el aislamiento de la LAN sigue requiriendo cortafuegos/VLAN;
+- ajusta 2.4/5G, canal y ancho según el dispositivo;
+- con varios AP: mismo SSID/contraseña/seguridad, canales escalonados.
+
+## 5. Si usas VLAN
+
+- crea una VLAN dedicada para invitados (p. ej. 20) en DSA/switch;
+- une el SSID de invitados a esa VLAN;
+- etiqueta el troncal en ambos extremos y permite la VLAN 20;
+- enlaza la interfaz/DHCP de invitados a la VLAN 20;
+- no configures la VLAN de invitados como PVID untagged en la VLAN de administración.
+
+Consulta 023 para la sintaxis de `bridge-vlan`.
+
+## Verificación (con hardware)
+
+```sh
+iwinfo
+ip -4 addr show
+bridge vlan show
+```
+
+Cliente:
+
+- se une a `OpenWrt-Guest` y recibe `192.168.50.x`;
+- llega a internet/DNS;
+- **no puede** llegar a la LAN principal `192.168.1.0/24`, a la administración de LuCI ni al NAS/impresora;
+- la LAN principal no puede iniciar conexiones hacia los invitados (según la política);
+- desactivar el SSID de invitados no afecta a la LAN principal.
+
+Sin hardware inalámbrico/VLAN, nada de esto está «verificado».
+
+## Fallos comunes
+
+### Los invitados llegan a la LAN principal
+
+- no hay zona/reenvío separados;
+- invitados y lan comparten un puente;
+- regla, orden o zona del cortafuegos incorrectos;
+- la VLAN no está aislada, solo se cambió el SSID.
+
+### Los invitados no reciben dirección
+
+- el DHCP no está enlazado a la interfaz de invitados;
+- la interfaz de invitados está caída;
+- etiqueta VLAN o PVID incorrectos;
+- el cortafuegos bloquea DHCP/DNS.
+
+### Los invitados no tienen internet
+
+- falta el reenvío guest→wan;
+- masquerading/NAT de WAN;
+- el DNS no está permitido;
+- ruta upstream.
+
+### Desactivar la red de invitados rompe la LAN principal
+
+- invitados y lan comparten puente/VLAN;
+- cambió el PVID o la etiqueta del puerto de administración;
+- recupera mediante la consola; no restablezcas de fábrica.
+
+## Estado E1
+
+- Solo documentación; no verificada en hardware inalámbrico/DSA real; no se afirma que «el aislamiento de invitados está activo».
+- El E2 real requiere: AP con varios SSID, switch con VLAN o dispositivo DSA, dos clientes, consola y configuración de reversión.
+- Tras probar, registra el modelo del dispositivo, VLAN/SSID, zona del cortafuegos, DHCP y resultado del aislamiento.
+
+<TestRecord
+  status="planned"
+  environment="Compilado a partir de la documentación de Wi-Fi/VLAN/cortafuegos de OpenWrt 25.12; sin validación en hardware inalámbrico ni switch reales"
+  recipe="tests/recipes/guest-wifi-25.12.md"
+  result="E1: se documentan el SSID, la subred, el DHCP, la zona de cortafuegos, el aislamiento y el enfoque VLAN; no verificado en hardware inalámbrico/switch real"
+/>
+
+<PageSources />

@@ -1,0 +1,53 @@
+---
+title: "SQM y CAKE en OpenWrt: baja latencia cuando la línea está llena"
+description: "SQM limita el tráfico justo por debajo de la velocidad de tu línea para que las colas se mantengan cortas; con CAKE combate el bufferbloat. Los ajustes que recomienda la guía de OpenWrt."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt sqm", "openwrt cake", "bufferbloat openwrt", "latencia openwrt", "reducir lag openwrt"]
+sources:
+  - label: "Guía de SQM de OpenWrt"
+    url: https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm
+  - label: "Linux 4.19 (kernelnewbies)"
+    url: https://kernelnewbies.org/Linux_4.19
+  - label: "CAKE (bufferbloat.net)"
+    url: https://www.bufferbloat.net/projects/codel/wiki/Cake/
+sourceHash: '97230357bbbdc535'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="sqm" />
+
+## En una frase
+
+SQM (Smart Queue Management) limita el tráfico ligeramente por debajo de la velocidad de tu línea, de modo que la cola se forma en el router, donde se puede gestionar, en lugar de en el módem. Usado con la disciplina de colas CAKE, mantiene la latencia baja mientras la línea está ocupada. Ese problema se conoce como bufferbloat.
+
+## Qué recomienda la guía de OpenWrt
+
+1. Instala `luci-app-sqm`, o `sqm-scripts` si no usas LuCI.
+2. Mide tu velocidad real de bajada y de subida, y después ajusta ambas al **90%** de lo que mediste.
+3. Elige `cake` con `piece_of_cake.qos`.
+4. Prueba de nuevo bajo carga y ajusta. `fq_codel` con `simple.qos` es la alternativa más ligera y menos completa.
+
+CAKE está en el kernel de Linux desde la versión 4.19.
+
+## Pruébalo en tu router
+
+Después de instalar SQM:
+
+```sh
+cat /etc/config/sqm
+```
+
+## Ten cuidado
+
+- El shaping consume CPU. En una línea rápida, un router pequeño puede no dar abasto, así que compara velocidad y latencia antes y después.
+- Define las velocidades a partir de una medición, no de la velocidad anunciada de tu plan.
+
+## Guías relacionadas
+
+- [SQM / CAKE](/es/software/sqm/)
+
+<PageSources />

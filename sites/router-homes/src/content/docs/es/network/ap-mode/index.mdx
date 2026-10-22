@@ -1,0 +1,213 @@
+---
+title: "AP por cable/inalámbrico bajo un router existente: DHCP desactivado, nueva IP de LAN, puerto LAN"
+description: "Convierte OpenWrt en un AP bajo el router principal: solo LAN, DHCP desactivado, IP de LAN fuera del rango, los clientes siguen obteniendo dirección del router principal; el Wi-Fi se verifica por separado."
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'AP por cable E2: LAN del AP 192.168.1.2/24, DHCP desactivado; DHCP upstream 192.168.1.1; cliente 192.168.1.136; sin WAN/Wi-Fi'
+testRecipe: 'tests/recipes/ap-mode-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt ap mode', 'openwrt wireless ap', 'openwrt disable dhcp', 'router as ap', 'openwrt modo punto de acceso', 'openwrt como access point']
+symptoms: ['los clientes del AP no obtienen dirección', 'DHCP doble en el AP', 'toda la red cae tras añadir el AP']
+sources:
+  - label: Configuración de red de OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: DHCP y DNS de OpenWrt
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: Configuración Wi-Fi de OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/wifi/basic
+  - label: Cortafuegos de OpenWrt
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: '9f6d131b15ed3652'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="VM 200 en PVE" tested={true} evidence="E2" />
+
+## Qué significa realmente el modo AP
+
+Un AP no es “otro router”:
+
+- conecta el **puerto LAN**, no la WAN;
+- desactiva DHCP en el AP; el router principal sigue asignando direcciones;
+- pon la IP de LAN del AP fuera del rango DHCP del router principal;
+- no hagas NAT ni doble enrutamiento, a menos que quieras intencionadamente un segundo router.
+
+Este laboratorio verifica **solo AP por cable + DHCP upstream**; el SSID/cifrado/roaming del Wi-Fi no tiene hardware y es E1.
+
+## Topología
+
+```text
+Main router 192.168.1.1 (DHCP)
+        │ LAN port
+        │
+   OpenWrt AP
+   LAN br-lan 192.168.1.2/24
+   DHCP: ignore
+        │ LAN port
+        │
+   Client 192.168.1.136/24
+   gateway 192.168.1.1
+```
+
+- El cliente obtiene su dirección del router principal; la puerta de enlace es `.1`, no el AP `.2`;
+- el `.2` del AP es solo para administración;
+- si la puerta de enlace del cliente pasa a ser `.2`, existe un segundo servidor DHCP o una configuración incorrecta.
+
+## Configuración
+
+<Step where="router-shell" title="Respalda y confirma que la WAN no es necesaria" expected="Conoces la IP de la LAN, el estado de DHCP y si se usa la WAN.">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+uci show network.wan 2>/dev/null
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+El modo AP normalmente no necesita WAN; si la WAN permanece, asegúrate de que no se quede con la ruta por defecto ni haga NAT.
+
+</Step>
+
+<Step where="luci" title="Cambia la IP de la LAN y desactiva DHCP" expected="El AP es 192.168.1.2/24 y ya no asigna direcciones.">
+
+**Red → Interfaces → LAN → Editar**:
+
+1. Dirección IPv4: `192.168.1.2/24` (fuera del rango del router principal);
+2. **Servidor DHCP → Configuración general → Ignorar interfaz**;
+3. Guarda y aplica.
+
+CLI:
+
+```sh
+uci set network.lan.ipaddr='192.168.1.2/24'
+uci set dhcp.lan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+Después vuelve a abrir LuCI/SSH en `192.168.1.2`.
+
+</Step>
+
+<Step where="client" title="Conéctate al puerto LAN del router principal" expected="El cliente obtiene su dirección del router principal, con la puerta de enlace principal.">
+
+Conecta el **puerto LAN** de OpenWrt al **puerto LAN** del router principal; no uses la WAN.
+
+Reconecta/renueva en el cliente:
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.1.1
+ping 192.168.1.2
+```
+
+El cliente de este laboratorio obtuvo `192.168.1.136/24`, puerta de enlace `192.168.1.1`; el `.2` del AP fue accesible.
+
+</Step>
+
+<Step where="client" title="Confirma que el AP no sirve DHCP" expected="El servidor DHCP es el router principal, no el AP.">
+
+```sh
+# Linux example
+udhcpc -i eth0 -f -q -n -t 5
+```
+
+Comprueba `server 192.168.1.1`; si indica `192.168.1.2`, el DHCP del AP sigue activo.
+
+Este laboratorio solo con AP no tenía internet, por lo que es normal que `ping 1.1.1.1` falle; el internet real depende del router principal.
+
+</Step>
+
+## AP inalámbrico (E1)
+
+No hay hardware inalámbrico, por lo que no se verificó:
+
+- SSID/contraseña/WPA2/WPA3;
+- canal de 2,4/5 GHz, ancho de canal, potencia de transmisión;
+- roaming/802.11r/expulsión por señal débil;
+- aislamiento de clientes inalámbricos;
+- varios AP con un mismo SSID.
+
+Principios:
+
+- haz un puente (bridge) de la interfaz inalámbrica en `br-lan`;
+- desactiva DHCP;
+- usa WPA2/WPA3, nunca una red abierta;
+- escalona los canales y reutiliza el SSID/contraseña en todos los AP;
+- verifica primero el cable y luego añade el Wi-Fi, para no cambiar dos capas a la vez.
+
+## Fallos comunes
+
+### Toda la red cae tras añadir el AP
+
+- El DHCP del AP sigue activo y entra en conflicto con el router principal;
+- la IP de LAN del AP entra en conflicto con la del router principal;
+- el puerto WAN del AP se conectó a la LAN principal;
+- hay un bucle entre el router principal y el AP.
+
+Desconecta el AP, restaura el router principal y cambia un elemento cada vez.
+
+### Los clientes no obtienen dirección
+
+- El AP no está conectado a la LAN principal;
+- el DHCP del AP está desactivado, pero el DHCP principal está desactivado o lleno;
+- VLAN/puerto aislado;
+- la interfaz inalámbrica no está en puente con `br-lan`.
+
+### Los clientes tienen dirección pero la puerta de enlace es incorrecta
+
+- otro servidor DHCP reparte `.2`;
+- el cliente conservó una asignación antigua;
+- el AP sigue ejecutando un servidor DHCP;
+- revisa `cat /tmp/dhcp.leases` (el AP no debería tener asignaciones nuevas).
+
+### El Wi-Fi conecta pero no hay internet
+
+- la interfaz inalámbrica no está en el puente de la LAN;
+- el cortafuegos separa las zonas inalámbrica y LAN;
+- el router principal upstream lo bloquea;
+- aislamiento de clientes/red de invitados.
+
+## Demostración grabada (laboratorio 008)
+
+<TerminalCast
+  src="/casts/008-ap.cast"
+  title="Laboratorio 008: AP por cable, DHCP desactivado, el cliente obtiene dirección del upstream"
+  caption="VM real con OpenWrt 25.12.6: LAN del AP .2, DHCP desactivado; el cliente obtuvo 192.168.1.136/24 del upstream 192.168.1.1, puerta de enlace .1, y pudo hacer ping al AP y al upstream. Este laboratorio no tiene internet ni Wi-Fi."
+/>
+
+## Prueba E2 en laboratorio (2026-10-20)
+
+- Entorno: VM 200 x86 con OpenWrt 25.12.6; LAN del AP `192.168.1.2/24`; `dhcp.lan.ignore=1`; netns upstream `192.168.1.1/24` + BusyBox udhcpd; cliente `192.168.1.136/24`.
+- DHCP del cliente: servidor `192.168.1.1`, asignación de 864000 s; puerta de enlace `.1`.
+- El cliente hizo ping al AP `.2` y al upstream `.1`; este laboratorio solo con AP no tenía internet público, por lo que `1.1.1.1` falló.
+- No probado: internet real del router principal, Wi-Fi/SSID/cifrado/roaming, clientes Windows/teléfono, IPv6/RA.
+- Cast: `public/casts/008-ap.cast`; receta: `tests/recipes/ap-mode-25.12.md`.
+
+## Fuentes y revisión
+
+- Esto es E2 parcial: se probaron el AP por cable, L2 y DHCP; no se probaron el inalámbrico ni el internet real del upstream.
+- No hay revisor independiente; las conclusiones se limitan a este entorno VM/netns.
+- El modo AP es “solo LAN + DHCP desactivado + IP de LAN fuera del rango”, no una interfaz concreta.
+
+<TestRecord
+  status="partial"
+  environment="AP por cable E2: LAN del AP 192.168.1.2/24, DHCP desactivado; DHCP upstream 192.168.1.1; cliente 192.168.1.136; sin WAN/Wi-Fi"
+  recipe="tests/recipes/ap-mode-25.12.md"
+  result="E2 parcial: la LAN del AP cambió a .2 y DHCP ignore=1; el cliente obtuvo 192.168.1.136/24 del upstream .1 con puerta de enlace .1; el AP .2 fue accesible y el cliente pudo hacer ping al AP y al upstream; este laboratorio solo con AP no tenía internet; no se probaron el internet upstream ni el Wi-Fi."
+  date="2026-10-20"
+/>
+
+<PageSources />

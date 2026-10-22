@@ -1,0 +1,53 @@
+---
+title: "UCI: cómo OpenWrt guarda toda su configuración en /etc/config"
+description: "UCI es el sistema de configuración de OpenWrt. Dónde están los archivos, cómo se preparan y confirman los cambios, y cómo se relaciona con LuCI."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt uci", "uci commit", "openwrt /etc/config", "configuración uci openwrt"]
+sources:
+  - label: "UCI de OpenWrt"
+    url: https://openwrt.org/docs/guide-user/base-system/uci
+  - label: "Fundamentos de LuCI"
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+sourceHash: 'af6a6bb6c4e60fdd'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="uci" />
+
+## En una frase
+
+UCI (Unified Configuration Interface) guarda la configuración de los servicios de OpenWrt en archivos de texto plano dentro de `/etc/config/`. LuCI y el comando `uci` editan esos mismos archivos.
+
+## Cómo funciona
+
+- Hay un archivo por subsistema, como `network`, `wireless`, `dhcp`, `firewall` y `system`.
+- `uci set`, `uci add`, `uci rename` y `uci delete` se preparan primero (staging). `uci commit` los escribe en la flash de una sola vez.
+- Un cambio confirmado solo surte efecto cuando el servicio se recarga o se reinicia mediante su script de init. El ejemplo oficial cambia el puerto de uhttpd, confirma y luego ejecuta `/etc/init.d/uhttpd restart`.
+- LuCI es una interfaz: sus páginas leen y escriben los mismos archivos UCI mediante API.
+
+## Compruébalo en tu router
+
+Estos comandos son de solo lectura:
+
+```sh
+uci show network.lan
+uci get network.lan.ipaddr
+uci export dhcp
+```
+
+## Ten en cuenta
+
+- Un cambio que confirmas pero nunca recargas todavía no está activo. Surte efecto en el próximo reinicio del servicio o del equipo, lo que puede ocurrir mucho después de que lo hayas olvidado.
+- Copia `/etc/config` a un lugar seguro antes de editar a mano. [Respaldo y restauración](/es/recovery/backup-restore/) explica cómo hacer una copia completa.
+
+## Guías relacionadas
+
+- [Dirección LAN](/es/network/lan-address/)
+- [DNS](/es/network/dns/)
+- [Respaldo y restauración](/es/recovery/backup-restore/)
+
+<PageSources />

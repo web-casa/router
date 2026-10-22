@@ -1,0 +1,206 @@
+---
+title: "Copia de seguridad y restauración: verifica por separado configuración, paquetes y administración"
+description: Usa sysupgrade -b/-r para respaldar y restaurar la configuración de OpenWrt, distingue el archivo de configuración de los paquetes y de las imágenes completas, y verifica LAN/HTTP/SSH/DHCP tras restaurar.
+pageType: recovery
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; sysupgrade -b 4,2 MB/59 entradas; restauración con sysupgrade -r; LAN/HTTP/SSH comprobados'
+testRecipe: 'tests/recipes/backup-restore-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt copia de seguridad', 'openwrt restaurar configuración', 'sysupgrade backup', 'openwrt restaurar tras reinstalar', 'openwrt backup', 'openwrt restore config']
+symptoms: ['configuración perdida tras reinstalar el firmware', 'cómo restaurar una copia de seguridad', 'sysupgrade -b falla', 'no puedo acceder tras restaurar']
+sources:
+  - label: Copia de seguridad y restauración de OpenWrt
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+  - label: sysupgrade de OpenWrt
+    url: https://openwrt.org/docs/guide-user/installation/sysupgrade.owut
+  - label: Gestor de paquetes de OpenWrt
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: Copias de seguridad de Proxmox VE
+    url: https://pve.proxmox.com/pve-docs/chapter-vzdump.html
+sourceHash: 'eb78c790dd7db4e1'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## Tres «copias de seguridad» distintas
+
+| Tipo | Contiene | No contiene | Uso típico |
+|---|---|---|---|
+| Archivo de configuración `sysupgrade -b` | `/etc/config` y los archivos de `sysupgrade.conf` | firmware, paquetes instalados, disco completo | restaurar los ajustes tras reinstalar o actualizar |
+| Lista de paquetes | nombres, versiones, feeds | binarios de los paquetes | lista de comprobación para reinstalar |
+| Imagen completa o copia de la VM | disco o VM completos | nada (más grande) | revertir la máquina entera o sustituir el disco |
+
+**Una copia de la configuración no es una copia del firmware.** Restaurar la configuración no reinstalará los paquetes que hayas eliminado.
+
+## Antes de la copia
+
+<Step where="router-shell" title="Registra versión, target y lista de paquetes" expected="Sabes de qué versión, target y arquitectura proviene la copia.">
+
+```sh
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+apk list --installed > /tmp/packages-$(date +%F).txt
+wc -l /tmp/packages-$(date +%F).txt
+sysupgrade -l
+```
+
+Este laboratorio: `25.12.6`, `x86/64`, 239 paquetes instalados; `sysupgrade -b` archivó 59 entradas.
+
+</Step>
+
+<Step where="router-shell" title="Crea el archivo de configuración" expected="Un .tar.gz verificable copiado fuera del dispositivo.">
+
+```sh
+sysupgrade -b /tmp/backup-$(date +%F).tar.gz
+ls -lh /tmp/backup-*.tar.gz
+tar -tzf /tmp/backup-$(date +%F).tar.gz | head
+sha256sum /tmp/backup-$(date +%F).tar.gz
+```
+
+Este laboratorio: 4,2 MB, 59 entradas, incluidas `etc/config/network`, `dhcp`, `firewall`, `openclash`, `sqm`.
+
+> El archivo puede contener contraseñas de Wi-Fi, credenciales PPPoE y configuración de DDNS o proxy. No lo subas a una nube pública ni a un repositorio; trátalo como información sensible.
+
+</Step>
+
+<Step where="client" title="Copia el archivo fuera del dispositivo" expected="Existe una copia aunque el dispositivo quede inutilizable o se reinstale el firmware.">
+
+```sh
+# pull from the router to the admin machine
+scp root@192.168.1.2:/tmp/backup-2026-10-20.tar.gz ./
+sha256sum backup-2026-10-20.tar.gz
+```
+
+No lo dejes solo en `/tmp`: un reinicio lo pierde y reinstalar el firmware seguro lo borra.
+
+</Step>
+
+## Tres vías de restauración
+
+### 1. Restauración de la misma versión en ejecución (este laboratorio)
+
+```sh
+sysupgrade -r /tmp/backup-2026-10-20.tar.gz
+```
+
+`-r` restaura la configuración y termina; no instala firmware. Después reinicia los servicios pertinentes o reinicia el equipo para que red, DHCP y DNS se recarguen.
+
+Este laboratorio escribió `network.lan.e2_marker='before-restore'`; tras `sysupgrade -r` el marcador desapareció, la LAN seguía en `192.168.1.2/24`, HTTP respondió 200 y SSH funcionó.
+
+### 2. Restauración durante la reinstalación o actualización
+
+```sh
+sysupgrade -f /tmp/backup-2026-10-20.tar.gz <firmware.img>
+```
+
+`-f` restaura la configuración durante una actualización; no trates la copia como firmware ni restaures a ciegas entre versiones o targets distintos.
+
+### 3. Reversión de la VM o imagen completa
+
+PVE usa `vzdump` o instantáneas para restaurar el disco y la configuración de toda la VM; eso revierte firmware + paquetes + configuración, pero es más grande y puede sobrescribir datos nuevos. Los archivos de configuración y las copias de la máquina completa no se sustituyen entre sí.
+
+## Verifica tras restaurar
+
+<Step where="client" title="Acceso de administración" expected="Comprueba al menos una vez la IP de la LAN, HTTP, SSH y DHCP.">
+
+```sh
+ping -c 2 192.168.1.2
+curl -sSI --max-time 5 http://192.168.1.2/ | head -3
+ssh root@192.168.1.2 'uci show network.lan | grep ipaddr'
+```
+
+- HTTP 200 no demuestra que DHCP funcione;
+- poder entrar por SSH no demuestra que la configuración de LuCI sea correcta;
+- los clientes deben renovar y recibir una dirección del rango restaurado.
+
+</Step>
+
+<Step where="router-shell" title="Red, DHCP y DNS" expected="La configuración restaurada surte efecto de verdad, no solo se extrajeron los archivos.">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+ubus call network.interface.lan status
+logread | grep -Ei 'dnsmasq|dhcp|netifd' | tail -30
+```
+
+Reinicia si hace falta:
+
+```sh
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+</Step>
+
+<Step where="router-shell" title="Paquetes" expected="Sabes qué paquetes hay que reinstalar; restaurar la configuración no restaura los paquetes.">
+
+```sh
+apk list --installed | wc -l
+apk list --installed | grep -E 'openclash|sqm|adguard|luci-app' || true
+```
+
+Un archivo de configuración no contiene binarios. Tras reinstalar el firmware, reinstala desde la lista de paquetes y los feeds. La configuración de OpenClash, SQM o AGH puede seguir existiendo, pero los programas y módulos del kernel deben reinstalarse y verificarse.
+
+</Step>
+
+## Fallos comunes
+
+### Sigue la configuración anterior tras restaurar
+
+- no se reiniciaron los servicios o el dispositivo después de `sysupgrade -r`;
+- restauraste otro archivo;
+- un comando UCI posterior la sobrescribió;
+- el archivo no contiene ese fichero (revisa `sysupgrade -l` o `tar -tzf`).
+
+### No puedo acceder tras restaurar
+
+- la copia procede de otra subred LAN;
+- DHCP o el cortafuegos no se recargaron;
+- el archivo contiene contraseñas o ajustes SSH antiguos;
+- usa la consola: `ip -4 addr show br-lan`; no restablezcas de fábrica de inmediato.
+
+### Los paquetes no volvieron
+
+- las copias de configuración no contienen archivos de paquetes;
+- el feed o la versión no coinciden;
+- reinstala `luci-app-*` y los módulos del kernel;
+- «la configuración existe» no significa «el programa está instalado».
+
+### Restauración entre versiones
+
+- la versión, el target o la arquitectura no coinciden;
+- opciones renombradas o eliminadas en la nueva versión;
+- prueba primero en una VM;
+- conserva el firmware anterior y una copia de la máquina completa para revertir.
+
+## Ejecución de laboratorio E2 (2026-10-20)
+
+- Entorno: OpenWrt 25.12.6 x86 VM 200; LAN `192.168.1.2/24`; `apk`; 239 paquetes instalados.
+- `sysupgrade -b /tmp/backup-e2.tar.gz`: 4,2 MB, 59 entradas; `tar -tzf` mostró `etc/config/network`, `dhcp`, `firewall`, `openclash`, `sqm`.
+- Se escribió `network.lan.e2_marker='before-restore'`; tras `sysupgrade -r` el marcador desapareció, la LAN seguía en `.2`, HTTP 200 y SSH funcionó.
+- No probado: restauración de una copia completa de PVE, restauración entre versiones, reinstalación de paquetes, corte de energía o dispositivo inutilizado en hardware real.
+- Receta: `tests/recipes/backup-restore-25.12.md`.
+
+## Fuentes y revisión
+
+- Esto es E2 parcial: se probaron la copia y restauración de configuración de la misma versión y el acceso de administración; no la máquina completa, entre versiones ni la reconstrucción de paquetes.
+- Los archivos de configuración contienen datos sensibles; no los subas a un repositorio ni los compartas.
+- Sin revisor independiente; las conclusiones se limitan a este entorno de VM.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; sysupgrade -b 4,2 MB/59 entradas; restauración con sysupgrade -r; LAN/HTTP/SSH comprobados"
+  recipe="tests/recipes/backup-restore-25.12.md"
+  result="E2 parcial: sysupgrade -b generó un archivo de configuración de 4,2 MB/59 entradas; tras añadir un marcador de prueba, sysupgrade -r lo eliminó y la LAN 192.168.1.2, HTTP 200 y SSH siguieron funcionando; imagen completa, restauración entre versiones y reinstalación de paquetes sin probar"
+  date="2026-10-20"
+/>
+
+<PageSources />

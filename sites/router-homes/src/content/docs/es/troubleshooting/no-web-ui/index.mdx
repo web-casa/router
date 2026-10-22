@@ -1,0 +1,243 @@
+---
+title: "No se puede acceder a LuCI: IP, puerto, DHCP y recuperación por consola"
+description: Avanza desde el puerto LAN y la dirección del cliente hasta la IP de administración real, uhttpd/SSH/cortafuegos, y conserva la recuperación por consola/failsafe sin un restablecimiento de fábrica a ciegas.
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; uhttpd detenido/recuperado, comprobación HTTP 80, SSH conservado'
+testRecipe: 'tests/recipes/troubleshooting-no-web-ui.md'
+aliases: ['openwrt cannot open luci', 'luci not loading', '192.168.1.1 not working', 'openwrt unreachable', 'no abre luci', 'no puedo entrar a openwrt']
+symptoms: ['no se abre 192.168.1.1', 'la página de inicio de sesión agota el tiempo', 'perdí el acceso tras cambiar la LAN', 'no obtengo dirección DHCP']
+sources:
+  - label: Failsafe y restablecimiento de fábrica de OpenWrt
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+  - label: Conceptos básicos de LuCI en OpenWrt
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: Configuración de red de OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: DHCP y DNS de OpenWrt
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+sourceHash: 'bfd0c331078d3002'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
+
+## Resultado
+
+- Distinguirás si el problema está en el enlace físico, la dirección del cliente, la IP de administración, el servicio HTTP o SSH/cortafuegos.
+- Decidirás si LuCI realmente está escuchando sin cambiar la configuración.
+- Te recuperarás con una dirección estática en el cliente, la consola o failsafe en lugar de un restablecimiento de fábrica a ciegas.
+- Sabrás cuándo parar, hacer una copia de seguridad o leer la documentación del dispositivo.
+
+## Tabla de triaje
+
+| Síntoma | Comprueba primero | No hagas primero |
+|---|---|---|
+| Sin LED de enlace | cable, puerto LAN, alimentación | reinstalar el firmware |
+| El cliente tiene 169.254.x.x | DHCP/cable/puerto LAN | cambiar la LAN del router |
+| El ping funciona, la web no | 80/443, uhttpd, cortafuegos, HTTPS | restablecimiento de fábrica |
+| El ping falla | subred del cliente, IP de administración, VLAN/puerto | seguir cambiando IP |
+| SSH funciona, LuCI no | uhttpd/paquete LuCI/puerto | cambiar la configuración de red |
+| Sin salida por consola | ajustes serie, salida de vídeo, alimentación | cortocircuitar pines/reinstalar a ciegas |
+
+## Capa 1: puerto físico y enlace
+
+<Step where="client" title="Usa un puerto LAN, no WAN" expected="El LED de LAN está encendido y el cliente detecta un enlace.">
+
+Conéctate a un puerto con la etiqueta **LAN**; el puerto WAN normalmente no ofrece acceso de administración. Prueba otro cable y otro puerto LAN; revisa los LED y el estado de la tarjeta de red del cliente.
+
+Si el LED nunca se enciende: revisa la alimentación, el cable y el puerto antes de tocar el firmware.
+
+</Step>
+
+## Capa 2: dirección del cliente y puerta de enlace
+
+<Step where="client" title="Confirma que el cliente está en la subred LAN" expected="El cliente tiene 192.168.1.x u otra dirección LAN conocida.">
+
+Linux:
+
+```sh
+ip addr show
+ip route
+```
+
+Windows:
+
+```powershell
+ipconfig /all
+```
+
+macOS:
+
+```sh
+ifconfig
+netstat -rn
+```
+
+Una dirección `169.254.x.x` significa que DHCP falló. Confirma primero el cable y la LAN, y luego establece una dirección estática temporal:
+
+- IP: `192.168.1.2`
+- Máscara: `255.255.255.0`
+- Puerta de enlace: `192.168.1.1`
+
+Úsala solo para acceder; no colisiones con la dirección LAN del router.
+
+</Step>
+
+<Step where="client" title="Haz ping a la puerta de enlace" expected="Responde, o sabes que la IP de administración no es 192.168.1.1.">
+
+```sh
+ping 192.168.1.1
+```
+
+- Responde: pasa a la capa 3.
+- No responde: revisa la subred del cliente, el puerto LAN y si se cambió la dirección predeterminada.
+- No des el dispositivo por muerto solo porque falla un ping.
+
+</Step>
+
+## Capa 3: ¿se cambió la IP de administración?
+
+<Step where="client" title="Encuentra la dirección LAN real" expected="Tienes al menos dos direcciones candidatas y las pruebas.">
+
+Fuentes habituales:
+
+- la etiqueta o el manual del dispositivo;
+- una configuración o captura de pantalla guardada;
+- la tabla de asignaciones DHCP del router de origen, si es accesible;
+- `uci show network` en la consola;
+- una dirección LAN que cambiaste tú mismo.
+
+En **tu propia subred**, inspecciona la caché ARP:
+
+```sh
+ip neigh
+```
+
+No escanees ampliamente una red desconocida, y no identifiques un dispositivo a partir de los resultados de un escaneo.
+
+</Step>
+
+## Capa 4: HTTP/HTTPS y SSH
+
+<Step where="client" title="Separa “el ping funciona pero la web falla” de un fallo de enlace" expected="Sabes si es un problema de puerto, servicio o protocolo.">
+
+```sh
+curl -v http://192.168.1.1/
+curl -k -v https://192.168.1.1/
+ssh root@192.168.1.1
+```
+
+- HTTP y HTTPS agotan el tiempo: uhttpd/LuCI no está escuchando, o el cortafuegos lo bloquea.
+- HTTP 404/redirección: puerto/ruta/configuración de HTTPS.
+- SSH funciona: depura los servicios por SSH; no cambies la LAN.
+
+</Step>
+
+<Step where="router-shell" title="Si SSH funciona, inspecciona uhttpd y los puertos" expected="Sabes si LuCI se ejecuta y si 80/443 están escuchando.">
+
+```sh
+netstat -lnp | grep -E ':80|:443|:22'
+ps w | grep -E 'uhttpd|rpcd' | grep -v grep
+logread -e uhttpd | tail -30
+uci show uhttpd
+```
+
+Si uhttpd no se está ejecutando, prueba:
+
+```sh
+/etc/init.d/uhttpd restart
+```
+
+Si sigue fallando, lee los registros y el cortafuegos; no reinicies toda la red repetidamente.
+
+</Step>
+
+<Step where="router-shell" title="Comprueba si el cortafuegos bloquea la administración" expected="El tráfico de LAN al router en 80/443/22 no está bloqueado por accidente.">
+
+```sh
+uci show firewall
+logread | grep -i firewall | tail -20
+```
+
+Si acabas de cambiar una zona del cortafuegos, restaura la copia de seguridad o corrígelo desde la consola; no sigas cambiándolo sin acceso a la consola.
+
+</Step>
+
+## Capa 5: consola local / failsafe
+
+<Step where="console" title="Confirma desde la consola que el sistema está activo" expected="Ves un aviso de inicio de sesión o el registro del kernel.">
+
+Usa serie/HDMI/teclado, IPMI o una consola en la nube. El puerto serie suele ser `115200 8N1`, pero compruébalo en tu dispositivo. Si no hay salida, verifica primero el cable, la velocidad en baudios y la alimentación.
+
+Una vez dentro:
+
+```sh
+ip addr show
+ip route
+uci show network
+uci show dhcp
+logread | tail -50
+```
+
+</Step>
+
+<Step where="console" title="Usa failsafe solo cuando haga falta" expected="Puedes restaurar LAN/DHCP sin un restablecimiento de fábrica.">
+
+El momento de pulsar el botón de failsafe depende del dispositivo; sigue la página del dispositivo en OpenWrt o el manual del fabricante. Una vez dentro, inspecciona primero:
+
+```sh
+uci show network
+uci show dhcp
+```
+
+Si solo la dirección LAN es incorrecta, cámbiala de nuevo y reinicia tras verificarla. Si tienes dudas, anota o haz una copia de seguridad de la configuración primero; no ejecutes `firstboot`. Un restablecimiento de fábrica borra la configuración.
+
+</Step>
+
+## Orden de recuperación
+
+1. **No cambies nada**: cable/puerto LAN/dirección estática en el cliente.
+2. **El ping funciona, la web falla**: uhttpd/cortafuegos/HTTPS.
+3. **SSH funciona**: depura los servicios por SSH; no cambies la LAN.
+4. **Sin SSH**: consola/failsafe.
+5. **Restablecimiento de fábrica al final**: confirma que no hay configuración ni copia de seguridad importante, y sé consciente de que tendrás que reconfigurar WAN/LAN/Wi-Fi.
+
+## Diagnósticos erróneos comunes
+
+- Usar el puerto WAN como administración.
+- El cliente aún tiene una subred o IP estática antigua.
+- El navegador fuerza HTTPS mientras LuCI usa HTTP.
+- Suponer que LuCI está sano porque el ping funciona.
+- Cambiar la dirección LAN sin actualizar DHCP/puerta de enlace.
+- Una regla del cortafuegos bloquea la administración desde la LAN.
+- Falta uhttpd o se eliminó, pero se reinicia la red repetidamente.
+
+## Prueba E2 de laboratorio (2026-10-20)
+
+- Entorno: OpenWrt 25.12.6 x86 VM 200; LAN `192.168.1.2`; HTTP comprobado desde el host PVE.
+- `/etc/init.d/uhttpd stop`: curl a `http://192.168.1.2/` devolvió `http=000` (conexión fallida); SSH siguió disponible.
+- `/etc/init.d/uhttpd start`: HTTP devolvió `200`.
+- No probado: bloqueo por cortafuegos, cambio de puerto de uhttpd, falta del paquete LuCI, secuencia real de teclas del puerto serie/failsafe.
+- Receta: `tests/recipes/troubleshooting-no-web-ui.md`.
+
+## Estado E2 y fuentes
+
+- Esto es E2 parcial: se probaron la parada/recuperación de uhttpd y la conservación de SSH; el cortafuegos, el puerto y failsafe siguen siendo documentación.
+- Decide primero si es enlace, dirección, uhttpd o cortafuegos; no hagas un restablecimiento de fábrica en lugar de diagnosticar por capas.
+- Los procedimientos de consola/failsafe varían según el dispositivo y el firmware; lee antes la documentación del dispositivo.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; uhttpd detenido/recuperado, comprobación HTTP 80, SSH conservado"
+  recipe="tests/recipes/troubleshooting-no-web-ui.md"
+  result="E2 parcial: tras detener uhttpd, HTTP 80 rechazó la conexión y SSH siguió disponible; start restauró HTTP 200; cortafuegos/cambio de puerto/failsafe sin probar"
+/>
+
+<PageSources />

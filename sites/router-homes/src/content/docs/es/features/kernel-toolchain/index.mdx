@@ -1,0 +1,58 @@
+---
+title: "Linux 6.12 y la toolchain de 25.12: por qué los módulos del kernel deben coincidir"
+description: "OpenWrt 25.12 pasa de Linux 6.6 a 6.12 y de GCC 13.3 a 14.3. Qué implica para los paquetes kmod y los feeds de terceros."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["versión del kernel de openwrt", "kernel de openwrt 25.12", "kmod no coincide openwrt", "openwrt kernel version", "openwrt kmod mismatch"]
+sources:
+  - label: "Anuncio de la versión OpenWrt 25.12.0"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: "Versión de servicio OpenWrt 25.12.6"
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: "Anuncio de la versión OpenWrt 24.10.0"
+    url: https://forum.openwrt.org/t/openwrt-24-10-0-first-stable-release/223845
+sourceHash: 'b6196d9a49934dce'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="kernel-toolchain" />
+
+## En una frase
+
+25.12 lleva todos los targets de Linux 6.6 a 6.12 y actualiza la toolchain, por lo que los módulos del kernel compilados para 24.10 no se cargarán en 25.12.
+
+## Versiones lado a lado
+
+| Componente | 24.10.0 | 25.12.0 |
+|---|---|---|
+| Kernel de Linux | 6.6.73 | 6.12.71 |
+| GCC | 13.3.0 | 14.3.0 |
+| binutils | 2.42 | 2.44 |
+| musl | 1.2.5 | 1.2.5 |
+| glibc | 2.38 | 2.41 |
+
+25.12.6 lleva el kernel a 6.12.112. En 25.12.0 la pila inalámbrica (cfg80211/mac80211) procede del kernel 6.18.7, junto con dnsmasq 2.91, dropbear 2025.89 y busybox 1.37.0.
+
+## Por qué importa en casa
+
+- Los paquetes `kmod-*` se compilan para un kernel exacto. La ruta del feed contiene el hash del kernel, como en `targets/<target>/kmods/<kernel-hash>/`, y debe coincidir con el kernel en ejecución.
+- Un kmod de otra versión, de otra compilación o de un mirror con un hash distinto fallará al instalarse o al cargarse. Es una causa común de que un paquete «no se instale».
+- Las compilaciones de terceros suelen incluir su propio kernel. Es posible que los kmods oficiales no encajen en absoluto.
+
+## Compruébalo en tu router
+
+```sh
+uname -r
+grep -E 'RELEASE|TARGET' /etc/openwrt_release
+```
+
+## Guías relacionadas
+
+- [Orígenes de paquetes](/es/software/package-sources/)
+- [El paquete no se instala](/es/troubleshooting/plugin-install/)
+- [¿Qué OpenWrt es este?](/es/getting-started/which-openwrt/)
+
+<PageSources />

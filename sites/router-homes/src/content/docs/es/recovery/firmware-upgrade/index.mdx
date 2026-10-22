@@ -1,0 +1,199 @@
+---
+title: "Actualización del firmware: conserva la configuración, reconstruye los paquetes y verifica DNS y administración"
+description: Respalda la configuración y la lista de paquetes antes de actualizar, y luego verifica LAN/HTTP/SSH, DNS y la supervivencia de los paquetes; distingue las vías de sysupgrade, conservar la configuración y restaurar la configuración.
+pageType: recovery
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; sysupgrade de la misma versión; configuración conservada; paquetes 239→182; SQM/OpenClash perdidos; DNS/HTTP correctos'
+testRecipe: 'tests/recipes/firmware-upgrade-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt actualizar firmware', 'sysupgrade conservar configuración', 'openwrt paquetes desaparecen tras actualizar', 'openwrt upgrade', 'openwrt firmware upgrade']
+symptoms: ['sin internet tras actualizar', 'faltan paquetes tras actualizar', 'DNS falla tras actualizar', 'sysupgrade falla']
+sources:
+  - label: sysupgrade de OpenWrt
+    url: https://openwrt.org/docs/guide-user/installation/generic.backup
+  - label: Copia de seguridad y restauración de OpenWrt
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+  - label: Attended sysupgrade de OpenWrt
+    url: https://openwrt.org/docs/guide-user/installation/attended.sysupgrade
+  - label: Gestor de paquetes de OpenWrt
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+sourceHash: '012dc7ede32ddb47'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## Actualizar no es solo «cambiar el archivo de firmware»
+
+Separa cuatro cosas:
+
+1. si el **firmware** se instaló y arrancó;
+2. si la **configuración** se conservó o restauró;
+3. si los **paquetes y plugins** siguen ahí o hay que reinstalarlos;
+4. si la **administración, el DNS y la WAN** se recuperaron.
+
+Conservar la configuración no conserva los paquetes. Conservar la configuración de una aplicación no conserva su binario.
+
+## Antes de actualizar
+
+<Step where="router-shell" title="Registra versión, target, lista de paquetes y copia de seguridad" expected="Puedes revertir y sabes qué desapareció.">
+
+```sh
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+apk list --installed > /tmp/packages-$(date +%F).txt
+wc -l /tmp/packages-$(date +%F).txt
+sysupgrade -b /tmp/pre-upgrade-$(date +%F).tar.gz
+sha256sum /tmp/pre-upgrade-$(date +%F).tar.gz
+```
+
+Copia el archivo de configuración fuera del dispositivo; en una VM, haz además una instantánea o copia de PVE. No lo dejes solo en `/tmp`.
+
+</Step>
+
+<Step where="router-shell" title="Verifica la imagen y el checksum" expected="La imagen coincide con la versión, el target y la arquitectura, y el checksum es válido.">
+
+```sh
+wget -O /tmp/openwrt.img.gz <official-image-url>
+sha256sum /tmp/openwrt.img.gz
+# compare with the matching line in official sha256sums
+gzip -dkf /tmp/openwrt.img.gz
+ls -lh /tmp/openwrt.img
+```
+
+Este laboratorio usó la imagen combinada ext4 de 25.12.6 x86/64; el SHA-256 del `.img.gz` coincidió y después se descomprimió para `sysupgrade`.
+
+</Step>
+
+<Step where="router-shell" title="Conserva la consola y la vía de reversión" expected="Puedes recuperarte de una actualización interrumpida o fallida.">
+
+- Dispositivo físico: serie/HDMI, tecla de failsafe, firmware anterior;
+- PVE: instantánea antes de actualizar, verifica `qm rollback`;
+- Anota la IP de la LAN, DHCP, WAN, DNS y el puerto de administración;
+- No cortes la energía ni quites discos durante la actualización.
+
+</Step>
+
+## Comando de actualización
+
+Por defecto (conserva la configuración):
+
+```sh
+sysupgrade -v /tmp/openwrt.img
+```
+
+Opciones:
+
+- `-n`: no conserva la configuración (instalación limpia);
+- `-f <backup.tar.gz>`: restaura la configuración durante la actualización;
+- `-c`/`-o`: conservan más archivos modificados; los límites son más complejos;
+- No uses `-F` para ignorar la compatibilidad salvo que lo entiendas por completo.
+
+La actualización cierra las sesiones SSH y web; espera al reinicio y no apagues el equipo solo porque se perdió la conexión.
+
+## Verifica tras actualizar
+
+<Step where="client" title="Acceso de administración" expected="Comprueba al menos una vez la IP de la LAN, HTTP y SSH.">
+
+```sh
+ping -c 2 192.168.1.2
+curl -sSI --max-time 5 http://192.168.1.2/ | head -3
+ssh root@192.168.1.2 'cat /etc/openwrt_release'
+```
+
+Este laboratorio conservó la LAN `192.168.1.2/24`; HTTP respondió 200 y SSH funcionó.
+
+</Step>
+
+<Step where="router-shell" title="Configuración, DNS y WAN" expected="La configuración se conserva y el DNS y la WAN funcionan de verdad.">
+
+```sh
+uci show network.lan.ipaddr
+uci show dhcp.lan
+ip route
+nslookup openwrt.org 127.0.0.1
+logread | grep -Ei 'dnsmasq|netifd|dhcp' | tail -30
+```
+
+Este laboratorio: DNS y HTTP funcionaron tras la actualización; la configuración de la WAN se conservó. Aun así, vuelve a verificar las concesiones DHCP de los clientes y el acceso real a internet, no solo el propio router.
+
+</Step>
+
+<Step where="router-shell" title="Paquetes y plugins" expected="Sabes qué se perdió y reinstalas desde la lista.">
+
+```sh
+apk list --installed | wc -l
+for p in sqm-scripts luci-app-sqm luci-app-openclash; do
+  apk info -e "$p" && echo "$p installed" || echo "$p MISSING"
+done
+```
+
+Este laboratorio: 239 paquetes antes, 182 después; `sqm-scripts`, `luci-app-sqm` y `luci-app-openclash` desaparecieron. La configuración puede permanecer, pero los binarios deben reinstalarse.
+
+Reinstala uno por uno:
+
+```sh
+apk update
+apk add sqm-scripts luci-app-sqm
+# verify menu/service before the next package
+```
+
+No restaures todos los plugins de golpe; recupera primero la administración, el DNS y la red básica.
+
+</Step>
+
+## Orden de reconstrucción
+
+1. Red básica: network/dhcp/firewall;
+2. DNS: dnsmasq y, si hace falta, AGH;
+3. Administración: luci/uhttpd;
+4. Proxy y control de tráfico: OpenClash, SQM;
+5. Al final: reglas, suscripciones y ajuste de rendimiento.
+
+Para cada paquete comprueba:
+
+- si está instalado o no;
+- si existen el menú y el controlador de LuCI;
+- si el servicio arranca;
+- si no se cambiaron el DNS ni la ruta por defecto;
+- si al desactivarlo se restaura la red básica.
+
+## Reversión
+
+- Dispositivo físico: conserva el firmware anterior o el modo de recuperación;
+- PVE: instantánea previa a la actualización o `vzdump`; si falla, revierte toda la VM;
+- Configuración: `sysupgrade -r` con el archivo;
+- No uses «volver a instalar el firmware» en lugar de diagnosticar el fallo.
+
+Este laboratorio usó la instantánea `pre-019`; tras registrar los resultados se revirtió al estado previo a la actualización. La página documenta la ejecución real de la actualización.
+
+## Ejecución de laboratorio E2 (2026-10-20)
+
+- Entorno: OpenWrt 25.12.6 x86 VM 200; misma versión antes y después (reinstalación, no entre versiones).
+- Antes: 239 paquetes; `sqm-scripts`, `luci-app-sqm`, `luci-app-openclash` instalados; LAN `.2`, DHCP ignore.
+- Tras `sysupgrade -v /tmp/openwrt.img`: el dispositivo se reinició; se conservaron la LAN `.2` y DHCP ignore; HTTP 200, SSH y DNS funcionaron.
+- Paquetes: 239 → 182; SQM/OpenClash se perdieron; la configuración puede permanecer, pero los binarios deben reinstalarse.
+- No completado: actualización entre versiones, verificación de la reinstalación de SQM/OpenClash, Wi-Fi/PPPoE reales, recuperación tras corte de energía.
+- Receta: `tests/recipes/firmware-upgrade-25.12.md`.
+
+## Fuentes y revisión
+
+- Esto es E2 parcial: se probaron la conservación de la configuración con sysupgrade de la misma versión, la administración y el DNS, y la pérdida de paquetes; no se completaron la actualización entre versiones ni la reconstrucción de plugins.
+- No infieras el comportamiento entre versiones a partir de resultados de la misma versión; lee las notas de la versión, haz una copia de seguridad y prueba en una VM.
+- Sin revisor independiente; las conclusiones se limitan a este entorno de VM.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; sysupgrade de la misma versión; configuración conservada; paquetes 239→182; SQM/OpenClash perdidos; DNS/HTTP correctos"
+  recipe="tests/recipes/firmware-upgrade-25.12.md"
+  result="E2 parcial: tras sysupgrade de la misma versión, se conservó la configuración de LAN/DHCP y HTTP/SSH/DNS funcionaron; los paquetes bajaron de 239 a 182 y SQM/OpenClash desaparecieron; sin actualización entre versiones; reinstalación de SQM no completada; instantánea revertida"
+  date="2026-10-20"
+/>
+
+<PageSources />

@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "topK": 5,
+  "queries": [
+    {
+      "id": "es-dns-01",
+      "locale": "es",
+      "query": "servidor DNS ascendente dnsmasq",
+      "expectedUrls": [
+        "/es/network/dns/"
+      ],
+      "category": "dns",
+      "aliasCase": false
+    },
+    {
+      "id": "es-proxmox-01",
+      "locale": "es",
+      "query": "proxmox una sola nic openwrt",
+      "expectedUrls": [
+        "/es/installation/proxmox/"
+      ],
+      "category": "proxmox",
+      "aliasCase": false
+    },
+    {
+      "id": "es-agh-01",
+      "locale": "es",
+      "query": "adguard home puerto 5353",
+      "expectedUrls": [
+        "/es/software/adguard-home/"
+      ],
+      "category": "agh",
+      "aliasCase": false
+    },
+    {
+      "id": "es-sqm-01",
+      "locale": "es",
+      "query": "sqm cake bufferbloat",
+      "expectedUrls": [
+        "/es/software/sqm/"
+      ],
+      "category": "sqm",
+      "aliasCase": false
+    },
+    {
+      "id": "es-luci-01",
+      "locale": "es",
+      "query": "primer acceso luci contraseña",
+      "expectedUrls": [
+        "/es/getting-started/luci-first-login/"
+      ],
+      "category": "luci",
+      "aliasCase": false
+    },
+    {
+      "id": "es-fw-01",
+      "locale": "es",
+      "query": "immortalwrt istoreos fabricante",
+      "expectedUrls": [
+        "/es/getting-started/which-openwrt/"
+      ],
+      "category": "fw",
+      "aliasCase": false
+    },
+    {
+      "id": "es-oc-01",
+      "locale": "es",
+      "query": "openclash conflicto dns",
+      "expectedUrls": [
+        "/es/software/openclash/"
+      ],
+      "category": "oc",
+      "aliasCase": false
+    },
+    {
+      "id": "es-pkg-01",
+      "locale": "es",
+      "query": "apk opkg feeds mirror",
+      "expectedUrls": [
+        "/es/software/package-sources/"
+      ],
+      "category": "pkg",
+      "aliasCase": false
+    },
+    {
+      "id": "es-rec-01",
+      "locale": "es",
+      "query": "no puedo acceder a luci 192.168.1.1",
+      "expectedUrls": [
+        "/es/troubleshooting/no-web-ui/"
+      ],
+      "category": "rec",
+      "aliasCase": false
+    },
+    {
+      "id": "es-lan-01",
+      "locale": "es",
+      "query": "cambiar dirección ip lan",
+      "expectedUrls": [
+        "/es/network/lan-address/"
+      ],
+      "category": "lan",
+      "aliasCase": false
+    },
+    {
+      "id": "es-bak-01",
+      "locale": "es",
+      "query": "copia de seguridad restaurar configuración",
+      "expectedUrls": [
+        "/es/recovery/backup-restore/"
+      ],
+      "category": "bak",
+      "aliasCase": false
+    },
+    {
+      "id": "es-upg-01",
+      "locale": "es",
+      "query": "actualizar firmware sysupgrade",
+      "expectedUrls": [
+        "/es/recovery/firmware-upgrade/"
+      ],
+      "category": "upg",
+      "aliasCase": false
+    },
+    {
+      "id": "es-wg-01",
+      "locale": "es",
+      "query": "servidor wireguard",
+      "expectedUrls": [
+        "/es/remote-access/wireguard-server/"
+      ],
+      "category": "wg",
+      "aliasCase": false
+    },
+    {
+      "id": "es-vlan-01",
+      "locale": "es",
+      "query": "vlan dsa puertos",
+      "expectedUrls": [
+        "/es/wireless-vlan/dsa-vlan/"
+      ],
+      "category": "vlan",
+      "aliasCase": false
+    },
+    {
+      "id": "es-guest-01",
+      "locale": "es",
+      "query": "wifi de invitados",
+      "expectedUrls": [
+        "/es/wireless-vlan/guest-wifi/"
+      ],
+      "category": "guest",
+      "aliasCase": false
+    }
+  ]
+}

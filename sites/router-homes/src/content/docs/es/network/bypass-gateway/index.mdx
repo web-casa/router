@@ -1,0 +1,234 @@
+---
+title: "Puerta de enlace bypass: desactiva DHCP, configura puerta de enlace/DNS en los clientes y vuelve atrás"
+description: Distingue un bypass de un solo brazo de una segunda puerta de enlace con WAN, cambia la LAN, desactiva DHCP, apunta los clientes al bypass y conserva una vía de reversión.
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'E2 de bypass con WAN: LAN 192.168.1.2/24, DHCP desactivado, WAN 192.168.50.5/24; cliente estático 192.168.1.100; bypass puro de un solo brazo sin probar'
+testRecipe: 'tests/recipes/bypass-gateway-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt bypass gateway', 'openwrt bypass router', 'bypass router dhcp', 'openwrt gateway change', 'router bypass openwrt', 'cambiar puerta de enlace openwrt']
+symptoms: ['el router bypass rompe internet', 'cómo configurar la puerta de enlace del cliente', 'conflicto de DHCP en bypass']
+sources:
+  - label: Configuración de red de OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: DHCP y DNS de OpenWrt
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: Cortafuegos de OpenWrt
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: Bridging/relay de OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+sourceHash: '111105920d4777d6'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="VM PVE 200" tested={true} evidence="E2" />
+
+## Elige el modo: bypass de un solo brazo o puerta de enlace con WAN
+
+| Modo | Interfaces de OpenWrt | Quién da DHCP | Puerta de enlace/DNS del cliente | Probado aquí |
+|---|---|---|---|---|
+| Bypass de un solo brazo | solo LAN, sin WAN | router principal upstream | IP LAN del bypass | no (pasos E1) |
+| Puerta de enlace con WAN | LAN + WAN | upstream o bypass | IP LAN del bypass | **E2** |
+
+Ambos pueden «enviar a los clientes a través de OpenWrt», pero los puntos de fallo son distintos:
+
+- bypass de un solo brazo: sin DHCP/NAT, el router principal debe conocer la ruta de retorno, o el bypass debe hacer NAT;
+- con WAN: OpenWrt obtiene su propia dirección WAN y hace NAT de los clientes LAN; este es el modo del laboratorio.
+
+No digas «el bypass funciona» sin decir si tiene WAN y quién da el DHCP.
+
+## Topología del laboratorio
+
+```text
+Upstream 192.168.50.1
+      │
+  WAN eth1 (DHCP 192.168.50.5/24)
+      │
+  OpenWrt VM 200
+      │
+  LAN br-lan 192.168.1.2/24
+      │  DHCP disabled
+  Client 192.168.1.100/24
+  gateway/DNS = 192.168.1.2
+```
+
+- No hay `.1` en esta LAN, lo que evita el conflicto con el router principal upstream;
+- los clientes deben ser estáticos;
+- con el DHCP desactivado, las solicitudes DHCP no reciben respuesta por diseño.
+
+## Configuración
+
+<Step where="router-shell" title="Respalda y registra el estado de LAN/WAN" expected="Conoces la IP de la LAN, el protocolo de WAN y el estado de DHCP.">
+
+```sh
+uci show network.lan
+uci show network.wan
+uci show dhcp.lan
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+Mantén el acceso por consola; la antigua IP de la LAN deja de funcionar de inmediato.
+
+</Step>
+
+<Step where="luci" title="Cambia la IP de la LAN y desactiva DHCP" expected="La LAN es 192.168.1.2/24 y DHCP ya no entrega direcciones.">
+
+**Red → Interfaces → LAN → Editar**:
+
+1. Dirección IPv4: `192.168.1.2/24`;
+2. **Servidor DHCP → Configuración general → Ignorar interfaz**;
+3. Guarda y aplica.
+
+Equivalente en CLI:
+
+```sh
+uci set network.lan.ipaddr='192.168.1.2/24'
+uci set dhcp.lan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+Después vuelve a abrir LuCI/SSH en `192.168.1.2`.
+
+</Step>
+
+<Step where="router-shell" title="Conserva WAN y NAT (modo con WAN)" expected="WAN tiene una dirección y el reenvío/NAT LAN→WAN funciona.">
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+uci show firewall | grep -E 'zone|masquerade|forward'
+```
+
+Este laboratorio usó WAN `192.168.50.5/24`, puerta de enlace `192.168.50.1`; los clientes LAN hacen NAT a través de OpenWrt.
+
+</Step>
+
+<Step where="client" title="Apunta el cliente al bypass" expected="La puerta de enlace/DNS del cliente es 192.168.1.2; la IP pública y el DNS funcionan.">
+
+```sh
+# Linux example
+ip addr add 192.168.1.100/24 dev eth0
+ip route add default via 192.168.1.2
+echo 'nameserver 192.168.1.2' > /etc/resolv.conf
+ping -c 2 192.168.1.2
+ping -c 2 1.1.1.1
+nslookup openwrt.org 192.168.1.2
+```
+
+Windows: configura manualmente IP, puerta de enlace y DNS; no conserves la antigua dirección DHCP.
+
+</Step>
+
+<Step where="client" title="Confirma que DHCP está realmente desactivado" expected="DHCP no recibe ninguna oferta; la configuración estática sigue funcionando.">
+
+```sh
+# Linux example
+udhcpc -i eth0 -f -q -n -t 3
+```
+
+Este laboratorio imprimió `no lease, failing`; la dirección estática siguió respondiendo al ping y resolviendo. Si aún obtienes una asignación, existe un segundo servidor DHCP o `ignore` no se aplicó.
+
+</Step>
+
+<Step where="client" title="Cambia el DNS/puerta de enlace como control" expected="Separas un fallo de DNS de un fallo de puerta de enlace.">
+
+```sh
+# public DNS
+nslookup openwrt.org 1.1.1.1
+# dead gateway
+ip route replace default via 192.168.1.250
+ping -c 2 1.1.1.1
+# restore
+ip route replace default via 192.168.1.2
+```
+
+En este laboratorio: el DNS público funcionó; `.250` dio 100 % de pérdida; al restaurar `.2` se recuperó.
+
+</Step>
+
+## Bypass de un solo brazo (E1, no probado aquí)
+
+Solo LAN, sin WAN:
+
+- LAN del bypass `192.168.1.2/24`, puerta de enlace hacia el router principal `192.168.1.1`;
+- desactiva el DHCP del bypass;
+- puerta de enlace/DNS del cliente `.2`;
+- activa el reenvío; el router principal necesita una ruta de retorno, o el bypass hace NAT del tráfico de la LAN;
+- el cortafuegos del router principal debe permitir el reenvío cliente→internet.
+
+No había un router principal de laboratorio, por lo que esta parte es **E1**, no E2; verifícala con tu router/cortafuegos.
+
+## Fallos comunes
+
+### No se puede acceder al bypass tras cambiar la LAN
+
+- sigues usando la IP antigua;
+- el cliente no está en `192.168.1.0/24`;
+- ARP obsoleto: `ip neigh flush dev <iface>`;
+- usa la consola: `ip -4 addr show br-lan`.
+
+### El cliente no recibe dirección
+
+- el DHCP del bypass está desactivado; es lo esperado; configura una IP estática;
+- si quieres DHCP, mantén exactamente un servidor (el bypass o el router principal);
+- revisa `dhcp.lan.ignore` y si hay un segundo DHCP.
+
+### El cliente tiene dirección pero no hay internet
+
+- la puerta de enlace/DNS no apuntan al bypass;
+- el bypass no tiene ruta por defecto/upstream;
+- reenvío/NAT del cortafuegos;
+- al router principal le falta una ruta de retorno (un solo brazo);
+- conflicto de subred/doble NAT.
+
+### Falla el DNS
+
+- el cliente sigue usando la antigua puerta de enlace para el DNS;
+- dnsmasq del bypass no escucha en la LAN;
+- DNS upstream bloqueado;
+- DoH/DNS privado a nivel de aplicación.
+
+## Demostración grabada (laboratorio 009)
+
+<TerminalCast
+  src="/casts/009-bypass.cast"
+  title="Laboratorio 009: puerta de enlace bypass, DHCP desactivado, puerta de enlace/DNS estáticos"
+  caption="VM real con OpenWrt 25.12.6: LAN .2 + WAN por DHCP, DHCP desactivado; el cliente estático .100 verifica IP pública/DNS, cambio de DNS, fallo de puerta de enlace caída y recuperación. El bypass puro de un solo brazo no está en esta grabación."
+/>
+
+## Prueba de laboratorio E2 (2026-10-20)
+
+- Entorno: VM x86 200 con OpenWrt 25.12.6; LAN `192.168.1.2/24`; `DHCP ignore=1`; WAN por DHCP `192.168.50.5/24`; cliente netns `192.168.1.100/24`.
+- DHCP desactivado: `udhcpc` no obtuvo ninguna oferta (`no lease, failing`); la dirección estática funcionó.
+- Puerta de enlace/DNS estáticos `.2`: ping a la puerta de enlace, `1.1.1.1` y `nslookup` funcionaron.
+- El DNS `1.1.1.1` funcionó; la puerta de enlace caída `.250` interrumpió el acceso público; al restaurar `.2` se recuperó.
+- Sin probar: bypass puro de un solo brazo, ruta de retorno del router principal, clientes reales Wi-Fi/Windows, IPv6/RA.
+- Grabación: `public/casts/009-bypass.cast`; receta: `tests/recipes/bypass-gateway-25.12.md`.
+
+## Fuentes y revisión
+
+- Es un E2 parcial: se probó el bypass con WAN; la vía de un solo brazo son solo pasos E1.
+- Sin revisor independiente; las conclusiones se limitan a este entorno de VM/netns.
+- «Puerta de enlace bypass» no es una configuración fija; confirma quién da DHCP, quién hace NAT y si existe la ruta de retorno.
+
+<TestRecord
+  status="partial"
+  environment="E2 de bypass con WAN: LAN 192.168.1.2/24, DHCP desactivado, WAN 192.168.50.5/24; cliente estático 192.168.1.100; bypass puro de un solo brazo sin probar"
+  recipe="tests/recipes/bypass-gateway-25.12.md"
+  result="E2 parcial: con DHCP desactivado el cliente no recibió asignación; la puerta de enlace/DNS estáticos .2 dieron ping público y DNS funcionales; el DNS 1.1.1.1 funcionó; la puerta de enlace caída .250 interrumpió el acceso público y al restaurar .2 se recuperó."
+  date="2026-10-20"
+/>
+
+<PageSources />

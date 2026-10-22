@@ -1,0 +1,208 @@
+---
+title: "Antes de descargar el firmware: modelo, revisión, target/profile y recuperación"
+description: Confirma el modelo y la revisión exactos, el target, el profile, el tipo de imagen y la vía de recuperación con comprobaciones de solo lectura antes de descargar o instalar firmware.
+pageType: overview
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Dispositivo concreto pendiente; lista de comprobación de solo lectura, sin instalar firmware'
+testRecipe: 'tests/recipes/firmware-download-check.md'
+aliases: ['openwrt firmware download', 'openwrt model', 'openwrt hardware revision', 'sysupgrade image', 'factory image', 'descargar firmware openwrt', 'qué imagen elegir openwrt', 'revisión de hardware']
+symptoms: ['firmware equivocado', 'no sé qué imagen elegir', 'el modelo no coincide', 'fallo de checksum']
+sources:
+  - label: Selector de firmware de OpenWrt
+    url: https://firmware-selector.openwrt.org/
+  - label: Documentación de sysupgrade de OpenWrt
+    url: https://openwrt.org/docs/guide-user/installation/sysupgrade
+  - label: Notas de la versión 25.12 de OpenWrt
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: Páginas de dispositivos de OpenWrt
+    url: https://openwrt.org/toh/start
+sourceHash: 'c06b58c12c079954'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="—" device="dispositivo pendiente" tested={false} evidence="E1" />
+
+## Resultado
+
+- Conoces el modelo exacto y la revisión de hardware, no un modelo que «se parece».
+- Conoces el target/subtarget/profile de OpenWrt y qué imagen descargar.
+- Eliges correctamente entre `sysupgrade`, `factory` o una imagen combinada de x86.
+- Verificas el origen del archivo y su checksum.
+- Conoces la vía de recuperación antes de instalar el firmware y qué camino seguir si falla.
+
+> Esta es una lista de comprobación previa a la descarga, no una guía de instalación de firmware. La instalación en hardware real, la recuperación del bootloader y las migraciones entre versiones principales son R2: usa revisión independiente y la documentación del dispositivo. No trates esta página como un tutorial universal de instalación.
+
+## Empieza por la etiqueta
+
+<Step where="client" title="Registra el modelo y la revisión de hardware" expected="El modelo, la revisión, la región y los datos de la etiqueta están anotados.">
+
+Revisa la etiqueta inferior, la caja y el manual; anota:
+
+- fabricante + modelo completo (no solo la serie);
+- revisión de hardware (v1, v2, V2.1, etc.);
+- variante de región u operador;
+- FCC ID y prefijo del número de serie si existen (no los publiques);
+- método de recuperación (botón reset, TFTP, serie, herramienta del fabricante).
+
+Un mismo modelo puede tener varias revisiones con distinta flash, chips Wi-Fi o diseño de particiones. **El mismo nombre de modelo no implica una imagen universal.**
+
+</Step>
+
+<Step where="router-shell" title="En un OpenWrt existente, lee los datos de la placa" expected="distribution/target/model/board_name coinciden con la página del dispositivo.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+cat /tmp/sysinfo/model 2>/dev/null
+cat /tmp/sysinfo/board_name 2>/dev/null
+```
+
+Campos clave: `release.distribution`, `release.version`, `release.target`, `model`, `board_name`. `model` no es la revisión de hardware; no elijas una imagen basándote solo en esa línea.
+
+</Step>
+
+<Step where="router-shell" title="En x86, lee DMI/BIOS" expected="Conoces el modelo de placa o dispositivo y no mezclas imágenes de PC y de VM.">
+
+```sh
+cat /sys/class/dmi/id/sys_vendor
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/board_version
+cat /sys/class/dmi/id/bios_version
+```
+
+Confirma también BIOS/Legacy frente a UEFI, la interfaz del disco y si la imagen es combined/ext4. Eso decide si arranca; «x86/64» por sí solo no basta.
+
+</Step>
+
+## Consulta el selector de firmware
+
+<Step where="client" title="Elige por target/profile, no por nombre de archivo" expected="Encuentras la página exacta del dispositivo y la imagen.">
+
+Abre el [OpenWrt Firmware Selector](https://firmware-selector.openwrt.org/):
+
+1. Selecciona la versión correcta (p. ej. 25.12.6).
+2. Busca el modelo completo y abre la página de su dispositivo.
+3. Verifica el target/subtarget, el profile y la revisión de hardware.
+4. Lee la sección «Installation» de la página del dispositivo para ver los tipos de imagen de la primera instalación y de la actualización.
+5. Descarga y verifica el SHA-256; no te limites a renombrar un archivo.
+
+Si el selector y la página del dispositivo no coinciden, detente y verifica el modelo y la revisión; no elijas la opción más parecida.
+
+</Step>
+
+## Tipos de imagen
+
+| Imagen/escenario | Uso | Riesgo principal |
+|---|---|---|
+| `sysupgrade` | OpenWrt existente, actualizar con o sin configuración | incompatibilidad entre versiones y de paquetes o módulos del kernel |
+| `factory` / transición desde el fabricante | Primera instalación desde el firmware del fabricante | un método de partición o flash que no coincide puede dejar el equipo inservible (brick) |
+| x86 combined/ext4 | Imagen de disco completo x86 o VM | BIOS/UEFI, diseño del disco, método de escritura |
+| firmware del fabricante | Interfaz web o herramienta de recuperación del fabricante | no lo mezcles con imágenes de OpenWrt |
+| paquetes «universales / sin desmontar» | Origen desconocido | evítalos; no se pueden verificar target, profile ni checksum |
+
+Que el nombre de un archivo contenga `sysupgrade` no es una prueba; el target, el profile, la revisión y el checksum deben coincidir.
+
+## Descarga y verificación
+
+<Step where="client" title="Usa solo fuentes oficiales o del fabricante" expected="El origen del archivo es rastreable y tiene checksum.">
+
+Da preferencia a:
+
+- `downloads.openwrt.org` de OpenWrt o el Firmware Selector;
+- la página oficial de descargas del fabricante del dispositivo;
+- la página oficial de versiones de un proyecto (el firmware de terceros requiere comprobaciones adicionales del mantenedor y de la firma).
+
+No uses espejos en discos en la nube, adjuntos de foros ni paquetes «preparados» recibidos por chat. Los paquetes reempaquetados pueden incluir scripts, kernels antiguos o controladores que no coinciden.
+
+</Step>
+
+<Step where="client" title="Verifica el SHA-256 y el tamaño del archivo" expected="El checksum coincide con la página oficial de la versión.">
+
+Linux:
+
+```sh
+sha256sum openwrt-*.img.gz
+```
+
+macOS:
+
+```sh
+shasum -a 256 openwrt-*.img.gz
+```
+
+Windows:
+
+```powershell
+certutil -hashfile openwrt-*.img.gz SHA256
+```
+
+Compáralo con `sha256sums` o la página oficial de la versión. Si difiere, descárgalo de nuevo; no lo instales «a ver qué pasa».
+
+</Step>
+
+## Recuperación antes de instalar
+
+<Step where="client" title="Anota la vía de recuperación" expected="Sabes cómo entrar en failsafe o recuperación si la instalación falla.">
+
+Confirma al menos:
+
+- cómo entrar en failsafe (momento de pulsar el botón, serie o IP);
+- si hay recuperación por TFTP, serie o herramienta del fabricante;
+- la dirección LAN de administración, la puerta de enlace y la contraseña de root;
+- la copia de seguridad de la configuración: `sysupgrade -b` en un OpenWrt existente, o la exportación del fabricante;
+- los paquetes y módulos del kernel instalados que habrá que reconstruir tras la actualización;
+- alimentación estable; no desenchufes durante la instalación.
+
+Sin vía de recuperación, sin checksum y sin copia de seguridad: no empieces.
+
+</Step>
+
+## Errores comunes
+
+- Comprobar solo el modelo y no la revisión;
+- usar `sysupgrade` como `factory`, o al revés;
+- renombrar la imagen de otro target e instalarla;
+- continuar tras un fallo de checksum;
+- usar paquetes «universales / ampliados» desconocidos;
+- perder la alimentación o desconectar el cable durante la instalación;
+- dar por hecho el éxito sin comprobar el DNS, el cortafuegos y los paquetes tras la actualización.
+
+## Ramas de fallo
+
+### Se descargó el modelo equivocado
+
+Elimínalo y descarga desde la página del dispositivo; no «lo pruebes». Si ya lo instalaste, usa la documentación de recuperación del dispositivo (failsafe/TFTP/serie); no sigas instalando imágenes distintas.
+
+### El checksum no coincide
+
+Descarga de nuevo; comprueba si un proxy o espejo ha truncado el archivo; cambia a la fuente oficial. No desactives la verificación.
+
+### Tu revisión no aparece en la lista
+
+Consulta la página del fabricante o la etiqueta, o el foro o la página del dispositivo de OpenWrt. Sin soporte explícito, no asumas compatibilidad.
+
+### El firmware del fabricante está bloqueado
+
+Usa el procedimiento del fabricante; no eludas firmas ni bloqueos solo para instalar OpenWrt. Confirma antes los compromisos con la garantía y las funciones del fabricante.
+
+## Estado E1 y fuentes
+
+- Esto es E1: los campos, los tipos de imagen y la recuperación se basan en documentación pública; no se descargó ni se instaló nada en un dispositivo.
+- El modelo y la revisión provienen de la etiqueta y de la página del fabricante; no generalices la experiencia con una VM x86 a los enrutadores.
+- Receta: `tests/recipes/firmware-download-check.md`; los pasos de instalación quedan fuera de alcance.
+
+<TestRecord
+  status="planned"
+  environment="Dispositivo concreto pendiente; lista de comprobación de solo lectura, sin instalar firmware"
+  recipe="tests/recipes/firmware-download-check.md"
+  result="E1: se documentan modelo/revisión, target/profile, tipos de imagen, checksums y vía de recuperación; no se ejecutó en un dispositivo"
+/>
+
+<PageSources />

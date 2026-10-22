@@ -1,0 +1,154 @@
+---
+title: "VLAN con DSA: puertos, PVID, tagged/untagged y reversión"
+description: Configura VLAN por puerto con bridge-vlan bajo DSA, entiende tagged/untagged/PVID y trunk, conserva un puerto de administración y cambia un puerto cada vez. Solo documentación; no verificado en hardware de conmutación real.
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Compilado a partir de la documentación DSA/VLAN de OpenWrt 25.12; no verificado en hardware/switch DSA real de varios puertos'
+testRecipe: 'tests/recipes/dsa-vlan-25.12.md'
+aliases: ['openwrt dsa vlan', 'openwrt vlan setup', 'bridge-vlan', 'openwrt tagged untagged', 'configurar vlan openwrt', 'vlan dsa openwrt']
+symptoms: ['la VLAN no funciona', 'perdí el acceso tras cambiar la VLAN', 'el trunk no se reconoce', 'PVID incorrecto en el puerto']
+sources:
+  - label: Minitutorial de DSA de OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+  - label: Configuración de VLAN en OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/vlan/switch_configuration
+  - label: Configuración de red de OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: Cortafuegos de OpenWrt
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: 'ffd770023be30d71'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="Dispositivo DSA de varios puertos (sin probar)" tested={false} evidence="E1" />
+
+> **Estado**: documentación E1. La configuración de VLAN depende de los nombres exactos de los puertos DSA, del puerto CPU y del switch par; sin hardware real, no trates el ejemplo como verificado.
+
+## DSA frente a swconfig
+
+- Los dispositivos más antiguos suelen usar `swconfig`: `switch0`, puertos 0/1/2;
+- DSA expone cada puerto como `lan1`, `lan2`, `wan`, etc.;
+- El OpenWrt moderno usa **filtrado de VLAN del puente** (bridge VLAN filtering), no la sintaxis `vid/ports` de `swconfig`;
+- Los nombres de los puertos varían según el dispositivo: `ip -d link show`, `ls /sys/class/net`.
+
+## Registra el estado antes de cambiar
+
+<Step where="router-shell" title="Confirma DSA, los nombres de los puertos y el acceso de administración" expected="Sabes qué puerto es LAN/WAN y desde dónde administras el dispositivo.">
+
+```sh
+ip -d link show
+ls /sys/class/net
+uci show network
+uci show firewall | grep -E 'zone.*name|zone.*network'
+bridge vlan show
+```
+
+- ¿`br-lan` ya tiene `bridge-vlan`?
+- ¿Qué puerto físico lleva la administración?
+- ¿El switch par ya está configurado como trunk/tagged?
+- Haz una copia: `cp /etc/config/network /etc/config/network.bak.$(date +%F)`.
+
+</Step>
+
+## Ejemplo de bridge-vlan
+
+Supón los puertos DSA `lan1`, `lan2`, `lan3`; convierte `lan1` en un trunk (VLAN 1 + 20 tagged) y `lan2/lan3` en acceso a la VLAN 1:
+
+```uci
+config device
+    option name 'br-lan'
+    option type 'bridge'
+    list ports 'lan1'
+    list ports 'lan2'
+    list ports 'lan3'
+
+config bridge-vlan
+    option device 'br-lan'
+    option vlan '1'
+    list ports 'lan1:u*'
+    list ports 'lan2:u*'
+    list ports 'lan3:u*'
+
+config bridge-vlan
+    option device 'br-lan'
+    option vlan '20'
+    list ports 'lan1:t'
+```
+
+Puntos clave:
+
+- `u*`: untagged y PVID de este puerto para la VLAN;
+- `t`: tagged, transportada por un trunk;
+- un puerto de acceso normalmente tiene un solo PVID untagged;
+- ambos extremos de un trunk entre switches deben ser tagged y permitir las mismas VLAN;
+- no mantengas la configuración antigua de `swconfig` junto a esta.
+
+> Sustituye los nombres de puerto/puerto CPU por los de tu dispositivo; si tienes dudas, prueba en un puerto o dispositivo de repuesto.
+
+## Aplica y verifica
+
+```sh
+uci commit network
+/etc/init.d/network reload
+bridge vlan show
+ip -d link show br-lan
+```
+
+Verifica:
+
+- la administración sigue llegando a LuCI/SSH;
+- un cliente de acceso obtiene DHCP de la VLAN correcta;
+- el par del trunk ve las VLAN tagged;
+- `bridge vlan show` coincide con el diseño de PVID/tagged.
+
+## Recuperación tras perder el acceso
+
+1. Usa la consola/serie; no dependas solo de la red;
+2. Restaura `/etc/config/network.bak.*`;
+3. O devuelve temporalmente el puerto de administración a la VLAN 1 untagged;
+4. Reinicia la red y confirma la administración;
+5. Añade las VLAN de una en una, puerto por puerto.
+
+## Fallos comunes
+
+### Pérdida de acceso inmediata
+
+- el puerto de administración pasó a tagged o tiene un PVID incorrecto;
+- el par del trunk no permite la VLAN;
+- se cambió de golpe el puerto CPU/uplink;
+- recupera por consola; no hagas un restablecimiento de fábrica a ciegas.
+
+### VLAN 20 inaccesible
+
+- desajuste de tagged/untagged entre los dos extremos;
+- PVID sin definir;
+- no hay interfaz/DHCP/cortafuegos para esa VLAN;
+- la VLAN no está creada/permitida en el switch.
+
+### Hay dirección pero no hay internet
+
+- la VLAN de invitados/servicio no tiene DHCP/DNS;
+- la zona del cortafuegos o el reenvío no coinciden;
+- falta NAT o la ruta de retorno;
+- la conectividad de VLAN no es enrutamiento/NAT.
+
+## Estado E1
+
+- Solo documentación; no verificado en hardware/switch DSA real; no se afirma “configurado con éxito”.
+- Una prueba real requiere un dispositivo DSA de varios puertos, un switch administrable, acceso por consola, una configuración de reversión y al menos dos clientes.
+- Pasa a E2 solo después de registrar el modelo del dispositivo, los nombres de los puertos, la configuración del switch y la recuperación ante fallos.
+
+<TestRecord
+  status="planned"
+  environment="Compilado a partir de la documentación DSA/VLAN de OpenWrt 25.12; no verificado en hardware/switch DSA real de varios puertos"
+  recipe="tests/recipes/dsa-vlan-25.12.md"
+  result="E1: se documentan puertos DSA, bridge-vlan, tagged/untagged/PVID y reversión; sin validación en hardware real y sin afirmar que “funciona”"
+/>
+
+<PageSources />

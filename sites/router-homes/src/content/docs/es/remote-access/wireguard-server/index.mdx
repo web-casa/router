@@ -1,0 +1,230 @@
+---
+title: "Acceso remoto a casa con WireGuard: servidor, peer, cortafuegos y verificación del túnel"
+description: Configura un servidor WireGuard, un peer y el cortafuegos en OpenWrt 25.12, y verifica el handshake, la IP del túnel y HTTP; el reenvío de puertos WAN, el DDNS y el roaming real de un teléfono son comprobaciones aparte.
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'VM x86 200 con OpenWrt 25.12.6 + cliente netns de PVE; wg0 10.10.0.1/24, UDP 51820; handshake/ping/HTTP correctos; sin reenvío de puertos WAN/DDNS/roaming de teléfono'
+testRecipe: 'tests/recipes/wireguard-server-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt wireguard', 'openwrt wireguard server', 'wireguard home access', 'openwrt wg0', 'servidor wireguard openwrt', 'vpn wireguard openwrt']
+symptoms: ['wireguard sin handshake', 'falta wg0', 'wireguard no conecta', 'falla el ping por el túnel']
+sources:
+  - label: Servidor WireGuard de OpenWrt
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/server
+  - label: Inicio rápido de WireGuard
+    url: https://www.wireguard.com/quickstart/
+  - label: Cortafuegos de OpenWrt
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: Protocolo WireGuard
+    url: https://www.wireguard.com/protocol/
+sourceHash: '37c1b278e3300bba'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="VM PVE 200 + netns de PVE" tested={true} evidence="E2" />
+
+## Alcance
+
+Esta página verifica:
+
+- la creación de una interfaz de servidor WireGuard `wg0` en OpenWrt;
+- la adición de un peer cliente;
+- colocar `wg0` en la zona LAN del cortafuegos;
+- handshake, ping a la IP del túnel y LuCI a través del túnel.
+
+**No** verifica:
+
+- reenvío/cortafuegos del puerto UDP público en WAN;
+- DDNS/dominio;
+- roaming de clientes de teléfono/Windows;
+- reenvío/NAT hacia toda la LAN.
+
+Eso depende del entorno de despliegue; esta prueba en la LAN no lo sustituye.
+
+## Topología
+
+```text
+Client 192.168.1.251
+   │  vmbr5 (lab LAN)
+   ▼
+OpenWrt VM 200 192.168.1.2
+   wg0 10.10.0.1/24, UDP 51820
+   │
+   └── tunnel 10.10.0.0/24
+       client wg0 10.10.0.2/24
+```
+
+En el acceso real a casa, el cliente está en internet; la WAN de OpenWrt necesita el UDP 51820 reenviado/permitido. Este laboratorio es solo del lado de la LAN.
+
+## Preparación
+
+<Step where="router-shell" title="Confirma el kernel y las herramientas" expected="wg existe y el módulo wireguard está cargado.">
+
+```sh
+apk add wireguard-tools kmod-wireguard
+wg --version
+cat /proc/modules | grep wireguard
+```
+
+En este laboratorio: `wireguard-tools v1.0.20260223`; módulo `wireguard` cargado.
+
+</Step>
+
+<Step where="router-shell" title="Genera las claves del servidor (nunca las pegues en un chat ni en el repositorio)" expected="La clave privada se queda en el dispositivo; la clave pública va al cliente.">
+
+```sh
+umask 077
+wg genkey > /tmp/wg-server.key
+wg pubkey < /tmp/wg-server.key > /tmp/wg-server.pub
+cat /tmp/wg-server.pub   # only the public key goes to the client
+```
+
+El cliente también genera su propio par de claves; **nunca envíes su clave privada al servidor**. El servidor solo necesita la clave pública del cliente.
+
+</Step>
+
+## Configura el servidor
+
+<Step where="router-shell" title="Crea wg0 y el peer" expected="netifd ve proto=wireguard y wg0 tiene su dirección.">
+
+```sh
+uci set network.wg0=interface
+uci set network.wg0.proto='wireguard'
+uci set network.wg0.private_key='<server-private-key>'
+uci set network.wg0.listen_port='51820'
+uci set network.wg0.addresses='10.10.0.1/24'
+uci set network.wg0.auto='1'
+
+uci set network.wg0_client=wireguard_wg0
+uci set network.wg0_client.public_key='<client-public-key>'
+uci set network.wg0_client.allowed_ips='10.10.0.2/32'
+uci set network.wg0_client.persistent_keepalive='25'
+
+uci commit network
+/etc/init.d/network restart
+```
+
+Los nombres importan:
+
+- sección de interfaz `wg0`, tipo de peer `wireguard_wg0`; los sufijos deben coincidir;
+- en este laboratorio, llamar `wg` a la interfaz hizo que netifd informara `proto: none` y que faltara el dispositivo `wg0`; renombrarla a `wg0` lo solucionó. **Usa wg0.**
+
+Verifica:
+
+```sh
+wg show
+ip -4 addr show wg0
+ubus call network.interface.wg0 status
+```
+
+</Step>
+
+<Step where="router-shell" title="Cortafuegos: coloca wg0 en la zona LAN" expected="El UDP 51820 es alcanzable y las IP del túnel pueden comunicarse.">
+
+```sh
+uci show firewall | grep -E "zone.*name|zone.*network"
+uci add_list firewall.@zone[0].network='wg0'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+`@zone[0]` era la zona LAN en este laboratorio; tu índice puede ser distinto: busca la sección con `name='lan'`.
+
+Tras añadir `wg0` a la LAN, el cliente pudo hacer ping a `10.10.0.1` y acceder a LuCI.
+
+</Step>
+
+## Comprobación mínima del cliente
+
+La configuración del cliente está en 022. En el servidor:
+
+```sh
+wg show
+```
+
+Cuando el cliente complete el handshake, el servidor debería mostrar:
+
+```text
+peer: <client-public-key>
+  endpoint: 192.168.1.251:44421
+  allowed ips: 10.10.0.2/32
+  latest handshake: ...
+  transfer: ...
+```
+
+El cliente de este laboratorio:
+
+- handshake hace 3 segundos;
+- `transfer 124 B received, 180 B sent`;
+- ping a `10.10.0.1` 4/4;
+- HTTP `http://10.10.0.1/` devolvió LuCI.
+
+## Qué sigue haciendo falta en una WAN real
+
+- IP pública/reenvío de puerto: WAN UDP 51820 → OpenWrt;
+- el cortafuegos de entrada de WAN permite ese UDP;
+- DDNS/nombre de host fijo;
+- el `Endpoint` del cliente usa la dirección pública, no 192.168.1.2;
+- para acceder a toda la LAN, `allowed_ips` del peer en el servidor y `AllowedIPs` del cliente deben incluir el prefijo de la LAN, además de enrutamiento de retorno/NAT;
+- no conviertas «la IP del túnel responde al ping» en «toda la LAN doméstica es accesible».
+
+## Fallos comunes
+
+### Falta wg0 / proto none
+
+- el nombre de la sección de la interfaz y el sufijo del tipo de peer no coinciden;
+- faltan `wireguard-tools`/`kmod-wireguard`;
+- no se reinició la red;
+- revisa `wg show`, `ubus status`, `logread`.
+
+### Sin handshake
+
+- claves públicas de cliente/servidor intercambiadas;
+- endpoint/puerto incorrectos;
+- el cortafuegos no permite el UDP;
+- permisos/contenido de la clave privada incorrectos;
+- WireGuard no depende de la sincronización del reloj para los handshakes, pero una clave incorrecta sigue fallando.
+
+### Falla el ping por el túnel
+
+- `allowed_ips` no incluye la IP del túnel del peer;
+- la interfaz no tiene dirección / está caída;
+- zona del cortafuegos;
+- la ruta del cliente envía el propio endpoint al túnel (bucle).
+
+### La IP del túnel responde, pero la LAN no es alcanzable
+
+- a `AllowedIPs` del cliente le falta el prefijo de la LAN;
+- al servidor le falta reenvío/NAT/ruta de retorno;
+- el reenvío del cortafuegos no está permitido;
+- no equipares un túnel que funciona con una LAN que funciona.
+
+## Prueba de laboratorio E2 (2026-10-20)
+
+- Entorno: VM x86 200 con OpenWrt 25.12.6; `wg0` `10.10.0.1/24`, UDP 51820; cliente netns de PVE `10.10.0.2/24`.
+- Servidor: `wg show` listó el peer, el handshake tuvo éxito, transferencia 1.47 KiB/1.90 KiB; `wg0` activo.
+- Cliente: handshake, ping por el túnel 4/4, HTTP 200 (LuCI).
+- Sin probar: reenvío de puertos/cortafuegos WAN, DDNS, teléfono/Windows, reenvío a la LAN, NAT/ruta de retorno.
+- Receta: `tests/recipes/wireguard-server-25.12.md`.
+
+## Fuentes y revisión
+
+- Es un E2 parcial: se probaron el servidor del lado de la LAN y el túnel; no se probaron la WAN real, los clientes móviles ni el reenvío a la LAN.
+- Las claves privadas se quedan en los dispositivos; nunca las pongas en el repositorio, capturas de pantalla ni chats.
+- Sin revisor independiente; las conclusiones se limitan a este entorno de VM/netns.
+
+<TestRecord
+  status="partial"
+  environment="VM x86 200 con OpenWrt 25.12.6 + cliente netns de PVE; wg0 10.10.0.1/24, UDP 51820; handshake/ping/HTTP correctos; sin reenvío de puertos WAN/DDNS/roaming de teléfono"
+  recipe="tests/recipes/wireguard-server-25.12.md"
+  result="E2 parcial: servidor wg0 10.10.0.1/24 en UDP 51820; el cliente 10.10.0.2/24 hizo handshake, ping por el túnel 4/4, HTTP 200; reenvío de puertos WAN, DDNS, teléfono real/roaming y reenvío a la LAN sin probar"
+  date="2026-10-20"
+/>
+
+<PageSources />

@@ -1,0 +1,241 @@
+---
+title: "Cambiar la dirección LAN y volver a entrar: subred anterior y nueva, DHCP y recuperación"
+description: Cambia la LAN de OpenWrt de 192.168.1.1 a 192.168.10.1, comprueba que la dirección anterior deja de responder, accede a la nueva y conserva DHCP y la reversión por consola.
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; LAN 192.168.1.1→192.168.10.1; concesión DHCP verificada tras reiniciar'
+testRecipe: 'tests/recipes/lan-address-change-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt cambiar ip lan', 'openwrt no puedo entrar a luci tras cambiar lan', 'cambiar ip de la lan', 'dhcp nueva subred', 'openwrt change lan ip']
+symptoms: ['perdí el acceso tras cambiar la LAN', 'la dirección anterior no abre', 'el cliente no tiene red']
+sources:
+  - label: Configuración de red de OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: DHCP y DNS de OpenWrt
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: Red en LuCI de OpenWrt
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: Modo a prueba de fallos de OpenWrt (failsafe)
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+sourceHash: '1c7601a56e42e0af'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import lanEdit from '@assets/screenshots/luci/lan-edit-192-168-10.webp';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## Resultado
+
+- Elige una subred LAN nueva que no se solape con la WAN, la red upstream ni la VPN;
+- Entiende por qué la dirección anterior deja de responder de inmediato y cómo acceder a la nueva;
+- Traslada los clientes y la administración a la nueva subred;
+- Actualiza a la vez el rango DHCP, la puerta de enlace y el DNS;
+- Recupera el acceso con la nueva dirección, la consola o una copia de seguridad si algo sale mal.
+
+## Elige la nueva subred
+
+- Usa un rango privado RFC1918: `192.168.10.0/24`, `10.10.0.0/24`, etc.;
+- No te solapes con la WAN upstream, la VPN ni otra LAN/VLAN;
+- Evita `192.168.1.0/24` si el ONT o el router principal upstream ya la usa;
+- Nueva puerta de enlace: `192.168.10.1`; rango DHCP: `192.168.10.100–199`;
+- Anota la dirección, la puerta de enlace y el rango DHCP anteriores.
+
+Esta página usa `192.168.1.1/24 → 192.168.10.1/24`.
+
+## Antes de cambiar nada
+
+<Step where="router-shell" title="Anota y respalda la LAN y el DHCP" expected="Puedes restaurar la dirección anterior y el rango DHCP.">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+ip -4 addr show br-lan
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+Confirma el acceso por LuCI y SSH; lo ideal es tener también consola serie o la consola de PVE. No dependas de una sola sesión web mientras cambias la LAN.
+
+</Step>
+
+## Cambia la LAN
+
+<Step where="luci" title="Edita la dirección IPv4 en LuCI" expected="La LAN usa la nueva subred y el rango DHCP la sigue.">
+
+Abre **Red → Interfaces → LAN → Editar**:
+
+1. Deja Protocolo en `Dirección estática`.
+2. Establece Dirección IPv4 en `192.168.10.1/24`.
+3. Deja vacía la Puerta de enlace IPv4 (la LAN no es la puerta de enlace de la WAN).
+4. En **Servidor DHCP**, establece Inicio `100`, Límite `100`, Tiempo de asignación `12h`.
+5. Guardar y aplicar.
+
+<Figure src={lanEdit} alt="Diálogo de edición de la LAN en LuCI con la dirección IPv4 192.168.10.1/24" caption="Página de edición de la LAN de ejemplo. La MAC y el IPv6 están ocultos; usa tu propia subred, no la de este ejemplo." />
+
+</Step>
+
+<Step where="router-shell" title="Equivalente por CLI" expected="uci tiene la nueva subred en network.lan y dhcp.lan.">
+
+```sh
+uci set network.lan.ipaddr='192.168.10.1/24'
+uci commit network
+
+uci set dhcp.lan.start='100'
+uci set dhcp.lan.limit='100'
+uci set dhcp.lan.leasetime='12h'
+uci commit dhcp
+
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+`network reload` corta de inmediato la sesión SSH o web anterior; es lo esperado. El comando puede terminar con un timeout o una desconexión, lo que no significa que haya fallado.
+
+En la primera ejecución, `network reload` + `dnsmasq restart` por sí solos no dieron una concesión al cliente DHCP; **tras reiniciar OpenWrt** el mismo cliente obtuvo `192.168.10.191/24`. Si DHCP no asigna dirección, programa un reinicio en lugar de reiniciar dnsmasq una y otra vez.
+
+</Step>
+
+## Vuelve a entrar
+
+<Step where="client" title="Pasa a la nueva subred" expected="La nueva dirección abre LuCI y SSH; la anterior deja de responder.">
+
+- Asigna a la máquina de administración una IP estática temporal `192.168.10.2/24`, puerta de enlace `192.168.10.1`;
+- o libera y renueva DHCP para que el cliente obtenga `192.168.10.x`;
+- abre `http://192.168.10.1/`;
+- la antigua `192.168.1.1` debería agotar el tiempo de espera en lugar de abrir la página anterior.
+
+```sh
+curl -I http://192.168.10.1/
+ssh root@192.168.10.1
+```
+
+Si la dirección anterior sigue abriendo, revisa la caché del navegador, una pestaña obsoleta, otro dispositivo que tenga esa IP o si cambiaste la LAN equivocada.
+
+</Step>
+
+## Verifica
+
+<Step where="router-shell" title="Confirma la interfaz y la configuración DHCP" expected="br-lan usa la nueva dirección y dhcp-range usa la nueva subred.">
+
+```sh
+ip -4 addr show br-lan
+uci show network.lan
+uci show dhcp.lan
+ubus call network.interface.lan status | head -20
+grep -R "dhcp-range" /var/etc/dnsmasq.conf* /tmp/etc/dnsmasq.conf* 2>/dev/null
+```
+
+`dhcp-range` debe contener `192.168.10.100,192.168.10.199` y `/24`.
+
+</Step>
+
+<Step where="client" title="Verifica DHCP por separado" expected="El cliente obtiene 192.168.10.x y puerta de enlace y DNS 192.168.10.1.">
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.10.1
+```
+
+Libera la concesión anterior o vuelve a conectarte. Si el cliente sigue obteniendo `192.168.1.x`, revisa el rango DHCP, un segundo servidor DHCP y si el cliente sigue en el segmento anterior.
+
+> Esta prueba E2 verificó DHCP en dos fases: con solo `network reload` + `dnsmasq restart`, el cliente netns no obtuvo concesión; tras `reboot`, el mismo cliente netns obtuvo `192.168.10.191/24` y la puerta de enlace `192.168.10.1`. Por eso la página trata «reiniciar y volver a probar DHCP» como un paso obligatorio en lugar de dar por hecho que basta con recargar.
+
+</Step>
+
+<Step where="router-shell" title="Confirma que la WAN sigue intacta" expected="La WAN sigue funcionando; cambiar la LAN no la restableció.">
+
+```sh
+ip -4 addr show eth1
+ping -c 3 192.168.50.1
+nslookup openwrt.org 192.168.10.1
+```
+
+Cambiar solo la LAN no debería restablecer el DHCP o PPPoE de la WAN. Si también cambiaste la WAN, verifícala por separado.
+
+</Step>
+
+## Reversión
+
+<Step where="router-shell" title="Vuelve desde la nueva dirección" expected="La dirección anterior funciona de nuevo y la nueva agota el tiempo de espera.">
+
+```sh
+uci set network.lan.ipaddr='192.168.1.1/24'
+uci commit network
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+La sesión de administración se corta otra vez; devuelve el cliente a `192.168.1.x` o a DHCP y confirma la dirección anterior.
+
+</Step>
+
+<Step where="console" title="Si no puedes entrar de ninguna manera" expected="Recupera el acceso sin restablecer de fábrica.">
+
+- Inicia sesión por consola serie, HDMI o la consola de PVE;
+- revisa `uci show network.lan` y `ip -4 addr show br-lan`;
+- vuelve a la dirección anterior o a una subred a la que puedas llegar;
+- si la configuración está hecha un desastre, restaura `/etc/config/network.bak.*` y `/etc/config/dhcp.bak.*`;
+- el restablecimiento de fábrica es el último recurso y borra la configuración.
+
+</Step>
+
+## Fallos comunes
+
+### La dirección anterior sigue abriendo
+
+Caché del navegador, una pestaña obsoleta, otro dispositivo con la IP anterior o el cliente sigue en el segmento anterior. Usa una ventana privada o una terminal nueva y confirma que `curl` llega a la nueva IP.
+
+### La nueva dirección no abre
+
+- El cliente no está en `192.168.10.0/24`;
+- dirección estática o puerta de enlace incorrectas;
+- ARP obsoleto: `ip neigh flush dev <iface>`;
+- el cortafuegos bloquea la administración desde la LAN;
+- cambiaste la WAN u otra interfaz.
+
+### DHCP no funciona
+
+- `dhcp.lan.start/limit` queda fuera de la nueva subred;
+- no se reinició `dnsmasq`, o `/var/etc/dnsmasq.conf*` aún tiene el rango anterior;
+- solo recargar sigue sin dar concesión: reinicia OpenWrt y vuelve a probar (funcionó en este laboratorio);
+- existe un segundo servidor DHCP (otro router o VM);
+- el cliente no liberó la concesión anterior;
+- revisa `logread | grep dnsmasq` en busca de `no address range` o errores de interfaz.
+
+### La nueva subred entra en conflicto
+
+Solaparse con el ONT upstream, la VPN u otra LAN/VLAN causa problemas de enrutamiento y resolución. Elige otra subred; no lo fuerces.
+
+## Ejecución de laboratorio E2 (2026-10-20)
+
+- Entorno: PVE 9.2.2; OpenWrt 25.12.6 x86 VM 200; LAN `192.168.1.1/24` → `192.168.10.1/24`; DHCP `100–199`.
+- Tras el cambio: la antigua `192.168.1.1` con 100 % de pérdida; la nueva `192.168.10.1` con ping y HTTP 200; LuCI y SSH funcionaron.
+- Reversión: la dirección anterior respondió HTTP 200; la nueva agotó el tiempo de espera.
+- DHCP: solo recargar no dio concesión; tras reiniciar, el cliente netns obtuvo `192.168.10.191/24` y la puerta de enlace `192.168.10.1`.
+- No verificado: clientes físicos, IPv6, escenarios de conflicto con la red upstream.
+- Captura de pantalla: `src/assets/screenshots/luci/lan-edit-192-168-10.webp` (MAC e IPv6 ocultos).
+
+## Fuentes y revisión
+
+- Esto es E2: se probaron el cambio de dirección, el fallo de la dirección anterior, la concesión DHCP tras reiniciar y la reversión; no se probaron clientes físicos, IPv6 ni conflictos con la red upstream.
+- Receta: `tests/recipes/lan-address-change-25.12.md`.
+- Sin revisor independiente; las conclusiones se limitan a este entorno de VM.
+
+<TestRecord
+  status="verified"
+  environment="OpenWrt 25.12.6 x86 VM 200; LAN 192.168.1.1→192.168.10.1; concesión DHCP verificada tras reiniciar"
+  recipe="tests/recipes/lan-address-change-25.12.md"
+  result="E2: la dirección anterior agotó el tiempo de espera y la nueva funcionó con LuCI/SSH; solo recargar no dio concesión DHCP, pero tras reiniciar el cliente netns obtuvo 192.168.10.191/24; la reversión restauró la anterior y la nueva agotó el tiempo de espera"
+  date="2026-10-20"
+/>
+
+<PageSources />

@@ -1,0 +1,54 @@
+---
+title: "DSA en OpenWrt: puertos del switch como interfaces Linux, VLAN en br-lan"
+description: "En los targets DSA cada puerto del switch es su propia interfaz (lan1–lan4) dentro del puente br-lan, y las VLAN se definen como secciones bridge-vlan. Cómo distinguir DSA de swconfig."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt dsa", "openwrt swconfig vs dsa", "openwrt bridge-vlan", "dsa openwrt vlan"]
+sources:
+  - label: "DSA de OpenWrt"
+    url: https://openwrt.org/docs/guide-user/network/dsa/start
+  - label: "Mini tutorial de DSA"
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+  - label: "Anuncio de la versión OpenWrt 21.02.0"
+    url: https://forum.openwrt.org/t/openwrt-21-02-0-first-stable-release/105395
+  - label: "Anuncio de la versión OpenWrt 22.03.0"
+    url: https://forum.openwrt.org/t/openwrt-22-03-0-first-stable-release/136252
+sourceHash: '94301dc22a784645'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="dsa" />
+
+## En una frase
+
+DSA (Distributed Switch Architecture) es el subsistema del kernel de Linux para switches de red. En los dispositivos DSA cada puerto frontal aparece como su propia interfaz, como `lan1`–`lan4`, y esos puertos se unen en el puente `br-lan`.
+
+## Origen
+
+- DSA apareció por primera vez en la 21.02 y reemplazó al antiguo swconfig en algunos targets.
+- La 22.03 convirtió más targets, por ejemplo todo bcm53xx y lantiq xrx200.
+- Sysupgrade no puede migrar una configuración swconfig a DSA. Si tu dispositivo cambió de sistema, configura la red de nuevo.
+
+## VLAN en DSA
+
+Las VLAN son secciones `config bridge-vlan` en `/etc/config/network`. Las interfaces se asientan después sobre el puente con un sufijo de VLAN, como en `br-lan.1`. Cada puerto va con etiqueta (tagged) o sin ella (untagged) en cada VLAN.
+
+## Compruébalo en tu router
+
+```sh
+ip -br link
+uci show network | grep -E 'bridge-vlan|=device'
+```
+
+Si ves secciones `config switch` y `switch_vlan`, el dispositivo todavía usa swconfig y las guías de DSA no se aplican.
+
+## Guías relacionadas
+
+- [VLAN con DSA](/es/wireless-vlan/dsa-vlan/)
+- [Wi-Fi para invitados](/es/wireless-vlan/guest-wifi/)
+- [AP cableado/inalámbrico](/es/network/ap-mode/)
+
+<PageSources />

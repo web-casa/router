@@ -1,0 +1,51 @@
+---
+title: "firewall4: el cortafuegos nftables de OpenWrt y sus zonas"
+description: "Desde la 22.03, el cortafuegos de OpenWrt es firewall4 sobre nftables, configurado con la misma sintaxis UCI basada en zonas de antes. Cómo leerlo y qué ya no se aplica."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt firewall4", "openwrt fw4", "openwrt nftables", "cortafuegos openwrt", "firewall openwrt zonas"]
+sources:
+  - label: "Anuncio de la versión OpenWrt 22.03.0"
+    url: https://forum.openwrt.org/t/openwrt-22-03-0-first-stable-release/136252
+  - label: "Configuración del cortafuegos de OpenWrt"
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: 'df759f219b1c8f62'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="firewall4" />
+
+## En una frase
+
+Desde la 22.03, el cortafuegos predeterminado de OpenWrt es firewall4 (fw4). Genera reglas de nftables en lugar de iptables y mantiene en `/etc/config/firewall` la sintaxis UCI del antiguo fw3.
+
+## Zonas, no listas de reglas
+
+- Las interfaces se agrupan en zonas, normalmente `lan` y `wan`. Las políticas y los reenvíos se definen entre zonas.
+- En la configuración predeterminada, LAN y WAN son zonas separadas y el tráfico de LAN se reenvía a WAN. Las conexiones de WAN hacia tu red no se reenvían a menos que añadas una regla.
+- Las interfaces nuevas, como una red de invitados o un túnel WireGuard, normalmente necesitan una zona propia o unirse a una existente.
+
+## Compruébalo en tu router
+
+```sh
+uci show firewall | grep '=zone'
+fw4 print
+```
+
+`fw4 print` muestra la estructura de tablas, cadenas y reglas que fw4 cargaría, sin aplicar nada. Después de editar la configuración, `fw4 reload` la aplica.
+
+## Ten cuidado
+
+- Las guías basadas en comandos `iptables -A …` no se aplican a fw4. Expresa la regla en UCI.
+- Una zona incorrecta en una interfaz nueva es una causa habitual de que un túnel o una red de invitados “se conecte pero no tenga internet”.
+
+## Guías relacionadas
+
+- [Servidor WireGuard](/es/remote-access/wireguard-server/)
+- [Wi-Fi de invitados](/es/wireless-vlan/guest-wifi/)
+- [Puerta de enlace de bypass](/es/network/bypass-gateway/)
+
+<PageSources />

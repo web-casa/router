@@ -1,0 +1,179 @@
+---
+title: "Sin internet o cortes intermitentes: todos los dispositivos, un cliente o una aplicación"
+description: Usa cinco capas (WAN, DNS, LAN/DHCP, ruta del cliente, proxy de la aplicación) para distinguir un fallo de toda la red de un fallo de un solo dispositivo o de una sola aplicación.
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; WAN 192.168.50.191/24; LAN 192.168.1.1; cliente netns 192.168.1.175'
+testRecipe: 'tests/recipes/no-internet-triage-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt no internet', 'openwrt intermittent drops', 'only one device has no internet', 'dns resolution fails', 'openwrt sin internet', 'cortes intermitentes wifi', 'solo un dispositivo sin internet', 'falla la resolución dns']
+symptoms: ['todos los dispositivos sin conexión', 'solo un dispositivo sin conexión', 'el ping a la IP funciona pero la web falla', 'la red se corta de forma intermitente']
+sources:
+  - label: Solución de problemas de red en OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/troubleshooting
+  - label: DHCP y DNS en OpenWrt
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: Cortafuegos de OpenWrt
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: Failsafe de OpenWrt
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+sourceHash: 'bd543737b04bca88'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## Define qué tipo de «sin internet» es
+
+| Síntoma | Capa más probable | Primer paso |
+|---|---|---|
+| Ningún dispositivo puede navegar | WAN/upstream/DNS/NAT | prueba la WAN y el DNS desde el enrutador |
+| Solo un dispositivo está sin conexión | IP, puerta de enlace, DNS, Wi-Fi o VPN de ese cliente | compáralo con otro cliente de la misma LAN |
+| Solo falla una aplicación | DNS, proxy, QUIC o IPv6 de la aplicación | prueba otro navegador, desactiva el proxy, prueba el DNS |
+| Intermitente | enlace, concesión DHCP, Wi-Fi, upstream | registra una cronología; un solo ping no basta |
+| El ping a la IP funciona, la web falla | DNS o proxy | `nslookup` + DNS alternativo |
+
+## Cinco capas
+
+### 1. WAN / upstream
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+ping -c 3 192.168.50.1
+ping -c 3 1.1.1.1
+```
+
+- Sin dirección WAN: revisa DHCP/PPPoE (consulta 007);
+- La puerta de enlace no responde: cable, upstream u ONT;
+- La puerta de enlace responde pero falla la IP pública: upstream, NAT o cortafuegos;
+- Pérdida parcial: registra la hora y el estado del enlace antes de cambiar la configuración.
+
+### 2. DNS
+
+```sh
+nslookup openwrt.org 127.0.0.1
+nslookup openwrt.org 192.168.50.1
+cat /tmp/resolv.conf.d/resolv.conf.auto
+logread | grep -i dnsmasq | tail -20
+```
+
+Con dnsmasq detenido en este laboratorio:
+
+- `ping 1.1.1.1` desde el enrutador seguía funcionando;
+- `nslookup openwrt.org 127.0.0.1` falló;
+- `ping 1.1.1.1` desde el cliente funcionó, el DNS falló;
+- reiniciar dnsmasq lo recuperó.
+
+Ese es el patrón clásico de «la IP funciona, los nombres fallan».
+
+### 3. LAN / DHCP / dirección del cliente
+
+```sh
+ip -4 addr show br-lan
+cat /tmp/dhcp.leases
+ip neigh
+```
+
+En el cliente:
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.1.1
+```
+
+Una puerta de enlace incorrecta, un conflicto de IP o una subred antigua se manifiestan como «solo este dispositivo está sin conexión».
+
+### 4. Cortafuegos / NAT / reenvío
+
+```sh
+uci show firewall
+nft list ruleset 2>/dev/null | head -80
+logread | grep -i firewall | tail -20
+```
+
+Si la WAN tiene dirección y el DNS funciona, pero los clientes de la LAN no llegan a internet, revisa:
+
+- las zonas LAN/WAN;
+- el masquerade de la WAN;
+- el reenvío LAN→WAN;
+- reglas personalizadas que bloquean el DNS o el reenvío.
+
+### 5. Un cliente / una aplicación
+
+Un cliente:
+
+- elimina su ruta por defecto: `ip route del default`; si la puerta de enlace sigue respondiendo pero falla la IP pública, el problema es la ruta de ese cliente;
+- restaura: `ip route add default via 192.168.1.1`;
+- revisa el Wi-Fi, la VPN, el proxy, el DNS privado y la preferencia de IPv6.
+
+Una aplicación:
+
+- prueba otro navegador / desactiva el proxy;
+- compara con `nslookup`/`curl -v`;
+- el DoH, QUIC o proxy a nivel de aplicación pueden esquivar el DNS del enrutador;
+- no «reinstales la aplicación» en lugar de diagnosticar por capas.
+
+## Demostración grabada (laboratorio 015)
+
+<TerminalCast
+  src="/casts/015-triage.cast"
+  title="Laboratorio 015: DNS, WAN y ruta de un cliente"
+  caption="VM real de OpenWrt 25.12.6 + cliente netns: se detiene el DNS (la IP funciona / el DNS falla), se hace ifdown de la WAN (la puerta de enlace funciona / la IP pública falla) y luego se elimina la ruta por defecto del cliente (solo falla ese cliente). Los bloques de código son la referencia."
+/>
+
+## Cómo registrar los cortes intermitentes
+
+No escribas «a veces se corta». Registra:
+
+- hora, duración y si se recupera solo;
+- todos los dispositivos o uno;
+- cable frente a Wi-Fi, 2,4/5 GHz;
+- si la dirección WAN o la concesión cambiaron;
+- marcas de tiempo de enlace, DHCP, DNS y cortafuegos en `logread`;
+- si ocurre durante una descarga, subida, roaming o suspensión.
+
+Sin una cronología, lo «intermitente» es difícil de corregir o verificar.
+
+## Orden de recuperación
+
+1. Restaura primero el servicio de WAN/DNS; no restablezcas de fábrica;
+2. Si falla un solo cliente, cambia ese cliente, no el enrutador;
+3. Si falla una sola aplicación, desactiva primero el proxy y el DNS privado;
+4. Si reinicias, registra el estado antes de reiniciar;
+5. El restablecimiento de fábrica es el último recurso; haz una copia de seguridad antes.
+
+## Prueba de laboratorio E2 (2026-10-20)
+
+- Entorno: OpenWrt 25.12.6 x86 VM 200; WAN DHCP `192.168.50.191/24`; LAN `192.168.1.1/24`; cliente netns `192.168.1.175/24`.
+- DNS detenido: el ping público desde el enrutador funcionó; el DNS del enrutador y del cliente falló; reiniciar dnsmasq lo recuperó.
+- `ifdown` de la WAN: la dirección WAN desapareció; el cliente hizo ping a la puerta de enlace pero no a `1.1.1.1`; `ifup wan` lo recuperó.
+- Ruta por defecto del cliente eliminada: la puerta de enlace funcionó, la IP pública fue inalcanzable; restaurar la ruta lo recuperó.
+- No probado: Wi-Fi real, caídas del enlace físico, jitter del upstream, proxy/DoH/QUIC de aplicaciones, preferencia de IPv6.
+- Grabación: `public/casts/015-triage.cast`; receta: `tests/recipes/no-internet-triage-25.12.md`.
+
+## Fuentes y revisión
+
+- Esto es E2 parcial: se probaron tres fallos controlados; no se probaron las capas intermitente, física ni de aplicación.
+- No hay revisor independiente; las conclusiones se limitan a este entorno de VM/netns.
+- No culpes al ISP por un solo ping o una sola carga de página fallida.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; WAN 192.168.50.191/24; LAN 192.168.1.1; cliente netns 192.168.1.175"
+  recipe="tests/recipes/no-internet-triage-25.12.md"
+  result="E2 parcial: con el DNS detenido, el ping a la IP pública funcionó pero el DNS falló; tras reiniciar se recuperó. Con ifdown de la WAN, la puerta de enlace del cliente funcionó pero la IP pública falló; ifup lo recuperó. Eliminar la ruta por defecto del cliente afectó solo a ese terminal. Intermitencia, Wi-Fi físico y proxy de aplicaciones sin probar."
+  date="2026-10-20"
+/>
+
+<PageSources />

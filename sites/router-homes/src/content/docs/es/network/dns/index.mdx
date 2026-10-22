@@ -1,0 +1,264 @@
+---
+title: Configura el DNS y verifica el router, el cliente y el navegador
+description: Averigua qué servidor DNS usan realmente el router, el cliente y el navegador, y conserva una vía de recuperación.
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'PVE 9.2.2 con una sola NIC; VM 200 con OpenWrt 25.12.6; cliente DHCP en netns'
+lastVerifiedAt: '2026-10-20'
+testRecipe: 'tests/recipes/dns-25.12-x86.md'
+aliases: ['openwrt dns', 'openwrt dns settings', 'openwrt change dns', 'cambiar dns openwrt', 'configurar dns openwrt']
+symptoms: ['las páginas no cargan', 'algunos sitios fallan', 'falló la resolución DNS']
+sources:
+  - label: Configuración de DHCP y DNS en OpenWrt
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp_configuration
+  - label: dnsmasq en OpenWrt
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: Notas de la versión OpenWrt 25.12
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: Gestor de paquetes apk de OpenWrt
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+sourceHash: '0f4c118a13e248a2'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="VM x86" tested={true} evidence="E2" />
+
+## Resultado
+
+Podrás responder tres preguntas por separado:
+
+- ¿Qué servidor DNS upstream usa el router?
+- ¿Qué servidor DNS recibe un cliente desde OpenWrt?
+- ¿El navegador evita el resolvedor del sistema mediante DoH?
+
+Y podrás volver a un estado en el que se resuelvan nombres después de un cambio fallido.
+
+## Entorno aplicable
+
+- OpenWrt 25.12.6, con `dnsmasq` + `odhcpd` por defecto; 25.12 usa `apk` y 24.10 usa `opkg`.
+- Los comandos de inspección no necesitan paquetes adicionales. Si el dispositivo ejecuta `unbound` o `https-dns-proxy`, comprueba primero quién ocupa el puerto 53.
+- Las etiquetas de menú y las claves de configuración son similares en 24.10, pero los comandos de paquetes difieren; no copies comandos `apk` en 24.10.
+
+## Ruta del DNS y responsabilidades
+
+| Lugar | Responsable por defecto | Qué comprobar |
+|---|---|---|
+| Upstream de la WAN | Cliente DHCP/PPPoE | `cat /tmp/resolv.conf.d/resolv.conf.auto` |
+| Resolvedor del router | `dnsmasq` | `nslookup openwrt.org 127.0.0.1` |
+| Anuncio en la LAN | opción 6 de DHCP de `dnsmasq` / RDNSS de `odhcpd` | el DNS que se muestra en un cliente |
+| Navegador | resolvedor del sistema o DoH del navegador | el ajuste de DNS seguro del navegador |
+
+Diagnostica la capa antes de reemplazar los servidores DNS.
+
+## Antes de cambiar nada
+
+<Step where="router-shell" title="Respalda la configuración de DHCP/DNS" expected="Existe una copia de seguridad y sabes cómo restaurarla.">
+
+```sh
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+uci export dhcp > /tmp/dhcp.before
+uci show dhcp | grep -E 'dns|resolv|server|option'
+```
+
+Conserva una vía cableada en la LAN hacia LuCI/SSH. No hagas que la única vía de administración dependa del DNS que estás cambiando.
+
+</Step>
+
+## Pasos mínimos
+
+<Step where="router-shell" title="Lee el DNS upstream y los ajustes de dnsmasq" expected="Puedes nombrar los valores actuales de resolvfile, server y noresolv.">
+
+```sh
+cat /tmp/resolv.conf.d/resolv.conf.auto
+uci show dhcp.@dnsmasq[0]
+uci show network.wan | grep -E 'peerdns|dns'
+```
+
+`/tmp/resolv.conf.d/resolv.conf.auto` lo escribe el cliente de la WAN. Comprueba el valor real de `dhcp.@dnsmasq[0].resolvfile`. Si `noresolv='1'`, dnsmasq ignora ese archivo y usa su lista `server`.
+
+</Step>
+
+<Step where="luci" title="Define un DNS personalizado en la WAN (primer cambio más seguro)" expected="Tras reconectar la WAN, el resolvedor upstream es el valor que definiste.">
+
+Abre **Red → Interfaces → WAN → Configuración avanzada**:
+
+1. Desmarca “Use DNS servers advertised by peer” (`peerdns` pasa a 0).
+2. Añade los servidores DNS de confianza en “Usar servidores DNS personalizados”, por ejemplo `1.1.1.1` y `9.9.9.9`.
+3. Guarda y aplica; después reconecta la WAN si hace falta.
+
+Esto interrumpe brevemente la WAN, pero deja intacta la estructura DHCP/DNS de la LAN, lo que facilita revertir.
+
+</Step>
+
+<Step where="router-shell" title="Confirma que dnsmasq escucha y cargó el nuevo upstream" expected="El puerto 53 está a la escucha y el registro no muestra errores de configuración.">
+
+```sh
+netstat -lnp | grep ':53'
+/etc/init.d/dnsmasq restart
+logread -e dnsmasq | tail -20
+```
+
+Si `dnsmasq` no arranca, deja de cambiar opciones de DHCP. Usa el texto del error para encontrar un error de sintaxis o un conflicto de puerto.
+
+</Step>
+
+<Step where="luci" title="Comprueba el DNS anunciado a los clientes" expected="El cliente recibe la dirección LAN de OpenWrt, o la opción 6 explícita que pretendías.">
+
+Abre **Red → DHCP y DNS → Servidor DHCP → Configuración avanzada** y revisa “DHCP Options”. Sin la opción 6, los clientes normalmente usan la dirección LAN del router como DNS. Con la opción 6, reciben directamente esa dirección.
+
+No apuntes los clientes a una dirección que no esté escuchando en el puerto 53.
+
+</Step>
+
+<Step where="router-shell" title="Equivalente por CLI (opcional)" expected="resolv.auto muestra 1.1.1.1 y las consultas funcionan.">
+
+```sh
+uci set network.wan.peerdns='0'
+uci -q delete network.wan.dns
+uci add_list network.wan.dns='1.1.1.1'
+uci commit network
+ifup wan
+cat /tmp/resolv.conf.d/resolv.conf.auto
+```
+
+Después del cambio, usa `logread -e dnsmasq` para confirmar el nuevo upstream. Si los clientes siguen recibiendo el DNS antiguo, reinicia dnsmasq o revisa la opción 6 de DHCP.
+
+</Step>
+
+## Verifica desde los clientes
+
+<Step where="router-shell" title="Comprueba A y AAAA en el router" expected="Ambas consultas devuelven respuesta sin agotar el tiempo de espera.">
+
+```sh
+nslookup openwrt.org 127.0.0.1
+nslookup -type=AAAA openwrt.org 127.0.0.1
+```
+
+</Step>
+
+<Step where="client" title="Comprueba el DNS que el cliente recibió realmente" expected="El DNS del cliente coincide con la configuración DHCP/estática y resuelve un nombre.">
+
+Linux:
+
+```sh
+resolvectl status
+cat /etc/resolv.conf
+nslookup openwrt.org
+```
+
+Windows:
+
+```powershell
+ipconfig /all
+nslookup openwrt.org
+```
+
+macOS:
+
+```sh
+scutil --dns
+nslookup openwrt.org
+```
+
+</Step>
+
+<Step where="client" title="Comprueba si el navegador evita el router" expected="DoH está desactivado durante la prueba, o sabes exactamente a dónde apunta.">
+
+Chrome/Edge: `chrome://settings/security` o “Privacidad y seguridad → Seguridad → Usar DNS seguro”. Firefox: Ajustes → Privacidad y seguridad → DNS sobre HTTPS. Si DoH está activado, puede que no se use el resolvedor del sistema en absoluto; eso parece que “el DNS del router no surtió efecto”.
+
+</Step>
+
+<Step where="client" title="Comprueba la resolución IPv6 y RA/RDNSS" expected="AAAA resuelve cuando existe upstream IPv6; si no, anota la condición que falta.">
+
+```sh
+nslookup -type=AAAA openwrt.org
+ip -6 route
+```
+
+No deduzcas que el DNS IPv6 funciona a partir de un resultado IPv4 cuando el upstream no tiene prefijo IPv6.
+
+</Step>
+
+## Ramas de fallo y recuperación
+
+### Las páginas no cargan, pero el ping por IP funciona
+
+Sospecha primero del DNS:
+
+1. Comprueba el resolvedor del cliente: `resolvectl status`, `ipconfig /all` o `scutil --dns`.
+2. Comprueba el puerto 53 y los registros de dnsmasq en el router: `netstat -lnp | grep ':53'`, `logread -e dnsmasq`.
+3. Comprueba el DoH del navegador y desactívalo temporalmente.
+4. Comprueba si la opción 6 de DHCP tiene una dirección incorrecta.
+
+### LuCI/SSH no es accesible
+
+Deja de cambiar el DNS. Conecta un cliente por cable a la LAN, asígnale una dirección estática en la misma subred y confirma que la puerta de enlace es la dirección LAN de OpenWrt. Restaura desde la consola o por SSH:
+
+```sh
+cp /etc/config/dhcp.bak.YYYY-MM-DD /etc/config/dhcp
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+```
+
+Si cambiaste el DNS de la WAN, restaura el DNS upstream automático:
+
+```sh
+uci set network.wan.peerdns='1'
+uci -q delete network.wan.dns
+uci commit network
+ifup wan
+```
+
+### El DNS de la WAN cambió, pero los clientes siguen usando el resolvedor antiguo
+
+Comprueba si `resolv.auto` cambió y después si dnsmasq cargó el nuevo upstream:
+
+```sh
+cat /tmp/resolv.conf.d/resolv.conf.auto
+logread -e dnsmasq | tail -20
+/etc/init.d/dnsmasq restart
+```
+
+Si `resolv.auto` no cambió, revisa `network.wan.dns` y `peerdns`. Si los clientes siguen recibiendo el DNS antiguo, revisa la opción 6 de DHCP y el DoH del navegador.
+
+### dnsmasq no arranca
+
+Lee el error en lugar de reiniciar repetidamente:
+
+```sh
+logread -e dnsmasq | tail -50
+dnsmasq --test
+```
+
+Las causas habituales son otro resolvedor que ocupa el puerto 53, un error de sintaxis o un upstream inaccesible. Restaura primero la copia de seguridad y vuelve a introducir los ajustes personalizados uno por uno.
+
+## Prueba E2 en laboratorio (2026-10-20)
+
+- Entorno: PVE 9.2.2 con una sola NIC; VM 200 con OpenWrt 25.12.6; WAN `192.168.50.77/24`, LAN `192.168.1.1/24`.
+- Línea base: `resolv.auto` era `nameserver 192.168.50.1`; `nslookup openwrt.org 127.0.0.1` devolvió A/AAAA.
+- Personalizado: `peerdns=0` + `network.wan.dns=1.1.1.1`; `resolv.auto` cambió a `nameserver 1.1.1.1`; las consultas siguieron funcionando.
+- Fallo: se definió como upstream de dnsmasq la dirección inaccesible `192.0.2.1`; una consulta aleatoria a `.example.com` devolvió `connection timed out; no servers could be reached`; eliminar `noresolv`/`server` y restaurar `peerdns=1` recuperó la resolución.
+- Cliente: el DHCP en netns recibió `192.168.1.116/24`, DNS `192.168.1.1`; `dig @192.168.1.1 openwrt.org` funcionó; `ping 192.168.50.1` funcionó.
+- No probado: DoH del navegador, upstream IPv6/RA/RDNSS, clientes LAN físicos, estabilidad a largo plazo.
+
+## Fuentes y revisión
+
+- Esta página tiene una reproducción E2 en laboratorio; el DoH del navegador y el upstream IPv6 siguen sin probarse y no deben describirse como verificados.
+- Evidencia: `docs/dns-e2-run.md` y `tests/recipes/dns-25.12-x86.md`.
+- Actualiza `testedVersions` y `lastVerifiedAt` cuando cambie el menú o la versión; no pongas comandos `opkg` de 24.10 en un procedimiento de 25.12.
+
+<TestRecord
+  status="partial"
+  environment="PVE 9.2.2 con una sola NIC; VM 200 con OpenWrt 25.12.6; cliente DHCP en netns"
+  recipe="tests/recipes/dns-25.12-x86.md"
+  result="DNS de la WAN 192.168.50.1 → 1.1.1.1 aplicado; el upstream defectuoso agotó el tiempo de espera; la recuperación funcionó; DNS DHCP del cliente 192.168.1.1, resolución correcta"
+  date="2026-10-20"
+/>
+
+<PageSources />
