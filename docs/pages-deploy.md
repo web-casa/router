@@ -59,6 +59,17 @@ pnpm exec wrangler pages deploy sites/router-homes/dist \
 
 内容风险：feature/download 页是 E1 文档页，不是实测页；生产发布不等于 E2/E3 验收。
 
+## 发布方式（已决定）
+
+发布继续使用 **Wrangler OAuth 登录**在本地部署，不走 GitHub Actions：先 `pnpm check` 通过，再 `pnpm build`，然后
+
+```bash
+CLOUDFLARE_ACCOUNT_ID=<项目所在账号> pnpm exec wrangler pages deploy sites/router-homes/dist \
+  --project-name router-homes --branch main --commit-dirty=true
+```
+
+Wrangler 登录了多个 Cloudflare 账号时必须用 `CLOUDFLARE_ACCOUNT_ID` 指定项目所在的账号（`pnpm exec wrangler whoami` 可查），账号 ID 不要写进仓库。部署后按下方“验收”清单核对线上结果，并更新本文件的部署 ID。因此下面两个工作流目前不用配置 Cloudflare 密钥，也不要启用 `PAGES_CONTENT_ENABLED`。
+
 ## GitHub Actions
 
 - `.github/workflows/pages-placeholder.yml`：手动重发 noindex placeholder，使用 `cloudflare/wrangler-action@v3`。
@@ -80,5 +91,5 @@ pnpm exec wrangler pages deploy sites/router-homes/dist \
 2. Pages 项目 → Custom domains → 添加 apex `router.homes` 和 `www.router.homes`；明确唯一 canonical 主机。
 3. 验证 TLS、apex/www、`/` 根 301、`/en/`、`/zh/`、404、`x-robots-tag`。
 4. 绑定后补正式 `robots.txt` 与 sitemap 指令，并重新验收 canonical。
-5. 设置仓库变量 `PAGES_CONTENT_ENABLED=true`，推送 remote 后手动跑 `pages-content.yml`，把后续发布交给 CI。
+5. 后续发布继续用上面的 Wrangler OAuth 部署；除非改变决定，不需要设置 `PAGES_CONTENT_ENABLED` 或 Cloudflare 密钥。
 6. live 后把 `router-homes.pages.dev/*` 301 到正式域名，避免双主机收录。
