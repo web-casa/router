@@ -227,6 +227,13 @@ starlight-theme-select select,
 starlight-lang-select select {
   transition: color 0.2s;
 }
+/* Starlight fixes the select width; localized labels ("Automático", "System") get clipped.
+   Size to the selected label where field-sizing is supported, keeping the old width as the floor. */
+starlight-theme-select select {
+  field-sizing: content;
+  width: auto;
+  min-width: 6.5rem;
+}
 starlight-theme-select label:hover,
 starlight-lang-select label:hover {
   color: var(--sl-color-white);
@@ -844,4 +851,10 @@ starlight-toc h2 {
   .step::after {
     display: none;
   }
+}
+
+/* Japanese: wrap at phrase boundaries (supported browsers) instead of between any two characters.
+   word-break is inherited, so setting it once on the root covers headings, prose and table cells. */
+html:lang(ja) {
+  word-break: auto-phrase;
 }
