@@ -52,7 +52,9 @@ See [`docs/writing-guide.md`](docs/writing-guide.md) for the page structure, evi
 
 ### License
 
-No license has been chosen yet, so all rights are reserved by default. Please open an issue before reusing the content.
+Licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). This covers the code, the documentation text and the translations in this repository. If you run a modified version of the site as a network service, the AGPL requires you to offer its source to your users.
+
+Third-party material keeps its own license: the [Solar](https://www.figma.com/community/file/1166831539721848736) icons by 480 Design are CC BY 4.0, and the LuCI glossaries in `docs/i18n/glossary/` are extracted from [LuCI](https://github.com/openwrt/luci) translations (Apache-2.0).
 
 ## 简体中文
 
@@ -81,4 +83,6 @@ pnpm test:search  # 在真实浏览器里跑 Pagefind 搜索验收（需要 Chro
 
 ### 许可证
 
-尚未选定许可证，因此默认保留所有权利。如需复用内容，请先提 issue。
+采用 [GNU Affero 通用公共许可证 v3.0](LICENSE)（AGPL-3.0），适用于本仓库的代码、文档正文和译文。如果你把修改后的站点作为网络服务运行，AGPL 要求你向用户提供对应的源代码。
+
+第三方材料保留各自的许可证：480 Design 的 [Solar](https://www.figma.com/community/file/1166831539721848736) 图标为 CC BY 4.0；`docs/i18n/glossary/` 里的 LuCI 术语表取自 [LuCI](https://github.com/openwrt/luci) 的翻译（Apache-2.0）。
