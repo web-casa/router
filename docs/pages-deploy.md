@@ -5,12 +5,13 @@
 - 状态：`content-deployed-pages-dev`
 - Cloudflare Pages 项目：`router-homes`
 - 账号：项目所属的 Cloudflare 账号
-- 当前生产部署：`b03da577-df0a-4a3c-a32f-0b42b4e27aef`（source `bee9a95`）
+- 当前生产部署：`3f8c2247-d501-48c4-9659-1948d803f581`（source `628321d`，2026-10-23，7 种语言 260 页）
+- 上一个生产部署：`b03da577-df0a-4a3c-a32f-0b42b4e27aef`（source `bee9a95`，en/zh 75 页），可作为回滚目标
 - 生产别名：https://router-homes.pages.dev/
-- 部署别名：https://b03da577.router-homes.pages.dev/（Cloudflare 会给该别名加 `x-robots-tag: noindex`）
+- 部署别名：https://3f8c2247.router-homes.pages.dev/（Cloudflare 会给该别名加 `x-robots-tag: noindex`）
 - 当前 preview：`2e2e18f3-6a3c-4681-bed9-8ff61b210c1f` → https://preview.router-homes.pages.dev/（preview 自动 noindex）
 - 域名：`router.homes` 仍未绑定 Cloudflare Pages；DNS 仍解析到 `54.149.79.189`，TLS 不通过
-- 生产内容：`sites/router-homes/dist`，75 个页面索引 + 404；`/` 301 `/en/`
+- 生产内容：`sites/router-homes/dist`，260 个页面（en、zh、zh-hant、es、de、fr、ja 各 37 页 + 首页等）+ 404；`/` 301 `/en/`；`/zh-hans/*` 301 `/zh/*`
 - 生产别名 HTTP 响应没有 `x-robots-tag: noindex`；canonical 仍指向 `https://router.homes/...`
 
 ## 历史 placeholder
@@ -23,6 +24,18 @@
 - 保留用于回滚；已不是当前生产内容。
 
 ## 验收
+
+### 2026-10-23 多语言内容部署
+
+同一命令（Wrangler OAuth，账号用环境变量 `CLOUDFLARE_ACCOUNT_ID` 指定）部署 `sites/router-homes/dist`，部署 `3f8c2247`。线上核对：
+
+- `/`：301 → `/en/`；`/zh-hans/network/dns/`：301 → `/zh/network/dns/`；不存在的路径返回 404。
+- en、zh、zh-hant、es、de、fr、ja 的首页、`/network/dns/`、`/download/` 均为 200。
+- `/ja/network/dns/`：`<html lang="ja">`，canonical 自指 `https://router.homes/ja/network/dns/`，hreflang 覆盖 7 种语言和 `x-default`。
+- sitemap 覆盖 7 种语言。
+- 仍然：生产别名没有 `x-robots-tag: noindex`，canonical 指向未绑定的 `router.homes`，见下方“下一步”。
+
+### 2026-10-22 首次内容部署
 
 2026-10-22 直接使用 Wrangler OAuth 部署（无 git remote）：
 
@@ -57,7 +70,8 @@ pnpm exec wrangler pages deploy sites/router-homes/dist \
 ## 回滚
 
 - 回滚到 placeholder：Cloudflare Pages 项目 → Deployments → `212fc100-...` → Rollback；或重跑 `pages-placeholder.yml`。
-- 回滚到当前内容前的状态：当前生产部署 `b03da577-...` 之前是 placeholder。
+- 回滚到多语言上线前：Cloudflare Pages 项目 → Deployments → `b03da577-...` → Rollback（en/zh 75 页）。
+- 回滚到 placeholder：见上一条 `212fc100-...`。
 - 不要删除 preview/placeholder 部署记录，保留验收和回滚证据。
 
 ## 下一步：绑定与收尾
