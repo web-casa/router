@@ -1,0 +1,51 @@
+---
+title: "firewall4 : le pare-feu nftables d’OpenWrt et ses zones"
+description: "Depuis la 22.03, le pare-feu d’OpenWrt est firewall4 sur nftables, configuré avec la même syntaxe UCI par zones qu’auparavant. Comment le lire et ce qui ne s’applique plus."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt firewall4", "openwrt fw4", "openwrt nftables", "pare-feu openwrt"]
+sources:
+  - label: "Annonce de la version OpenWrt 22.03.0"
+    url: https://forum.openwrt.org/t/openwrt-22-03-0-first-stable-release/136252
+  - label: "Configuration du pare-feu OpenWrt"
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: 'df759f219b1c8f62'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="firewall4" />
+
+## En une phrase
+
+Depuis la 22.03, le pare-feu par défaut d'OpenWrt est firewall4 (fw4). Il génère des règles nftables au lieu d'iptables et conserve dans `/etc/config/firewall` la syntaxe UCI de l'ancien fw3.
+
+## Des zones, pas des listes de règles
+
+- Les interfaces sont regroupées en zones, généralement `lan` et `wan`. Les politiques et les redirections se définissent entre zones.
+- Dans la configuration par défaut, LAN et WAN sont des zones séparées et le trafic du LAN est transmis vers le WAN. Les connexions du WAN vers votre réseau ne sont pas transmises tant que vous n'ajoutez pas de règle.
+- Les nouvelles interfaces, comme un réseau invité ou un tunnel WireGuard, nécessitent normalement leur propre zone ou doivent rejoindre une zone existante.
+
+## Le voir sur votre routeur
+
+```sh
+uci show firewall | grep '=zone'
+fw4 print
+```
+
+`fw4 print` affiche la structure de tables, de chaînes et de règles que fw4 chargerait, sans rien appliquer. Après avoir modifié la configuration, `fw4 reload` l'applique.
+
+## Attention
+
+- Les guides basés sur des commandes `iptables -A …` ne s'appliquent pas à fw4. Exprimez la règle en UCI.
+- Une mauvaise zone sur une nouvelle interface est une cause fréquente du symptôme « le tunnel ou le réseau invité se connecte mais n'a pas d'accès à Internet ».
+
+## Guides associés
+
+- [Serveur WireGuard](/fr/remote-access/wireguard-server/)
+- [Wi-Fi invité](/fr/wireless-vlan/guest-wifi/)
+- [Passerelle de contournement](/fr/network/bypass-gateway/)
+
+<PageSources />

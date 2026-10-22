@@ -1,0 +1,227 @@
+---
+title: "Dépôts de paquets et miroirs chinois : séparer apk et opkg"
+description: Distinguez apk (OpenWrt 25.12) d'opkg (24.10), faites correspondre version/cible/architecture/kmods, et passez à un miroir chinois sans casser l'ABI.
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'VM x86 OpenWrt 25.12.6 200 ; dépôts officiel/TUNA, apk update/search/install, retour à l''officiel'
+testRecipe: 'tests/recipes/package-sources.md'
+aliases: ['openwrt package feeds', 'openwrt china mirror', 'apk feeds', 'opkg feeds', 'openwrt package will not install', 'openwrt miroir', 'openwrt dépôts de paquets']
+symptoms: ['apk update 404', 'échec d''opkg update', 'dépendances incompatibles', 'erreur de signature du dépôt']
+sources:
+  - label: Gestionnaire de paquets apk d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: Gestionnaire de paquets opkg d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg
+  - label: Notes de version d'OpenWrt 25.12
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: Miroir OpenWrt de TUNA
+    url: https://mirrors.tuna.tsinghua.edu.cn/openwrt/
+sourceHash: '55165ce9cac98759'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="VM x86 OpenWrt 25.12.6 200" tested={true} evidence="E2" />
+
+D'abord : la **différence entre apk et opkg** dépend de la version du firmware, pas de « quel miroir est le plus rapide ». 25.12 utilise `apk` ; 24.10 utilise `opkg`. Le format des paquets, les chemins des dépôts et la vérification diffèrent et ne sont pas interchangeables.
+
+## Résultat
+
+- Savoir si le firmware utilise `apk` ou `opkg`, et où se trouvent ses fichiers de dépôts.
+- Faire correspondre la version, la cible, l'architecture et le hash du noyau des kmods.
+- Savoir quelle partie de l'URL un miroir chinois remplace, et quels chemins doivent rester exacts.
+- Comprendre pourquoi « après le changement de miroir, les paquets ne s'installent plus », et comment récupérer.
+- Savoir pourquoi `apk upgrade`/`opkg upgrade` n'est pas une mise à jour du firmware.
+
+## Identifier le gestionnaire de paquets et les dépôts
+
+<Step where="router-shell" title="Lire la version, la cible et l'architecture" expected="Vous pouvez écrire la combinaison complète version/cible/architecture.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+uname -m
+cat /etc/apk/arch 2>/dev/null
+opkg print-architecture 2>/dev/null
+```
+
+Champs clés : `release.version`, `release.target`, `DISTRIB_ARCH`, `release.revision`. Ils doivent correspondre au chemin du miroir.
+
+</Step>
+
+<Step where="router-shell" title="Inspecter les fichiers de dépôts actuels" expected="Vous savez où pointe chaque dépôt et s'il s'agit d'apk ou d'opkg.">
+
+OpenWrt 25.12 (apk) :
+
+```sh
+cat /etc/apk/repositories.d/distfeeds.list
+```
+
+OpenWrt 24.10 (opkg) :
+
+```sh
+cat /etc/opkg/distfeeds.conf
+cat /etc/opkg/customfeeds.conf
+```
+
+Sauvegardez avant de modifier :
+
+```sh
+cp /etc/apk/repositories.d/distfeeds.list /etc/apk/repositories.d/distfeeds.list.bak.$(date +%F) 2>/dev/null || true
+cp /etc/opkg/distfeeds.conf /etc/opkg/distfeeds.conf.bak.$(date +%F) 2>/dev/null || true
+```
+
+</Step>
+
+## L'organisation d'apk dans 25.12
+
+OpenWrt 25.12 utilise `apk` ; les index sont des `.adb`, les paquets des `.apk`. Dépôts typiques :
+
+- `targets/<target>/packages/packages.adb` : paquets propres à la cible ;
+- `packages/<arch>/base/packages.adb` : base ;
+- `packages/<arch>/luci/packages.adb` : LuCI ;
+- `packages/<arch>/packages/packages.adb` : paquets généraux ;
+- `packages/<arch>/routing|telephony|video/packages.adb` : dépôts par catégorie ;
+- `targets/<target>/kmods/<kernel-hash>/packages.adb` : modules du noyau ; le hash doit correspondre au noyau en cours d'exécution.
+
+Commandes :
+
+```sh
+apk update
+apk search <name>
+apk add <name>
+apk info -e <name>
+```
+
+N'utilisez pas `opkg` et ne renommez pas un `.ipk` de 24.10 en `.apk`.
+
+## L'organisation d'opkg dans 24.10
+
+OpenWrt 24.10 utilise `opkg` ; les index sont des `Packages.gz`, les paquets des `.ipk` :
+
+```sh
+opkg update
+opkg list | grep <name>
+opkg install <name>
+opkg list-installed | grep <name>
+```
+
+N'utilisez pas `apk` et ne donnez pas un `.apk` de 25.12 à opkg.
+
+## Réécrire vers un miroir chinois
+
+Pour le miroir TUNA, la racine est :
+
+```text
+https://mirrors.tuna.tsinghua.edu.cn/openwrt/
+```
+
+Remplacez uniquement `https://downloads.openwrt.org` par cette racine et **conservez tout le chemin** :
+
+```text
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/packages/packages.adb
+→ https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.6/targets/x86/64/packages/packages.adb
+```
+
+Ne vous arrêtez pas à `.../openwrt/` et ne supprimez pas `releases/25.12.6/targets/x86/64/...` ; un chemin incomplet renvoie 404.
+
+<Step where="router-shell" title="Vérifier le chemin du miroir avant de modifier" expected="curl renvoie 200 et le chemin correspond à la version/cible actuelle.">
+
+```sh
+curl -I https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.6/targets/x86/64/packages/packages.adb
+```
+
+Remplacez l'URL par votre version/cible ; pour les kmods, vérifiez aussi le hash du noyau. Si le miroir n'a pas le chemin, ne forcez pas.
+
+</Step>
+
+<Step where="router-shell" title="Mettre à jour uniquement les index, sans mettre à niveau le système" expected="apk/opkg update réussit sans mise à niveau en masse des paquets.">
+
+```sh
+apk update
+# or
+opkg update
+```
+
+Utilisez `apk search`/`opkg list` pour confirmer que le dépôt est lisible, puis installez uniquement ce dont vous avez besoin. **Ne considérez pas** `apk upgrade`/`opkg upgrade` comme une mise à jour du firmware ; utilisez sysupgrade/ASU/owut pour le firmware.
+
+</Step>
+
+## Échecs courants
+
+### 404
+
+- Mauvaise version (25.12.6 et 24.10.8) ;
+- Mauvaise cible (`x86/64`, et non un répertoire `x86_64`) ;
+- Mauvaise architecture (`x86_64`, `aarch64`) ;
+- Le miroir n'a pas synchronisé ce chemin ;
+- Répertoires `packages` et `targets` confondus.
+
+### Échecs de signature/vérification
+
+- Index corrompu ou version différente ;
+- Heure système ou certificats erronés ;
+- Un autre dépôt a été mélangé ;
+- Ne comptez pas sur `--allow-untrusted` ; corrigez plutôt le dépôt/la vérification.
+
+### Incompatibilité de dépendances/ABI
+
+- le hash du noyau des kmods ne correspond pas ;
+- paquet compilé pour une autre cible/architecture ;
+- dépôts officiels et ImmortalWrt/iStoreOS mélangés ;
+- Il vous faut la même source, la même version et la même architecture, ou une recompilation.
+
+### Commande introuvable
+
+- 25.12 n'a pas `opkg` ; 24.10 n'a pas `apk` ;
+- N'installez pas un gestionnaire de paquets juste pour exécuter une commande ; identifiez d'abord le firmware/la source.
+
+### Paquet installé mais LuCI ne l'affiche pas
+
+- Seul le paquet principal a été installé ; le paquet `luci-app-*` manque ;
+- Paquet de langue manquant ;
+- Cache du navigateur/actualisation ;
+- La version du paquet ne correspond pas à LuCI.
+
+## Récupération
+
+```sh
+# apk
+cp /etc/apk/repositories.d/distfeeds.list.bak.YYYY-MM-DD /etc/apk/repositories.d/distfeeds.list
+apk update
+
+# opkg
+cp /etc/opkg/distfeeds.conf.bak.YYYY-MM-DD /etc/opkg/distfeeds.conf
+opkg update
+```
+
+Si les mises à jour cessent de fonctionner après un changement de miroir, restaurez d'abord le dépôt officiel, vérifiez le DNS, l'heure et les certificats, puis réessayez le miroir. Ne sautez pas d'un miroir à l'autre.
+
+## Essai en laboratoire E2 (2026-10-20)
+
+- Environnement : VM x86 OpenWrt 25.12.6 200 ; `apk` ; dépôt officiel et miroir TUNA.
+- `apk update` officiel : `OK: 11220 distinct packages available` ; `apk search -x sqm-scripts` a trouvé `sqm-scripts-1.7.2-r1`.
+- Passage à TUNA : `apk update` également 11220 ; `apk add sqm-scripts` a installé `1.7.2-r1`.
+- Retour au dépôt officiel : `apk update` a fonctionné ; le dépôt final est revenu sur `downloads.openwrt.org`.
+- Non testé : `opkg` de 24.10, erreurs de signature, dépôts mélangés/incompatibilité ABI, index de miroir corrompu.
+- Recette : `tests/recipes/package-sources.md`.
+
+## Statut E2 et sources
+
+- Ceci est un E2 partiel : le chemin `apk` de 25.12 (officiel/TUNA/installation/restauration) a été testé ; `opkg` et les branches de dépôt défaillant restent de la documentation.
+- Les chemins des miroirs changent avec les versions ; relancez `update`/`search` sur la version/cible/architecture visée avant de publier.
+- Ne mélangez pas les dépôts officiels, ImmortalWrt ou iStoreOS ; l'ABI, le noyau et les signatures peuvent tous être incompatibles.
+
+<TestRecord
+  status="partial"
+  environment="VM x86 OpenWrt 25.12.6 200 ; dépôts officiel/TUNA, apk update/search/install, retour à l'officiel"
+  recipe="tests/recipes/package-sources.md"
+  result="E2 partiel : le dépôt officiel de 25.12.6 x86 a signalé 11220 paquets ; TUNA également 11220 ; sqm-scripts 1.7.2 installé ; le retour au dépôt officiel s'est mis à jour normalement ; opkg 24.10 non testé"
+/>
+
+<PageSources />

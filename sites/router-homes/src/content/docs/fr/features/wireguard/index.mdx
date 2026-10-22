@@ -1,0 +1,53 @@
+---
+title: "WireGuard sur OpenWrt : un VPN noyau configuré comme une interface réseau"
+description: "WireGuard est dans le noyau Linux principal depuis la 5.6 ; sur OpenWrt, c'est un protocole réseau que vous configurez comme n'importe quelle interface. Paquets, emplacement et vérification."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt wireguard", "openwrt vpn", "wireguard router", "wireguard routeur", "vpn openwrt"]
+sources:
+  - label: "Linux 5.6 (kernelnewbies)"
+    url: https://kernelnewbies.org/Linux_5.6
+  - label: "Bases de WireGuard sur OpenWrt"
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/basics
+  - label: "Paquet wireguard-tools (OpenWrt 25.12)"
+    url: https://github.com/openwrt/openwrt/tree/openwrt-25.12/package/network/utils/wireguard-tools
+sourceHash: '485bb9713a3b4791'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="wireguard" />
+
+## En une phrase
+
+WireGuard fait partie du noyau Linux principal depuis la 5.6, publiée le 2020-03-29. Sur OpenWrt, c'est un protocole réseau nommé `wireguard`, que vous configurez comme n'importe quelle autre interface.
+
+## Les éléments
+
+- `kmod-wireguard` : le module noyau.
+- `wireguard-tools` : la commande `wg`. Il dépend du module noyau et enregistre le protocole `wireguard` auprès de netifd.
+- `luci-proto-wireguard` : ajoute « WireGuard VPN » comme protocole lorsque vous créez une interface dans LuCI.
+
+## À quoi cela sert à la maison
+
+- **Serveur :** accéder à votre réseau domestique depuis l'extérieur.
+- **Client :** envoyer tout le trafic du routeur, ou une partie, par un pair distant.
+
+Dans les deux cas, le tunnel est une interface dans `/etc/config/network`. Il a besoin d'une zone de pare-feu et, sur un serveur, d'un port UDP ouvert sur le WAN.
+
+## Le voir sur votre routeur
+
+```sh
+wg show
+uci show network | grep wireguard
+```
+
+## Guides associés
+
+- [Serveur WireGuard](/fr/remote-access/wireguard-server/)
+- [Client WireGuard](/fr/remote-access/wireguard-client/)
+- [firewall4 et les zones](/fr/features/firewall4/)
+
+<PageSources />

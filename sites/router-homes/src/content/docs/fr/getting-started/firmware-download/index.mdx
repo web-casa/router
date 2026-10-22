@@ -1,0 +1,208 @@
+---
+title: "Avant de télécharger un micrologiciel : modèle, révision, target/profile et récupération"
+description: Confirmez le modèle et la révision exacts, la target, le profile, le type d'image et la méthode de récupération avec des vérifications en lecture seule avant de télécharger ou de flasher un micrologiciel.
+pageType: overview
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Appareil précis à déterminer ; liste de vérification en lecture seule, sans flashage'
+testRecipe: 'tests/recipes/firmware-download-check.md'
+aliases: ['openwrt firmware download', 'openwrt model', 'openwrt hardware revision', 'sysupgrade image', 'factory image', 'télécharger firmware openwrt', 'quelle image openwrt choisir']
+symptoms: ['mauvais micrologiciel', 'je ne sais pas quelle image choisir', 'modèle incompatible', 'échec de la somme de contrôle']
+sources:
+  - label: Sélecteur de micrologiciel OpenWrt
+    url: https://firmware-selector.openwrt.org/
+  - label: Documentation OpenWrt sur sysupgrade
+    url: https://openwrt.org/docs/guide-user/installation/sysupgrade
+  - label: Notes de version OpenWrt 25.12
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: Pages des appareils OpenWrt
+    url: https://openwrt.org/toh/start
+sourceHash: 'c06b58c12c079954'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="—" device="appareil à déterminer" tested={false} evidence="E1" />
+
+## Résultat
+
+- Connaître le modèle exact et la révision matérielle, et non un modèle qui « ressemble ».
+- Connaître la target/subtarget/profile OpenWrt et l'image à télécharger.
+- Choisir correctement entre `sysupgrade`, `factory` et une image x86 combinée.
+- Vérifier la source du fichier et sa somme de contrôle.
+- Connaître la méthode de récupération avant de flasher, et la marche à suivre en cas d'échec.
+
+> Ceci est une liste de vérification avant téléchargement, pas un guide de flashage. Le flashage direct sur la mémoire, la récupération du bootloader et les migrations entre versions majeures sont de niveau R2 : appuyez-vous sur une relecture indépendante et sur la documentation de l'appareil. Ne considérez pas cette page comme un tutoriel de flashage universel.
+
+## Commencer par l'étiquette
+
+<Step where="client" title="Noter le modèle et la révision matérielle" expected="Le modèle, la révision, la région et les détails de l'étiquette sont notés.">
+
+Examinez l'étiquette du dessous, la boîte et le manuel ; notez :
+
+- le fabricant et le modèle complet (pas seulement la série) ;
+- la révision matérielle (v1, v2, V2.1, etc.) ;
+- la région ou la variante opérateur ;
+- l'identifiant FCC et le préfixe du numéro de série s'ils sont présents (ne les publiez pas) ;
+- la méthode de récupération (bouton reset, TFTP, série, outil du fabricant).
+
+Un même modèle peut avoir plusieurs révisions avec des mémoires flash, des puces Wi-Fi ou des partitions différentes. **Un même nom de modèle ne signifie pas une image universelle unique.**
+
+</Step>
+
+<Step where="router-shell" title="Sous OpenWrt existant, lire les données de la carte" expected="distribution/target/model/board_name correspondent à la page de l'appareil.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+cat /tmp/sysinfo/model 2>/dev/null
+cat /tmp/sysinfo/board_name 2>/dev/null
+```
+
+Champs clés : `release.distribution`, `release.version`, `release.target`, `model`, `board_name`. `model` n'est pas la révision matérielle ; ne choisissez pas une image d'après cette seule ligne.
+
+</Step>
+
+<Step where="router-shell" title="Sur x86, lire le DMI/BIOS" expected="Vous connaissez le modèle de carte ou d'appareil et ne confondez pas images de PC et de VM.">
+
+```sh
+cat /sys/class/dmi/id/sys_vendor
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/board_version
+cat /sys/class/dmi/id/bios_version
+```
+
+Confirmez aussi BIOS/Legacy ou UEFI, l'interface du disque et si l'image est combinée/ext4. Ces éléments déterminent si le système démarre ; « x86/64 » seul ne suffit pas.
+
+</Step>
+
+## Consulter le sélecteur de micrologiciel
+
+<Step where="client" title="Choisir d'après la target/profile, pas d'après le nom de fichier" expected="Vous trouvez la page exacte de l'appareil et l'image correspondante.">
+
+Ouvrez le [sélecteur de micrologiciel OpenWrt](https://firmware-selector.openwrt.org/) :
+
+1. Sélectionnez la bonne version (par ex. 25.12.6).
+2. Recherchez le modèle complet et ouvrez sa page d'appareil.
+3. Vérifiez la target/subtarget, le profile et la révision matérielle.
+4. Lisez la section « Installation » de la page de l'appareil pour connaître les types d'image de première installation et de mise à niveau.
+5. Téléchargez et vérifiez le SHA-256 ; ne vous contentez pas de renommer un fichier.
+
+Si le sélecteur et la page de l'appareil ne concordent pas, arrêtez-vous et vérifiez le modèle et la révision ; ne choisissez pas la correspondance la plus proche.
+
+</Step>
+
+## Types d'image
+
+| Image/scénario | Usage | Risque principal |
+|---|---|---|
+| `sysupgrade` | OpenWrt existant, mise à niveau avec ou sans configuration | incompatibilité entre versions, de paquets ou de modules du noyau |
+| `factory` / transition depuis le micrologiciel constructeur | Première installation depuis le micrologiciel constructeur | une méthode de partition ou de flashage inadaptée peut briquer l'appareil |
+| x86 combinée/ext4 | Image x86 de disque entier ou VM | BIOS/UEFI, organisation du disque, méthode d'écriture |
+| micrologiciel constructeur | Interface web ou outil de récupération du fabricant | ne pas mélanger avec des images OpenWrt |
+| paquets « universels/sans démontage » | Source inconnue | à éviter ; target, profile et somme de contrôle ne peuvent pas être vérifiés |
+
+Un nom de fichier contenant `sysupgrade` ne prouve rien ; la target, le profile, la révision et la somme de contrôle doivent tous correspondre.
+
+## Télécharger et vérifier
+
+<Step where="client" title="Utiliser uniquement des sources officielles ou celles du fabricant" expected="La source du fichier est traçable et fournit une somme de contrôle.">
+
+Privilégiez :
+
+- `downloads.openwrt.org` d'OpenWrt ou le sélecteur de micrologiciel ;
+- la page de téléchargement officielle du fabricant de l'appareil ;
+- la page officielle des versions d'un projet (un micrologiciel tiers exige des vérifications supplémentaires du mainteneur et de la signature).
+
+N'utilisez pas de miroirs de stockage cloud, de pièces jointes de forum ni de paquets « pré-modifiés » reçus par messagerie. Les paquets reconditionnés peuvent contenir des scripts, d'anciens noyaux ou des pilotes inadaptés.
+
+</Step>
+
+<Step where="client" title="Vérifier le SHA-256 et la taille du fichier" expected="La somme de contrôle correspond à celle de la page officielle de la version.">
+
+Linux :
+
+```sh
+sha256sum openwrt-*.img.gz
+```
+
+macOS :
+
+```sh
+shasum -a 256 openwrt-*.img.gz
+```
+
+Windows :
+
+```powershell
+certutil -hashfile openwrt-*.img.gz SHA256
+```
+
+Comparez avec `sha256sums` officiel ou la page de la version. En cas de différence, téléchargez à nouveau ; ne « flashez pas pour voir ».
+
+</Step>
+
+## Récupération avant le flashage
+
+<Step where="client" title="Noter la méthode de récupération" expected="Vous savez comment entrer en mode failsafe ou de récupération si le flashage échoue.">
+
+Confirmez au minimum :
+
+- comment entrer en failsafe (durée d'appui sur le bouton, liaison série, IP) ;
+- si la récupération par TFTP, liaison série ou outil du fabricant est disponible ;
+- l'adresse LAN d'administration, la passerelle et le mot de passe root ;
+- la sauvegarde de la configuration : `sysupgrade -b` sur un OpenWrt existant, ou l'export du fabricant ;
+- les paquets et modules du noyau installés à reconstruire après la mise à niveau ;
+- une alimentation stable ; ne débranchez pas pendant le flashage.
+
+Pas de méthode de récupération, pas de somme de contrôle, pas de sauvegarde : ne commencez pas.
+
+</Step>
+
+## Erreurs courantes
+
+- Vérifier uniquement le modèle, pas la révision ;
+- utiliser une image `sysupgrade` comme `factory`, ou l'inverse ;
+- renommer l'image d'une autre target et la flasher ;
+- continuer malgré une somme de contrôle incorrecte ;
+- utiliser des paquets « universels/étendus » inconnus ;
+- perdre l'alimentation ou débrancher le câble pendant le flashage ;
+- supposer que tout a réussi sans vérifier le DNS, le pare-feu et les paquets après la mise à niveau.
+
+## Cas d'échec
+
+### Mauvais modèle téléchargé
+
+Supprimez-le et téléchargez depuis la page de l'appareil ; ne « tentez pas ». S'il est déjà flashé, suivez la documentation de récupération de l'appareil (failsafe/TFTP/série) ; ne continuez pas à flasher d'autres images.
+
+### Somme de contrôle incorrecte
+
+Téléchargez à nouveau ; vérifiez qu'un proxy ou un miroir n'a pas tronqué le fichier ; passez à la source officielle. Ne désactivez pas la vérification.
+
+### Votre révision n'est pas listée
+
+Consultez la page du fabricant, l'étiquette, le forum OpenWrt ou la page de l'appareil. Sans prise en charge explicite, ne supposez pas la compatibilité.
+
+### Le micrologiciel constructeur est verrouillé
+
+Suivez la procédure du fabricant ; ne contournez pas les signatures ou verrous uniquement pour installer OpenWrt. Confirmez d'abord les compromis sur la garantie et les fonctions du fabricant.
+
+## Statut E1 et sources
+
+- Il s'agit d'un E1 : les champs, les types d'image et la récupération reposent sur la documentation publique ; aucun téléchargement ni flashage n'a été effectué sur un appareil.
+- Le modèle et la révision proviennent de l'étiquette et de la page du fabricant ; ne généralisez pas l'expérience d'une VM x86 aux routeurs.
+- Recette : `tests/recipes/firmware-download-check.md` ; les étapes de flashage sont hors périmètre.
+
+<TestRecord
+  status="planned"
+  environment="Appareil précis à déterminer ; liste de vérification en lecture seule, sans flashage"
+  recipe="tests/recipes/firmware-download-check.md"
+  result="E1 : modèle/révision, target/profile, types d'image, sommes de contrôle et méthode de récupération documentés ; non exécuté sur un appareil"
+/>
+
+<PageSources />

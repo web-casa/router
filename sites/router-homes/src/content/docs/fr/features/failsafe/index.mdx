@@ -1,0 +1,58 @@
+---
+title: "Mode failsafe et sysupgrade : les retours en arrière intégrés d'OpenWrt"
+description: "Le mode failsafe démarre OpenWrt avec une configuration minimale sur 192.168.1.1 pour que vous puissiez le réparer ; sysupgrade conserve vos réglages sauf indication contraire. Comment fonctionne chacun."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt failsafe", "openwrt recovery mode", "sysupgrade keep settings", "openwrt mode de récupération", "openwrt mode secours"]
+sources:
+  - label: "Failsafe et réinitialisation d'usine d'OpenWrt"
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+  - label: "Source de sysupgrade (OpenWrt 25.12)"
+    url: https://github.com/openwrt/openwrt/blob/openwrt-25.12/package/base-files/files/sbin/sysupgrade
+  - label: "Sauvegarde et restauration d'OpenWrt"
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+sourceHash: '9ab880000b82bb47'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="failsafe" />
+
+## En une phrase
+
+Le mode failsafe démarre OpenWrt avec une configuration minimale et connue sur `192.168.1.1`, pour que vous puissiez réparer une configuration défaillante. sysupgrade remplace le firmware et conserve votre configuration, sauf si vous lui demandez de ne pas le faire.
+
+## Mode failsafe
+
+- **Comment y entrer :** pendant le démarrage, il existe une fenêtre de 2 à 4 secondes. Appuyez alors sur presque n'importe quel bouton de l'appareil, ou appuyez sur `f` puis Entrée sur une console série.
+- **Ce que vous obtenez :** le routeur démarre sur `192.168.1.1/24` avec le DHCP et le sans-fil désactivés et seulement les services essentiels en cours d'exécution. Donnez à votre ordinateur une adresse statique dans ce sous-réseau, puis connectez-vous en SSH.
+- **Ce que vous pouvez faire :** exécutez `mount_root` pour monter l'overlay et réparer des fichiers, ou réinitialisez tous les réglages avec `firstboot && reboot`.
+- Le mode failsafe nécessite une image SquashFS.
+
+## sysupgrade
+
+- Il conserve la configuration par défaut. `-n` flashe sans la conserver.
+- `sysupgrade -b <file>` écrit une sauvegarde `.tar.gz` des fichiers listés dans `sysupgrade.conf`. `-r <file>` en restaure une, et `-l` liste ce qui serait sauvegardé.
+
+## Voir cela sur votre routeur
+
+Cette commande est en lecture seule :
+
+```sh
+sysupgrade -l | head
+```
+
+## Attention
+
+- Une réinitialisation d'usine efface tous les réglages, faites donc d'abord une sauvegarde.
+- Le mode failsafe ne fournit pas de DHCP. Sans IP statique sur votre ordinateur, on dirait que le routeur est mort.
+
+## Guides associés
+
+- [Impossible d'accéder à LuCI](/fr/troubleshooting/no-web-ui/)
+- [Sauvegarde et restauration](/fr/recovery/backup-restore/)
+- [Mise à niveau du firmware](/fr/recovery/firmware-upgrade/)
+
+<PageSources />

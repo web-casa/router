@@ -1,0 +1,53 @@
+---
+title: "SQM et CAKE sur OpenWrt : une faible latence quand la ligne est saturée"
+description: "SQM met en forme le trafic juste en dessous du débit de la ligne pour que les files restent courtes ; avec CAKE, il combat le bufferbloat. Les réglages recommandés par le guide OpenWrt."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt sqm", "openwrt cake", "bufferbloat openwrt", "openwrt latence", "openwrt qos"]
+sources:
+  - label: "Guide SQM d'OpenWrt"
+    url: https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm
+  - label: "Linux 4.19 (kernelnewbies)"
+    url: https://kernelnewbies.org/Linux_4.19
+  - label: "CAKE (bufferbloat.net)"
+    url: https://www.bufferbloat.net/projects/codel/wiki/Cake/
+sourceHash: '97230357bbbdc535'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="sqm" />
+
+## En une phrase
+
+SQM (Smart Queue Management) met en forme le trafic légèrement en dessous du débit de votre ligne, de sorte que la file se forme dans le routeur, où elle peut être gérée, plutôt que dans le modem. Utilisé avec la discipline de file CAKE, il maintient une faible latence quand la ligne est occupée. Ce problème s'appelle le bufferbloat.
+
+## Ce que recommande le guide OpenWrt
+
+1. Installez `luci-app-sqm`, ou `sqm-scripts` si vous n'utilisez pas LuCI.
+2. Mesurez votre débit réel en téléchargement et en envoi, puis réglez les deux à **90 %** de la valeur mesurée.
+3. Choisissez `cake` avec `piece_of_cake.qos`.
+4. Testez de nouveau sous charge et ajustez. `fq_codel` avec `simple.qos` est l'alternative plus légère mais moins complète.
+
+CAKE fait partie du noyau Linux depuis la version 4.19.
+
+## Voir cela sur votre routeur
+
+Après l'installation de SQM :
+
+```sh
+cat /etc/config/sqm
+```
+
+## Attention
+
+- La mise en forme consomme du CPU. Sur une ligne rapide, un petit routeur peut ne pas suivre, comparez donc le débit et la latence avant et après.
+- Réglez les débits à partir d'une mesure, pas à partir du débit annoncé de votre abonnement.
+
+## Guides associés
+
+- [SQM / CAKE](/fr/software/sqm/)
+
+<PageSources />

@@ -1,0 +1,230 @@
+---
+title: "Accès WireGuard à la maison : serveur, pair, pare-feu et vérification du tunnel"
+description: "Configurez un serveur WireGuard, un pair et le pare-feu sur OpenWrt 25.12, puis vérifiez la poignée de main, l'IP du tunnel et HTTP ; la redirection de port WAN, le DDNS et l'itinérance d'un vrai téléphone sont des vérifications distinctes."
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'VM OpenWrt 25.12.6 x86 n° 200 + client netns PVE ; wg0 10.10.0.1/24, UDP 51820 ; poignée de main/ping/HTTP réussis ; pas de redirection de port WAN/DDNS/itinérance téléphone'
+testRecipe: 'tests/recipes/wireguard-server-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt wireguard', 'openwrt wireguard server', 'wireguard home access', 'openwrt wg0', 'openwrt serveur wireguard', 'wireguard accès à distance']
+symptoms: ['wireguard pas de handshake', 'wg0 absent', 'wireguard ne se connecte pas', 'le ping dans le tunnel échoue']
+sources:
+  - label: Serveur WireGuard d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/server
+  - label: Démarrage rapide de WireGuard
+    url: https://www.wireguard.com/quickstart/
+  - label: Pare-feu d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: Protocole WireGuard
+    url: https://www.wireguard.com/protocol/
+sourceHash: '37c1b278e3300bba'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="VM PVE 200 + netns PVE" tested={true} evidence="E2" />
+
+## Périmètre
+
+Cette page vérifie :
+
+- la création d'une interface serveur WireGuard `wg0` sur OpenWrt ;
+- l'ajout d'un pair client ;
+- le placement de `wg0` dans la zone de pare-feu LAN ;
+- la poignée de main, le ping de l'IP du tunnel et LuCI à travers le tunnel.
+
+Elle ne vérifie **pas** :
+
+- la redirection de port UDP WAN publique/le pare-feu ;
+- le DDNS/nom de domaine ;
+- l'itinérance d'un client téléphone/Windows ;
+- le transfert/NAT vers tout le LAN.
+
+Cela dépend de l'environnement de déploiement ; ce test sur le LAN n'en tient pas lieu.
+
+## Topologie
+
+```text
+Client 192.168.1.251
+   │  vmbr5 (lab LAN)
+   ▼
+OpenWrt VM 200 192.168.1.2
+   wg0 10.10.0.1/24, UDP 51820
+   │
+   └── tunnel 10.10.0.0/24
+       client wg0 10.10.0.2/24
+```
+
+Dans un véritable accès depuis la maison, le client est sur internet ; le WAN d'OpenWrt doit transférer/autoriser l'UDP 51820. Ce laboratoire ne couvre que le côté LAN.
+
+## Préparation
+
+<Step where="router-shell" title="Confirmez le noyau et les outils" expected="wg existe et le module wireguard est chargé.">
+
+```sh
+apk add wireguard-tools kmod-wireguard
+wg --version
+cat /proc/modules | grep wireguard
+```
+
+Ce laboratoire : `wireguard-tools v1.0.20260223` ; module `wireguard` chargé.
+
+</Step>
+
+<Step where="router-shell" title="Générez les clés du serveur (ne les collez jamais dans un chat ou un dépôt)" expected="La clé privée reste sur l'appareil ; la clé publique va au client.">
+
+```sh
+umask 077
+wg genkey > /tmp/wg-server.key
+wg pubkey < /tmp/wg-server.key > /tmp/wg-server.pub
+cat /tmp/wg-server.pub   # only the public key goes to the client
+```
+
+Le client génère aussi sa propre paire de clés ; **n'envoyez jamais sa clé privée au serveur**. Le serveur n'a besoin que de la clé publique du client.
+
+</Step>
+
+## Configurer le serveur
+
+<Step where="router-shell" title="Créez wg0 et le pair" expected="netifd voit proto=wireguard et wg0 a son adresse.">
+
+```sh
+uci set network.wg0=interface
+uci set network.wg0.proto='wireguard'
+uci set network.wg0.private_key='<server-private-key>'
+uci set network.wg0.listen_port='51820'
+uci set network.wg0.addresses='10.10.0.1/24'
+uci set network.wg0.auto='1'
+
+uci set network.wg0_client=wireguard_wg0
+uci set network.wg0_client.public_key='<client-public-key>'
+uci set network.wg0_client.allowed_ips='10.10.0.2/32'
+uci set network.wg0_client.persistent_keepalive='25'
+
+uci commit network
+/etc/init.d/network restart
+```
+
+Les noms comptent :
+
+- section d'interface `wg0`, type de pair `wireguard_wg0` ; les suffixes doivent correspondre ;
+- dans ce laboratoire, nommer l'interface `wg` a fait signaler `proto: none` par netifd et le périphérique `wg0` était absent ; la renommer en `wg0` a corrigé le problème. **Utilisez wg0.**
+
+Vérifiez :
+
+```sh
+wg show
+ip -4 addr show wg0
+ubus call network.interface.wg0 status
+```
+
+</Step>
+
+<Step where="router-shell" title="Pare-feu : placez wg0 dans la zone LAN" expected="L'UDP 51820 est joignable et les IP du tunnel peuvent communiquer.">
+
+```sh
+uci show firewall | grep -E "zone.*name|zone.*network"
+uci add_list firewall.@zone[0].network='wg0'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+`@zone[0]` était la zone LAN dans ce laboratoire ; votre index peut différer — trouvez la section avec `name='lan'`.
+
+Après l'ajout de `wg0` au LAN, le client pouvait envoyer un ping à `10.10.0.1` et accéder à LuCI.
+
+</Step>
+
+## Vérification minimale du client
+
+La configuration du client est décrite dans la page 022. Sur le serveur :
+
+```sh
+wg show
+```
+
+Une fois la poignée de main du client effectuée, le serveur doit afficher :
+
+```text
+peer: <client-public-key>
+  endpoint: 192.168.1.251:44421
+  allowed ips: 10.10.0.2/32
+  latest handshake: ...
+  transfer: ...
+```
+
+Client de ce laboratoire :
+
+- poignée de main il y a 3 secondes ;
+- `transfer 124 B received, 180 B sent` ;
+- ping de `10.10.0.1` 4/4 ;
+- HTTP `http://10.10.0.1/` a renvoyé LuCI.
+
+## Ce qu'il faut encore pour un vrai WAN
+
+- IP publique/redirection de port : UDP 51820 du WAN → OpenWrt ;
+- le pare-feu en entrée du WAN autorise cet UDP ;
+- DDNS/nom d'hôte fixe ;
+- l'`Endpoint` du client utilise l'adresse publique, pas 192.168.1.2 ;
+- pour accéder à tout le LAN, les `allowed_ips` du pair côté serveur et les `AllowedIPs` du client doivent inclure le préfixe du LAN, ainsi que le routage de retour/NAT ;
+- ne confondez pas « l'IP du tunnel répond au ping » avec « tout le LAN de la maison est joignable ».
+
+## Défaillances courantes
+
+### wg0 absent / proto none
+
+- le nom de la section d'interface et le suffixe du type de pair ne correspondent pas ;
+- `wireguard-tools`/`kmod-wireguard` manquants ;
+- le réseau n'a pas été redémarré ;
+- vérifiez `wg show`, `ubus status`, `logread`.
+
+### Pas de poignée de main
+
+- clés publiques du client et du serveur inversées ;
+- mauvais endpoint/port ;
+- le pare-feu n'autorise pas l'UDP ;
+- permissions/contenu de la clé privée incorrects ;
+- WireGuard ne dépend pas de la synchronisation de l'horloge pour les poignées de main, mais une mauvaise clé échoue quand même.
+
+### Le ping dans le tunnel échoue
+
+- `allowed_ips` n'inclut pas l'IP du tunnel du pair ;
+- l'interface n'a pas d'adresse / est inactive ;
+- zone de pare-feu ;
+- la route du client envoie l'endpoint lui-même dans le tunnel (boucle).
+
+### L'IP du tunnel répond mais le LAN est injoignable
+
+- les AllowedIPs du client n'incluent pas le préfixe du LAN ;
+- le serveur n'a pas de transfert/NAT/route de retour ;
+- le transfert du pare-feu n'est pas autorisé ;
+- ne confondez pas un tunnel qui fonctionne avec un LAN qui fonctionne.
+
+## Essai en laboratoire E2 (2026-10-20)
+
+- Environnement : VM OpenWrt 25.12.6 x86 n° 200 ; `wg0` `10.10.0.1/24`, UDP 51820 ; client netns PVE `10.10.0.2/24`.
+- Serveur : `wg show` listait le pair, la poignée de main a réussi, transfert 1,47 KiB/1,90 KiB ; `wg0` actif.
+- Client : poignée de main, ping du tunnel 4/4, HTTP 200 (LuCI).
+- Non testé : redirection de port/pare-feu WAN, DDNS, téléphone/Windows, transfert LAN, NAT/route de retour.
+- Recette : `tests/recipes/wireguard-server-25.12.md`.
+
+## Sources et relecture
+
+- Il s'agit d'un E2 partiel : le serveur côté LAN et le tunnel ont été testés ; le vrai WAN, les clients mobiles et le transfert LAN ne l'ont pas été.
+- Les clés privées restent sur les appareils ; ne les mettez jamais dans le dépôt, les captures d'écran ou un chat.
+- Aucun relecteur indépendant ; les conclusions se limitent à cet environnement VM/netns.
+
+<TestRecord
+  status="partial"
+  environment="VM OpenWrt 25.12.6 x86 n° 200 + client netns PVE ; wg0 10.10.0.1/24, UDP 51820 ; poignée de main/ping/HTTP réussis ; pas de redirection de port WAN/DDNS/itinérance téléphone"
+  recipe="tests/recipes/wireguard-server-25.12.md"
+  result="E2 partiel : serveur wg0 10.10.0.1/24 sur UDP 51820 ; le client 10.10.0.2/24 a fait la poignée de main, ping du tunnel 4/4, HTTP 200 ; redirection de port WAN, DDNS, vrai téléphone/itinérance et transfert LAN non testés"
+  date="2026-10-20"
+/>
+
+<PageSources />

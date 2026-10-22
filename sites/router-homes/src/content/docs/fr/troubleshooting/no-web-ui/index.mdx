@@ -1,0 +1,243 @@
+---
+title: "LuCI inaccessible : IP, port, DHCP et récupération par la console"
+description: Remontez du port LAN et de l'adresse du client jusqu'à la véritable IP de gestion, uhttpd, SSH et pare-feu, et gardez la console et le mode failsafe comme voies de récupération sans réinitialisation d'usine à l'aveugle.
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'VM x86 200 sous OpenWrt 25.12.6 ; arrêt/reprise d’uhttpd, test HTTP 80, SSH conservé'
+testRecipe: 'tests/recipes/troubleshooting-no-web-ui.md'
+aliases: ['openwrt impossible d’ouvrir luci', 'luci ne se charge pas', '192.168.1.1 ne fonctionne pas', 'openwrt inaccessible', 'openwrt cannot open luci']
+symptoms: ['impossible d’ouvrir 192.168.1.1', 'la page de connexion expire', 'accès perdu après un changement du LAN', 'aucune adresse DHCP']
+sources:
+  - label: Failsafe et réinitialisation d'usine OpenWrt
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+  - label: Notions essentielles de LuCI sous OpenWrt
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: Configuration réseau OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: DHCP et DNS OpenWrt
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+sourceHash: 'bfd0c331078d3002'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="VM x86 200 sous OpenWrt 25.12.6" tested={true} evidence="E2" />
+
+## Résultat attendu
+
+- Déterminer si le problème vient du lien physique, de l'adresse du client, de l'IP de gestion, du service HTTP ou de SSH/pare-feu.
+- Savoir si LuCI écoute réellement, sans modifier la configuration.
+- Récupérer l'accès avec une adresse statique côté client, la console ou le mode failsafe, plutôt qu'une réinitialisation d'usine à l'aveugle.
+- Savoir quand s'arrêter, sauvegarder ou consulter la documentation de l'appareil.
+
+## Tableau de diagnostic
+
+| Symptôme | À vérifier d'abord | À ne pas faire d'abord |
+|---|---|---|
+| Aucune LED de lien | câble, port LAN, alimentation | reflasher le firmware |
+| Le client a une adresse 169.254.x.x | DHCP/câble/port LAN | changer le LAN du routeur |
+| Le ping fonctionne, pas le web | 80/443, uhttpd, pare-feu, HTTPS | réinitialisation d'usine |
+| Le ping échoue | sous-réseau du client, IP de gestion, VLAN/port | continuer à changer d'IP |
+| SSH fonctionne, pas LuCI | uhttpd/paquet LuCI/port | modifier la configuration réseau |
+| Aucune sortie sur la console | paramètres série, sortie vidéo, alimentation | court-circuiter des broches ou reflasher à l'aveugle |
+
+## Couche 1 : port physique et lien
+
+<Step where="client" title="Utilisez un port LAN, pas le WAN" expected="La LED LAN est allumée et le client détecte un lien.">
+
+Branchez-vous sur un port marqué **LAN** ; le port WAN ne donne généralement pas accès à la gestion. Essayez un autre câble et un autre port LAN ; vérifiez les LED et l'état de la carte réseau du client.
+
+Si la LED ne s'allume jamais, vérifiez l'alimentation, le câble et le port avant de toucher au firmware.
+
+</Step>
+
+## Couche 2 : adresse du client et passerelle
+
+<Step where="client" title="Vérifiez que le client est dans le sous-réseau LAN" expected="Le client a 192.168.1.x ou une autre adresse LAN connue.">
+
+Linux :
+
+```sh
+ip addr show
+ip route
+```
+
+Windows :
+
+```powershell
+ipconfig /all
+```
+
+macOS :
+
+```sh
+ifconfig
+netstat -rn
+```
+
+Une adresse `169.254.x.x` signifie que le DHCP a échoué. Vérifiez d'abord le câble et le port LAN, puis définissez une adresse statique temporaire :
+
+- IP : `192.168.1.2`
+- Masque : `255.255.255.0`
+- Passerelle : `192.168.1.1`
+
+Utilisez-la uniquement pour vous connecter ; évitez tout conflit avec l'adresse LAN du routeur.
+
+</Step>
+
+<Step where="client" title="Faites un ping vers la passerelle" expected="Elle répond, ou vous savez que l'IP de gestion n'est pas 192.168.1.1.">
+
+```sh
+ping 192.168.1.1
+```
+
+- Réponse : passez à la couche 3.
+- Pas de réponse : vérifiez le sous-réseau du client, le port LAN et si l'adresse par défaut a été modifiée.
+- Ne déclarez pas l'appareil mort sur la seule base d'un ping échoué.
+
+</Step>
+
+## Couche 3 : l'IP de gestion a-t-elle été modifiée ?
+
+<Step where="client" title="Trouvez la véritable adresse LAN" expected="Vous avez au moins deux adresses candidates et vous les testez.">
+
+Sources courantes :
+
+- l'étiquette de l'appareil ou le manuel ;
+- une configuration ou une capture d'écran enregistrée ;
+- la table des baux DHCP du routeur amont, s'il est accessible ;
+- `uci show network` sur la console ;
+- une adresse LAN que vous avez modifiée vous-même.
+
+Sur **votre propre sous-réseau**, consultez le cache ARP :
+
+```sh
+ip neigh
+```
+
+Ne scannez pas largement un réseau inconnu et ne devinez pas un appareil à partir des résultats d'un scan.
+
+</Step>
+
+## Couche 4 : HTTP/HTTPS et SSH
+
+<Step where="client" title="Distinguez « le ping fonctionne mais pas le web » d'une panne de lien" expected="Vous savez s'il s'agit d'un problème de port, de service ou de protocole.">
+
+```sh
+curl -v http://192.168.1.1/
+curl -k -v https://192.168.1.1/
+ssh root@192.168.1.1
+```
+
+- HTTP et HTTPS expirent tous deux : uhttpd/LuCI n'écoute pas, ou le pare-feu le bloque.
+- HTTP 404 ou redirection : problème de port, de chemin ou de configuration HTTPS.
+- SSH fonctionne : diagnostiquez les services via SSH ; ne modifiez pas le LAN.
+
+</Step>
+
+<Step where="router-shell" title="Si SSH fonctionne, inspectez uhttpd et les ports" expected="Vous savez si LuCI tourne et si les ports 80/443 écoutent.">
+
+```sh
+netstat -lnp | grep -E ':80|:443|:22'
+ps w | grep -E 'uhttpd|rpcd' | grep -v grep
+logread -e uhttpd | tail -30
+uci show uhttpd
+```
+
+Si uhttpd ne tourne pas, essayez :
+
+```sh
+/etc/init.d/uhttpd restart
+```
+
+Si cela échoue encore, lisez les journaux et le pare-feu ; ne redémarrez pas le réseau entier à répétition.
+
+</Step>
+
+<Step where="router-shell" title="Vérifiez si le pare-feu bloque la gestion" expected="Le trafic du LAN vers les ports 80/443/22 du routeur n'est pas bloqué par erreur.">
+
+```sh
+uci show firewall
+logread | grep -i firewall | tail -20
+```
+
+Si vous venez de modifier une zone du pare-feu, restaurez la sauvegarde ou corrigez-la depuis la console ; ne continuez pas à la modifier sans accès à la console.
+
+</Step>
+
+## Couche 5 : console locale / failsafe
+
+<Step where="console" title="Vérifiez depuis la console que le système est actif" expected="Vous voyez une invite de connexion ou le journal du noyau.">
+
+Utilisez le port série, HDMI/clavier, IPMI ou une console cloud. Le port série est souvent en `115200 8N1`, mais vérifiez pour votre appareil. S'il n'y a aucune sortie, vérifiez d'abord le câble, la vitesse en bauds et l'alimentation.
+
+Une fois connecté :
+
+```sh
+ip addr show
+ip route
+uci show network
+uci show dhcp
+logread | tail -50
+```
+
+</Step>
+
+<Step where="console" title="N'utilisez le failsafe qu'en cas de besoin" expected="Vous pouvez restaurer le LAN/DHCP sans réinitialisation d'usine.">
+
+Le moment où appuyer sur le bouton failsafe dépend de l'appareil ; suivez la page OpenWrt de l'appareil ou le manuel du constructeur. Une fois connecté, commencez par inspecter :
+
+```sh
+uci show network
+uci show dhcp
+```
+
+Si seule l'adresse LAN est incorrecte, remettez-la en place et redémarrez après vérification. En cas de doute, enregistrez ou sauvegardez d'abord la configuration ; n'exécutez pas `firstboot`. Une réinitialisation d'usine efface la configuration.
+
+</Step>
+
+## Ordre de récupération
+
+1. **Ne modifiez rien** : câble, port LAN, adresse statique côté client.
+2. **Le ping fonctionne, pas le web** : uhttpd, pare-feu, HTTPS.
+3. **SSH fonctionne** : diagnostiquez les services via SSH ; ne modifiez pas le LAN.
+4. **Pas de SSH** : console ou failsafe.
+5. **Réinitialisation d'usine en dernier recours** : assurez-vous qu'aucune configuration importante n'est perdue sans sauvegarde, et sachez que vous devrez reconfigurer WAN, LAN et Wi-Fi.
+
+## Erreurs de diagnostic courantes
+
+- Utiliser le port WAN pour la gestion.
+- Le client a encore un ancien sous-réseau ou une ancienne IP statique.
+- Le navigateur force HTTPS alors que LuCI est en HTTP.
+- Croire que LuCI fonctionne parce que le ping répond.
+- Changer l'adresse LAN sans mettre à jour le DHCP et la passerelle.
+- Une règle du pare-feu bloque la gestion depuis le LAN.
+- uhttpd est absent ou a été supprimé, mais le réseau est redémarré à répétition.
+
+## Essai en laboratoire E2 (2026-10-20)
+
+- Environnement : VM x86 200 sous OpenWrt 25.12.6 ; LAN `192.168.1.2` ; HTTP testé depuis l'hôte PVE.
+- `/etc/init.d/uhttpd stop` : curl vers `http://192.168.1.2/` a renvoyé `http=000` (échec de connexion) ; SSH est resté disponible.
+- `/etc/init.d/uhttpd start` : HTTP a renvoyé `200`.
+- Non testé : blocage par le pare-feu, changement de port d'uhttpd, paquet LuCI manquant, vraie séquence de touches série/failsafe.
+- Recette : `tests/recipes/troubleshooting-no-web-ui.md`.
+
+## Statut E2 et sources
+
+- Il s'agit d'un E2 partiel : l'arrêt/la reprise d'uhttpd et le maintien de SSH ont été testés ; le pare-feu, le port et le failsafe restent de la documentation.
+- Déterminez d'abord s'il s'agit du lien, de l'adresse, d'uhttpd ou du pare-feu ; ne remplacez pas un diagnostic par couches par une réinitialisation d'usine.
+- Les procédures de console et de failsafe varient selon l'appareil et le firmware ; lisez d'abord la documentation de l'appareil.
+
+<TestRecord
+  status="partial"
+  environment="VM x86 200 sous OpenWrt 25.12.6 ; arrêt/reprise d’uhttpd, test HTTP 80, SSH conservé"
+  recipe="tests/recipes/troubleshooting-no-web-ui.md"
+  result="E2 partiel : après l'arrêt d'uhttpd, HTTP 80 refusé et SSH resté disponible ; le démarrage a rétabli HTTP 200 ; pare-feu, changement de port et failsafe non testés"
+/>
+
+<PageSources />

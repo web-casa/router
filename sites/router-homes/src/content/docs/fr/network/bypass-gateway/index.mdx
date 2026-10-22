@@ -1,0 +1,234 @@
+---
+title: "Passerelle en contournement : désactiver le DHCP, définir passerelle/DNS des clients et revenir en arrière"
+description: "Distinguez un contournement à un bras d'une seconde passerelle avec WAN, puis changez le LAN, désactivez le DHCP, pointez les clients vers le contournement et gardez une voie de retour."
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'Contournement avec WAN E2 : LAN 192.168.1.2/24, DHCP désactivé, WAN 192.168.50.5/24 ; client statique 192.168.1.100 ; contournement pur à un bras non testé'
+testRecipe: 'tests/recipes/bypass-gateway-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt bypass gateway', 'openwrt bypass router', 'bypass router dhcp', 'openwrt gateway change', 'openwrt passerelle en contournement', 'openwrt routeur bypass']
+symptoms: ['le routeur bypass coupe internet', 'comment définir la passerelle du client', 'conflit DHCP avec le bypass']
+sources:
+  - label: Configuration réseau d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: DHCP et DNS d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: Pare-feu d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: Pont/relais d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+sourceHash: '111105920d4777d6'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="VM PVE 200" tested={true} evidence="E2" />
+
+## Choisir le mode : contournement à un bras ou passerelle avec WAN
+
+| Mode | Interfaces OpenWrt | Qui sert le DHCP | Passerelle/DNS du client | Testé ici |
+|---|---|---|---|---|
+| Contournement à un bras | LAN seul, pas de WAN | routeur principal amont | IP LAN du contournement | non (étapes E1) |
+| Passerelle avec WAN | LAN + WAN | amont ou contournement | IP LAN du contournement | **E2** |
+
+Les deux peuvent « faire passer les clients par OpenWrt », mais les points de défaillance diffèrent :
+
+- contournement à un bras : sans DHCP/NAT, le routeur principal doit connaître la route de retour, ou le contournement doit faire du NAT ;
+- avec WAN : OpenWrt obtient sa propre adresse WAN et fait du NAT pour les clients LAN ; c'est le mode du laboratoire.
+
+Ne dites pas « le contournement fonctionne » sans préciser s'il a un WAN et qui sert le DHCP.
+
+## Topologie du laboratoire
+
+```text
+Upstream 192.168.50.1
+      │
+  WAN eth1 (DHCP 192.168.50.5/24)
+      │
+  OpenWrt VM 200
+      │
+  LAN br-lan 192.168.1.2/24
+      │  DHCP disabled
+  Client 192.168.1.100/24
+  gateway/DNS = 192.168.1.2
+```
+
+- Il n'y a pas de `.1` sur ce LAN, ce qui évite le conflit avec le routeur principal amont ;
+- les clients doivent être configurés en statique ;
+- avec le DHCP désactivé, les requêtes DHCP restent sans réponse, par conception.
+
+## Configuration
+
+<Step where="router-shell" title="Sauvegardez et notez l'état du LAN/WAN" expected="Vous connaissez l'IP du LAN, le protocole du WAN et l'état du DHCP.">
+
+```sh
+uci show network.lan
+uci show network.wan
+uci show dhcp.lan
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+Gardez un accès console ; l'ancienne IP du LAN disparaît immédiatement.
+
+</Step>
+
+<Step where="luci" title="Changez l'IP du LAN et désactivez le DHCP" expected="Le LAN est 192.168.1.2/24 et le DHCP ne distribue plus d'adresses.">
+
+**Réseau → Interfaces → LAN → Éditer** :
+
+1. Adresse IPv4 : `192.168.1.2/24` ;
+2. **Serveur DHCP → Réglages généraux → Ignorer l'interface** ;
+3. Enregistrez et appliquez.
+
+Équivalent en ligne de commande :
+
+```sh
+uci set network.lan.ipaddr='192.168.1.2/24'
+uci set dhcp.lan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+Rouvrez ensuite LuCI/SSH à l'adresse `192.168.1.2`.
+
+</Step>
+
+<Step where="router-shell" title="Conservez le WAN et le NAT (mode avec WAN)" expected="Le WAN a une adresse et le transfert/NAT LAN→WAN fonctionne.">
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+uci show firewall | grep -E 'zone|masquerade|forward'
+```
+
+Ce laboratoire utilisait le WAN `192.168.50.5/24`, passerelle `192.168.50.1` ; les clients LAN passent par le NAT d'OpenWrt.
+
+</Step>
+
+<Step where="client" title="Pointez le client vers le contournement" expected="La passerelle/DNS du client est 192.168.1.2 ; l'IP publique et le DNS fonctionnent.">
+
+```sh
+# Linux example
+ip addr add 192.168.1.100/24 dev eth0
+ip route add default via 192.168.1.2
+echo 'nameserver 192.168.1.2' > /etc/resolv.conf
+ping -c 2 192.168.1.2
+ping -c 2 1.1.1.1
+nslookup openwrt.org 192.168.1.2
+```
+
+Windows : définissez manuellement l'IP, la passerelle et le DNS ; ne conservez pas l'ancienne adresse DHCP.
+
+</Step>
+
+<Step where="client" title="Confirmez que le DHCP est vraiment désactivé" expected="Le DHCP ne reçoit aucune offre ; la configuration statique fonctionne toujours.">
+
+```sh
+# Linux example
+udhcpc -i eth0 -f -q -n -t 3
+```
+
+Ce laboratoire a affiché `no lease, failing` ; l'adresse statique répondait toujours au ping et résolvait les noms. Si vous obtenez encore un bail, un second serveur DHCP existe ou `ignore` ne s'est pas appliqué.
+
+</Step>
+
+<Step where="client" title="Changez le DNS/la passerelle comme contrôle" expected="Distinguez une panne de DNS d'une panne de passerelle.">
+
+```sh
+# public DNS
+nslookup openwrt.org 1.1.1.1
+# dead gateway
+ip route replace default via 192.168.1.250
+ping -c 2 1.1.1.1
+# restore
+ip route replace default via 192.168.1.2
+```
+
+Dans ce laboratoire : le DNS public fonctionnait ; `.250` donnait 100 % de perte ; le retour à `.2` a rétabli la connexion.
+
+</Step>
+
+## Contournement à un bras (E1, non testé ici)
+
+LAN seul, sans WAN :
+
+- LAN du contournement `192.168.1.2/24`, passerelle vers le routeur principal `192.168.1.1` ;
+- désactivez le DHCP du contournement ;
+- passerelle/DNS du client `.2` ;
+- activez le transfert ; le routeur principal a besoin d'une route de retour, ou le contournement fait du NAT sur le trafic LAN ;
+- le pare-feu du routeur principal doit autoriser le transfert client→internet.
+
+Aucun laboratoire avec routeur principal n'était disponible, cette partie est donc **E1**, pas E2 ; vérifiez-la avec votre routeur et votre pare-feu.
+
+## Défaillances courantes
+
+### Le contournement est injoignable après le changement du LAN
+
+- vous utilisez toujours l'ancienne IP ;
+- le client n'est pas sur `192.168.1.0/24` ;
+- ARP périmé : `ip neigh flush dev <iface>` ;
+- utilisez la console : `ip -4 addr show br-lan`.
+
+### Le client n'obtient pas d'adresse
+
+- le DHCP du contournement est désactivé ; c'est normal ; configurez en statique ;
+- si vous voulez du DHCP, gardez exactement un serveur (contournement ou routeur principal) ;
+- vérifiez `dhcp.lan.ignore` et l'existence d'un second DHCP.
+
+### Le client a une adresse mais pas d'internet
+
+- la passerelle/DNS ne pointe pas vers le contournement ;
+- le contournement n'a pas de route par défaut/d'amont ;
+- transfert/NAT du pare-feu ;
+- le routeur principal n'a pas de route de retour (un bras) ;
+- conflit de sous-réseau/double NAT.
+
+### Le DNS échoue
+
+- le client utilise encore l'ancienne passerelle pour le DNS ;
+- dnsmasq du contournement n'écoute pas sur le LAN ;
+- DNS amont bloqué ;
+- DoH/DNS privé au niveau de l'application.
+
+## Démonstration enregistrée (laboratoire 009)
+
+<TerminalCast
+  src="/casts/009-bypass.cast"
+  title="Laboratoire 009 : passerelle en contournement, DHCP désactivé, passerelle/DNS statiques"
+  caption="VM OpenWrt 25.12.6 réelle : LAN .2 + WAN DHCP, DHCP désactivé ; le client statique .100 vérifie l'IP publique et le DNS, le changement de DNS, la panne de passerelle et la récupération. Le contournement pur à un bras n'est pas dans cet enregistrement."
+/>
+
+## Essai en laboratoire E2 (2026-10-20)
+
+- Environnement : VM OpenWrt 25.12.6 x86 n° 200 ; LAN `192.168.1.2/24` ; `DHCP ignore=1` ; WAN DHCP `192.168.50.5/24` ; client netns `192.168.1.100/24`.
+- DHCP désactivé : `udhcpc` n'a reçu aucune offre (`no lease, failing`) ; l'adresse statique fonctionnait.
+- Passerelle/DNS statiques `.2` : le ping de la passerelle, `1.1.1.1` et `nslookup` fonctionnaient.
+- Le DNS `1.1.1.1` fonctionnait ; la passerelle inexistante `.250` a coupé l'accès public ; le retour à `.2` a rétabli la connexion.
+- Non testé : contournement pur à un bras, route de retour du routeur principal, vrais clients Wi-Fi/Windows, IPv6/RA.
+- Enregistrement : `public/casts/009-bypass.cast` ; recette : `tests/recipes/bypass-gateway-25.12.md`.
+
+## Sources et relecture
+
+- Il s'agit d'un E2 partiel : le contournement avec WAN a été testé ; le chemin à un bras ne repose que sur des étapes E1.
+- Aucun relecteur indépendant ; les conclusions se limitent à cet environnement VM/netns.
+- « Passerelle en contournement » n'est pas une configuration unique ; confirmez qui sert le DHCP, qui fait le NAT et si la route de retour existe.
+
+<TestRecord
+  status="partial"
+  environment="Contournement avec WAN E2 : LAN 192.168.1.2/24, DHCP désactivé, WAN 192.168.50.5/24 ; client statique 192.168.1.100 ; contournement pur à un bras non testé"
+  recipe="tests/recipes/bypass-gateway-25.12.md"
+  result="E2 partiel : avec le DHCP désactivé, le client n'a obtenu aucun bail ; la passerelle/DNS statiques .2 ont donné un ping public et un DNS fonctionnels ; le DNS 1.1.1.1 fonctionnait ; une passerelle inexistante .250 a coupé l'accès public et le retour à .2 l'a rétabli."
+  date="2026-10-20"
+/>
+
+<PageSources />

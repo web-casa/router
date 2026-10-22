@@ -1,0 +1,275 @@
+---
+title: "Connectivité du routeur principal : vérifier séparément le WAN DHCP et PPPoE"
+description: Vérifiez pas à pas le client DHCP du WAN, la passerelle/le DNS, un client LAN et le NAT, puis voyez ce que PPPoE exige réellement.
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'WAN DHCP E2 : VM x86 OpenWrt 25.12.6 200, WAN 192.168.50.166/24, LAN 192.168.10.1 ; PPPoE non testé'
+testRecipe: 'tests/recipes/wan-dhcp-pppoe-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt wan dhcp', 'openwrt pppoe', 'openwrt main router internet', 'wan port no internet', 'openwrt pas d''internet', 'openwrt wan sans adresse']
+symptoms: ['le WAN n''a pas d''adresse', 'échec de l''authentification PPPoE', 'le LAN a une adresse mais pas d''internet']
+sources:
+  - label: Configuration réseau d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: Protocoles de l'interface WAN d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/wan/wan_interface_protocols
+  - label: PPPoE / configurations FAI d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/wan/isp-configurations
+  - label: Pare-feu d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: '92abdcdd7cb6f92a'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="VM PVE 200 + vrai FAI (PPPoE en attente)" tested={true} evidence="E2" />
+
+## Résultat
+
+- Déterminer si le WAN utilise DHCP ou PPPoE et quel état vérifier ;
+- Vérifier l'adresse, la passerelle et le DNS du WAN au lieu de se fier à « connecté » ;
+- Vérifier l'adresse, la passerelle et le DNS d'un client LAN ;
+- Décider si un échec « WAN actif, LAN hors service » vient du routage/NAT ou du DNS ;
+- Savoir ce que PPPoE exige et pourquoi on ne peut pas le déclarer testé sans une vraie ligne.
+
+## Topologie et hypothèses
+
+```text
+Upstream router/ONT 192.168.50.1
+        │
+   WAN eth1 (DHCP 192.168.50.166/24)
+        │
+   OpenWrt VM 200
+        │
+   LAN br-lan 192.168.10.1/24
+        │
+   LAN client 192.168.10.191/24
+```
+
+- Le WAN et le LAN doivent être dans des sous-réseaux différents ; ne chevauchez pas l'amont.
+- Le routeur principal doit faire du NAT et du routage ; la vérification en mode contournement/AP est différente.
+- Gardez un accès console ; ne vous appuyez pas sur une seule session web pendant que vous modifiez le WAN.
+
+## Identifier le protocole du WAN
+
+<Step where="router-shell" title="Lire la configuration actuelle du WAN et du LAN" expected="Vous savez si le WAN est en dhcp, pppoe ou static.">
+
+```sh
+uci show network.wan
+uci show network.wan6 2>/dev/null
+uci show network.lan
+ip -4 addr show
+ip route
+```
+
+Le `proto` du WAN détermine ce qu'il faut inspecter : `dhcp` → udhcpc, `pppoe` → pppd/pppoe-wan.
+
+</Step>
+
+## WAN DHCP
+
+<Step where="luci" title="Définir le WAN en client DHCP" expected="Le WAN reçoit une adresse, une passerelle et un DNS.">
+
+Ouvrez **Réseau → Interfaces → WAN → Éditer** :
+
+1. Protocole : `client DHCP` ;
+2. Enregistrez et appliquez ;
+3. Dans Interfaces, confirmez que le WAN a une adresse IPv4, et pas seulement « Connected ».
+
+Équivalent en ligne de commande :
+
+```sh
+uci set network.wan.proto='dhcp'
+uci commit network
+/etc/init.d/network reload
+```
+
+</Step>
+
+<Step where="router-shell" title="Vérifier l'adresse, la passerelle et le DNS du WAN" expected="Le WAN a une adresse, la route par défaut pointe vers l'amont et le DNS fonctionne.">
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+cat /tmp/resolv.conf.d/resolv.conf.auto
+nslookup openwrt.org 192.168.50.1
+```
+
+Ce laboratoire a obtenu :
+
+- WAN `192.168.50.166/24` ;
+- passerelle/DNS `192.168.50.1` ;
+- périphérique WAN `eth1`.
+
+Si `ubus` indique `up: false` ou n'a pas d'`ipv4-address`, consultez `logread -e udhcpc` avant de toucher au LAN.
+
+</Step>
+
+<Step where="client" title="Vérifier le client LAN" expected="Le client obtient une adresse LAN, une passerelle et un DNS.">
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.10.1
+```
+
+Dans ce laboratoire, le client DHCP du LAN a obtenu `192.168.10.191/24`, passerelle `192.168.10.1`.
+
+Testez au-delà du routeur :
+
+```sh
+ping -c 3 1.1.1.1
+nslookup openwrt.org
+```
+
+> Cet essai E2 a revérifié le DHCP du WAN et le DHCP du LAN ; le chemin NAT/DNS du client LAN vers l'internet public n'a pas été entièrement rejoué, donc « le client peut naviguer » n'est pas marqué comme testé.
+
+</Step>
+
+<Step where="router-shell" title="WAN actif mais LAN hors service" expected="Séparez le routage/NAT du DNS.">
+
+```sh
+uci show firewall
+nft list ruleset 2>/dev/null | head -80
+logread | grep -i firewall | tail -20
+```
+
+Vérifiez :
+
+- le LAN et le WAN sont dans les bonnes zones du pare-feu ;
+- le masquerading est activé sur la zone WAN ;
+- le forward autorise LAN→WAN ;
+- la passerelle/le DNS du client pointent vers OpenWrt ;
+- aucun second DHCP ni conflit de sous-réseau.
+
+</Step>
+
+## PPPoE (E1, vraie ligne requise)
+
+<Step where="client" title="Confirmer les informations dont vous disposez" expected="Le compte, le mot de passe, le VLAN/nom de service sont disponibles et obtenus légalement.">
+
+PPPoE nécessite généralement :
+
+- le compte/mot de passe du FAI (ne les publiez jamais dans un chat, un dépôt ou une capture d'écran) ;
+- l'ID de VLAN dans certaines régions ;
+- le nom de service/nom de l'AC dans certaines régions ;
+- si l'ONT établit déjà la connexion (mode pont ou routeur) ;
+- les exigences de MTU/MSS et d'IPv6.
+
+Sans ces éléments, ne déclarez pas PPPoE testé ; ne testez jamais avec le compte de quelqu'un d'autre.
+
+</Step>
+
+<Step where="luci" title="Configurer PPPoE dans LuCI (exemple, sans vrai mot de passe)" expected="Le protocole du WAN devient PPPoE ; les identifiants restent sur l'appareil.">
+
+**Réseau → Interfaces → WAN → Éditer → Protocole : PPPoE** :
+
+- Nom d'utilisateur/mot de passe : vos identifiants du FAI ;
+- configurez le VLAN au niveau du périphérique/de l'interface si nécessaire ;
+- Keepalive peut commencer à `5 3` ;
+- Enregistrez et appliquez.
+
+Forme en ligne de commande (ne mettez pas de vrai mot de passe dans l'historique du shell ni dans les dépôts) :
+
+```sh
+uci set network.wan.proto='pppoe'
+uci set network.wan.username='<your-account>'
+uci set network.wan.password='<your-password>'
+uci set network.wan.keepalive='5 3'
+uci commit network
+/etc/init.d/network reload
+```
+
+</Step>
+
+<Step where="router-shell" title="Vérifier l'état de PPPoE" expected="pppoe-wan a une adresse, une route par défaut et un DNS.">
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show pppoe-wan
+ip route
+logread | grep -Ei 'pppd|pppoe' | tail -30
+```
+
+Vérifiez :
+
+- IPv4 sur `pppoe-wan` ;
+- route par défaut via `pppoe-wan` ;
+- le DNS fonctionne ;
+- MTU d'environ 1492 (courant pour PPPoE) ;
+- échecs d'authentification, expirations ou erreurs de nom de service dans le journal.
+
+Cette page ne dispose d'aucun vrai compte FAI, donc **PPPoE reste E1** et n'affirme pas que « la connexion a réussi ».
+
+</Step>
+
+## Échecs courants
+
+### Le WAN DHCP n'obtient pas d'adresse
+
+- Mauvais port (WAN et LAN confondus) ;
+- DHCP amont désactivé ;
+- liaison à l'adresse MAC/authentification en amont ;
+- VLAN requis ;
+- consultez `logread -e udhcpc` pour voir discover/offer ;
+- ne devinez pas le sous-réseau amont avec une IP statique.
+
+### L'authentification PPPoE échoue
+
+- Mauvais compte/mot de passe (casse/suffixe) ;
+- VLAN/nom de service requis ;
+- l'ONT établit encore la connexion (double connexion) ;
+- compte lié à une adresse MAC/un port ;
+- des tentatives répétées peuvent déclencher des limites du FAI ; lisez le journal au lieu de marteler.
+
+### Le WAN a une adresse, le LAN n'a pas d'internet
+
+- zone/forward/masquerading du pare-feu ;
+- passerelle/DNS du client ;
+- l'amont n'autorise qu'un seul appareil/une seule adresse MAC ;
+- conflit de sous-réseau/double NAT ;
+- différences entre IPv6 et IPv4.
+
+### Le DNS échoue
+
+- Testez le DNS côté WAN (`nslookup ... 192.168.50.1`) ;
+- puis le routeur lui-même (`nslookup ... 127.0.0.1`) ;
+- puis le client LAN (`cat /etc/resolv.conf`) ;
+- n'accusez pas le WAN pour chaque échec DNS.
+
+## Compte rendu E2/E1
+
+### WAN DHCP (E2)
+
+- Environnement : VM x86 OpenWrt 25.12.6 200 ; WAN `eth1` ; amont `192.168.50.1`.
+- Résultat : WAN `192.168.50.166/24`, passerelle/DNS `192.168.50.1` ; LAN `192.168.10.1/24`.
+- DHCP du LAN : client netns `192.168.10.191/24`, passerelle `192.168.10.1`.
+- Non rejoué : NAT/DNS de bout en bout du client LAN vers l'internet public, IPv6, WAN physique.
+
+### PPPoE (E1)
+
+- Pas de vrai compte ni de vraie ligne FAI ; aucune vérification de connexion, d'authentification, de MTU ou de DNS.
+- Les lecteurs doivent tester avec leur propre compte légal et la documentation de leur appareil/FAI ; ne publiez jamais d'identifiants.
+
+## Sources et relecture
+
+- Le WAN DHCP est E2 ; PPPoE est E1. Ne les fusionnez pas en « routeur principal entièrement testé ».
+- Recette : `tests/recipes/wan-dhcp-pppoe-25.12.md`.
+- Pas de relecteur indépendant ; les conclusions se limitent à cet environnement de VM/amont.
+
+<TestRecord
+  status="partial"
+  environment="WAN DHCP E2 : VM x86 OpenWrt 25.12.6 200, WAN 192.168.50.166/24, LAN 192.168.10.1 ; PPPoE non testé"
+  recipe="tests/recipes/wan-dhcp-pppoe-25.12.md"
+  result="Le WAN DHCP a obtenu 192.168.50.166/24 avec passerelle/DNS 192.168.50.1 ; le client DHCP du LAN a obtenu 192.168.10.191/24 ; le NAT/DNS de bout en bout du client LAN n'a pas été rejoué ; PPPoE non testé sans vrai compte/ligne"
+  date="2026-10-20"
+/>
+
+<PageSources />

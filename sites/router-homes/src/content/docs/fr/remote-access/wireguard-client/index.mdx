@@ -1,0 +1,178 @@
+---
+title: "Client WireGuard : configuration, AllowedIPs, DNS et reconnexion"
+description: Le client ne conserve que sa clé privée et la clé publique du serveur ; utilisez AllowedIPs pour choisir tunnel seul, LAN ou tunnel complet, vérifiez handshake/ping/DNS et évitez une boucle de routage de l'endpoint.
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'Client netns PVE ; wg0 10.10.0.2/24 → 192.168.1.2:51820 ; allowed-ips 10.10.0.0/24 ; handshake/ping/HTTP réussis ; Windows/téléphone/DNS/tunnel complet non testés'
+testRecipe: 'tests/recipes/wireguard-client-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['wireguard client', 'openwrt wireguard client', 'wireguard allowedips', 'wireguard cannot connect', 'client wireguard openwrt', 'wireguard pas de handshake', 'wireguard impossible de se connecter']
+symptoms: ['client wireguard sans handshake', 'le ping du tunnel échoue', 'comment définir allowedips', 'le DNS wireguard ne fonctionne pas']
+sources:
+  - label: Démarrage rapide WireGuard
+    url: https://www.wireguard.com/quickstart/
+  - label: Configuration du client WireGuard
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/client
+  - label: Routage WireGuard et AllowedIPs
+    url: https://www.wireguard.com/quickstart/#configure-the-peer
+  - label: Pare-feu OpenWrt
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: 'd749ad7be74e1585'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="Client netns PVE" tested={true} evidence="E2" />
+
+## Ce dont le client a besoin
+
+- sa propre clé privée (uniquement sur le client) ;
+- la clé publique du serveur ;
+- le point de terminaison du serveur (IP/domaine + port UDP) ;
+- l'adresse du tunnel du client ;
+- `AllowedIPs` : quelles destinations passent par le tunnel ;
+- en option, DNS et PersistentKeepalive.
+
+La configuration du serveur est décrite en 021 ; le client n'a jamais besoin de la clé privée du serveur.
+
+## Exemple `wg-quick` sous Linux
+
+```ini
+[Interface]
+PrivateKey = <client-private-key>
+Address = 10.10.0.2/24
+# DNS = 10.10.0.1
+
+[Peer]
+PublicKey = <server-public-key>
+Endpoint = 203.0.113.10:51820
+AllowedIPs = 10.10.0.0/24
+PersistentKeepalive = 25
+```
+
+Utilisation réelle :
+
+```sh
+sudo install -m 600 client.conf /etc/wireguard/wg0.conf
+sudo wg-quick up wg0
+sudo wg show
+```
+
+`Endpoint` utilise une adresse publique ou un domaine ; ce labo a utilisé l'adresse LAN `192.168.1.2:51820`.
+
+## Configuration manuelle minimale utilisée ici
+
+Dans le netns PVE, créez l'interface avec `ip` + `wg` :
+
+```sh
+ip link add wg0 type wireguard
+wg set wg0 private-key /tmp/wg-client.key \
+  peer <server-public-key> \
+  endpoint 192.168.1.2:51820 \
+  allowed-ips 10.10.0.0/24 \
+  persistent-keepalive 5
+ip addr add 10.10.0.2/24 dev wg0
+ip link set wg0 up
+```
+
+Le client `192.168.1.251/24` joignait le LAN du labo via veth ; `wg0` ne transportait que `10.10.0.0/24`.
+
+## Choisir AllowedIPs
+
+| Objectif | AllowedIPs | Nécessite aussi |
+|---|---|---|
+| IP du tunnel uniquement | `10.10.0.0/24` | le pair du serveur autorise l'IP du tunnel du client |
+| LAN du serveur | `10.10.0.0/24, 192.168.1.0/24` | forward/route de retour ou NAT sur le serveur ; forward du pare-feu |
+| tunnel complet / vers la maison | `0.0.0.0/0, ::/0` | NAT/forward sur le serveur, DNS, conflits éventuels avec un kill-switch |
+| un seul hôte du LAN | `10.10.0.0/24, 192.168.1.10/32` | exposition minimale ; la route côté serveur reste nécessaire |
+
+Si `AllowedIPs` inclut l'IP de l'Endpoint (par ex. `0.0.0.0/0`), `wg-quick` ajoute une route d'exception pour l'Endpoint ; en configuration manuelle, vous devez garder l'Endpoint hors du tunnel, sinon le handshake boucle dans `wg0`.
+
+## Vérifier
+
+```sh
+wg show
+ip addr show wg0
+ip route
+ping -c 3 10.10.0.1
+curl -sSI --max-time 5 http://10.10.0.1/ | head -3
+```
+
+Ce labo :
+
+- handshake il y a 3 secondes ;
+- `transfer 124 B received, 180 B sent` ;
+- ping du tunnel 4/4 ;
+- HTTP 200 (LuCI du serveur).
+
+## DNS
+
+- `DNS = 10.10.0.1` indique seulement au client l'adresse du tunnel ; le serveur doit réellement écouter et relayer le DNS ;
+- avec `AllowedIPs=0.0.0.0/0`, les fuites DNS et le kill switch relèvent d'une autre couche ;
+- ce labo n'a pas déplacé le DNS dans le tunnel ; les résultats de `nslookup` ne prouvent pas que le DNS passe par le tunnel.
+
+## Windows / téléphone
+
+- À l'importation, vérifiez `AllowedIPs`, Endpoint et DNS ;
+- les téléphones peuvent activer par défaut « toujours actif » ou « VPN à la demande » ; testez d'abord la déconnexion et la reconnexion ;
+- ne copiez jamais de clés privées depuis un chat ou une capture d'écran ;
+- ce labo n'a pas testé Windows/Android/iOS ; ne prétendez pas que « toutes les plateformes sont vérifiées ».
+
+## Échecs courants
+
+### Pas de handshake
+
+- la clé publique du serveur et la clé privée du client ne correspondent pas ;
+- endpoint, port ou pare-feu ;
+- le `allowed_ips` du pair serveur n'inclut pas l'IP du tunnel du client ;
+- l'horloge n'a pas d'importance pour WireGuard, mais les clés, si.
+
+### Le ping de l'IP du tunnel échoue
+
+- l'interface n'a pas d'adresse ou est désactivée ;
+- `allowed_ips` n'inclut pas `10.10.0.0/24` ;
+- zone du pare-feu du serveur ;
+- la route de l'endpoint est envoyée à tort dans le tunnel.
+
+### Le tunnel répond au ping, mais le LAN est injoignable
+
+- `AllowedIPs` n'inclut pas le préfixe du LAN ;
+- le serveur n'a ni forward, ni route de retour, ni NAT ;
+- forward du pare-feu du serveur ;
+- ne confondez pas connectivité du tunnel et connectivité du LAN.
+
+### Le DNS ne fonctionne pas
+
+- le client n'a aucun DNS défini ;
+- le DNS du serveur n'écoute pas sur l'adresse du tunnel ;
+- route de tunnel complet ou fuite DNS ;
+- testez séparément l'IP, le nom et le serveur DNS avant de modifier la configuration.
+
+## Test de labo E2 (2026-10-20)
+
+- Environnement : client netns PVE `192.168.1.251/24` ; `wg0 10.10.0.2/24` ; endpoint `192.168.1.2:51820` ; AllowedIPs `10.10.0.0/24`.
+- Serveur `wg0 10.10.0.1/24` ; le handshake du client a réussi ; transfert 1,47 KiB/1,90 KiB (vue du serveur).
+- Le client a pingé `10.10.0.1` 4/4 ; HTTP 200.
+- Non testé : Windows/téléphone, DNS dans le tunnel, `0.0.0.0/0` complet, vrai endpoint public, itinérance/reconnexion.
+- Recette : `tests/recipes/wireguard-client-25.12.md`.
+
+## Sources et relecture
+
+- Niveau E2 partiel : le client netns Linux et le tunnel côté LAN ont été testés ; mobile, DNS, tunnel complet et WAN public ne l'ont pas été.
+- La clé privée reste sur le client ; le serveur ne reçoit que la clé publique.
+- Aucun relecteur indépendant ; les conclusions se limitent à cet environnement VM/netns.
+
+<TestRecord
+  status="partial"
+  environment="Client netns PVE ; wg0 10.10.0.2/24 → 192.168.1.2:51820 ; allowed-ips 10.10.0.0/24 ; handshake/ping/HTTP réussis ; Windows/téléphone/DNS/tunnel complet non testés"
+  recipe="tests/recipes/wireguard-client-25.12.md"
+  result="E2 partiel : le client 10.10.0.2/24 a effectué le handshake avec le serveur 10.10.0.1/24 ; ping du tunnel 4/4 ; HTTP 200 ; Windows/téléphone, DNS dans le tunnel, routage en tunnel complet et vraie itinérance non testés"
+  date="2026-10-20"
+/>
+
+<PageSources />

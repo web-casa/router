@@ -1,0 +1,281 @@
+---
+title: "Installer OpenWrt sur un hôte Proxmox VE à une seule carte réseau"
+description: "Utilisez un résolveur en contournement ou un pont interne pour exécuter OpenWrt sur un hôte PVE doté d'une seule carte réseau physique, tout en conservant l'accès à l'hôte."
+pageType: install
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'Proxmox VE 9.2.2, un seul Realtek RTL8111 ; VM OpenWrt 25.12.6 n° 200 ; client DHCP netns'
+lastVerifiedAt: '2026-10-20'
+testRecipe: 'tests/recipes/pve-single-nic-25.12.md'
+aliases: ['openwrt proxmox', 'pve openwrt', 'proxmox single nic openwrt', 'openwrt proxmox une seule carte réseau']
+symptoms: ['pas d''internet après l''installation', 'hôte injoignable', 'PVE n''a qu''une seule carte réseau']
+sources:
+  - label: Configuration réseau de Proxmox VE
+    url: https://pve.proxmox.com/wiki/Network_Configuration
+  - label: Commande qm de Proxmox VE
+    url: https://pve.proxmox.com/pve-docs/qm.1.html
+  - label: Installation d'OpenWrt sur x86
+    url: https://openwrt.org/docs/guide-user/installation/openwrt_x86
+  - label: Notes de version d'OpenWrt 25.12
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+sourceHash: 'b8b086f75bf2a67f'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import pveConsole from '@assets/screenshots/pve/openwrt-console-login.webp';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import TopologyTable from '@components/TopologyTable.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="Proxmox VE" version="9.2.2" packageManager="—" device="hôte x86 à une seule carte réseau" tested={true} evidence="E2" />
+
+## Résultat
+
+Vous pouvez choisir la bonne topologie sur un hôte PVE doté d'**une seule carte réseau physique** :
+
+- sans modifier l'adresse de gestion de PVE ;
+- sans servir du DHCP sur `vmbr0` par erreur ;
+- avec un résolveur en contournement ou un laboratoire LAN interne ;
+- et avec un accès à l'hôte qui survit à l'arrêt de la VM routeur.
+
+## Environnement concerné
+
+- Proxmox VE 8.x/9.x avec une seule carte réseau physique ; `vmbr0` porte à la fois l'adresse de gestion de PVE et la passerelle amont.
+- Cette page est rédigée pour PVE 9.2.2, une carte Realtek RTL8111, `vmbr0 192.168.50.2/24`, passerelle `192.168.50.1`.
+- **Une seule carte réseau ne peut pas séparer physiquement le WAN et le LAN.** Ne recopiez pas la disposition `enp1s0/enp2s0` des guides à deux cartes. Utilisez un service en contournement ou un pont PVE interne.
+- Une deuxième carte réseau ou un commutateur compatible VLAN est plus simple ; cette topologie est hors du périmètre de cette page.
+
+## Deux topologies
+
+### A. DNS/passerelle en contournement (plus petit changement)
+
+OpenWrt dispose d'une vNIC sur `vmbr0` avec l'adresse LAN `192.168.50.3/24`, et le **DHCP est désactivé**. Les clients l'utilisent manuellement comme DNS (ou comme passerelle) ; il accède à internet via `192.168.50.1`.
+
+<TopologyTable rows={[
+  { physical: 'nic0', bridge: 'vmbr0', vnic: 'net0', iface: 'lan 192.168.50.3', role: 'DNS/passerelle en contournement' },
+]} />
+
+Convient pour valider le DNS, AdGuard Home ou le DNS/les règles d'OpenClash sans toucher au DHCP du routeur principal.
+
+### B. Laboratoire LAN interne PVE (recommandé pour tester le routage)
+
+OpenWrt dispose de deux vNIC : `net0` sur `vmbr0` en WAN (DHCP), `net1` sur `vmbr1` en LAN (`192.168.1.1/24`). `vmbr1` n'a **aucun port physique** et ne sert qu'à une VM cliente de test.
+
+<TopologyTable rows={[
+  { physical: 'nic0', bridge: 'vmbr0', vnic: 'net0', iface: 'wan DHCP', role: 'amont 192.168.50.1' },
+  { physical: '—', bridge: 'vmbr1', vnic: 'net1', iface: 'lan 192.168.1.1', role: 'client de test interne' },
+]} />
+
+Cette topologie valide le routage, le NAT, le DHCP, le DNS et « l'hôte reste joignable après l'arrêt de la VM routeur » sans toucher au LAN physique.
+
+## Avant de modifier quoi que ce soit
+
+<Step where="router-shell" title="Notez l'état du réseau de l'hôte et des VM" expected="Vous pouvez restaurer vmbr0 à partir de vos notes en cas de problème.">
+
+```sh
+ip -br link
+ip -br addr
+cat /etc/network/interfaces
+bridge link
+qm list
+pvesm status
+```
+
+Notez l'adresse de `vmbr0`, la passerelle, le port physique et la liste des VM. Sur un hôte à une seule carte réseau, `vmbr0` est votre seul chemin de gestion ; une erreur peut vous en exclure.
+
+</Step>
+
+<Step where="router-shell" title="Préparez l'accès console et l'image" expected="Vous pouvez toujours joindre PVE si SSH tombe.">
+
+Utilisez un écran et un clavier, l'IPMI ou un VNC cloud ; ne vous fiez pas à SSH seul. Téléchargez ensuite l'image OpenWrt x86_64 sur l'hôte PVE :
+
+```sh
+cd /var/lib/vz/template/iso
+wget https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+wget https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/sha256sums
+sha256sum -c sha256sums --ignore-missing
+gzip -d openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+```
+
+Ne continuez pas si la somme de contrôle échoue. Utilisez le nom de fichier et la version actuels de downloads.openwrt.org.
+
+</Step>
+
+## Étapes minimales
+
+<Step where="router-shell" title="Créez le pont interne vmbr1 (laboratoire B uniquement)" expected="vmbr1 existe et est actif ; les adresses de vmbr0 sont inchangées.">
+
+Commencez par un pont temporaire ; ne le rendez persistant qu'une fois qu'il fonctionne :
+
+```sh
+ip link add name vmbr1 type bridge
+ip link set vmbr1 up
+ip -br link show vmbr1
+ip -br addr show vmbr0
+```
+
+`vmbr1` n'a aucun port physique, il ne peut donc pas diffuser de DHCP vers le LAN domestique. N'exécutez pas de serveur DHCP sur `vmbr0`.
+
+</Step>
+
+<Step where="router-shell" title="Créez la VM OpenWrt 200" expected="La VM 200 a un disque de démarrage scsi0 et net0/net1.">
+
+```sh
+qm create 200 --name openwrt-lab --memory 512 --cores 2 --ostype l26 \
+  --scsihw virtio-scsi-pci \
+  --net0 virtio,bridge=vmbr0 \
+  --net1 virtio,bridge=vmbr1 \
+  --serial0 socket
+qm importdisk 200 /var/lib/vz/template/iso/openwrt-25.12.6-x86-64-generic-ext4-combined.img local-lvm
+qm set 200 --scsi0 local-lvm:vm-200-disk-0
+qm set 200 --boot order=scsi0
+qm start 200
+```
+
+Utilisez `pvesm status` pour connaître l'identifiant réel du stockage. Après `qm importdisk`, vérifiez le nom du disque dans la sortie de la commande ; il peut s'agir de `vm-200-disk-0`.
+
+</Step>
+
+<Step where="router-shell" title="Ouvrez la console OpenWrt et identifiez l'ordre des cartes réseau" expected="Vous savez quelle interface est le WAN et laquelle est le LAN.">
+
+```sh
+qm terminal 200
+```
+
+Si le port série n'affiche rien, utilisez la console VNC de PVE. Dans OpenWrt :
+
+```sh
+ip link show
+ip addr show
+uci show network
+```
+
+L'ordre `eth0/eth1` ne correspond pas forcément à `net0/net1` ; vérifiez par l'adresse MAC, l'état du lien et `uci show network`. Ne supposez pas que `eth0` est le WAN. Dans ce laboratoire, `net0=eth0=WAN` et `net1=eth1=LAN`, mais revérifiez sur un autre hôte.
+
+</Step>
+
+<Step where="router-shell" title="Configurez le WAN/LAN et désactivez le DHCP sur le WAN" expected="Le WAN obtient une adresse de 192.168.50.1 ; le LAN est 192.168.1.1 ; pas de DHCP sur vmbr0.">
+
+Dans la console OpenWrt, remplacez `eth0/eth1` par les interfaces que vous avez vérifiées :
+
+```sh
+uci set network.wan=interface
+uci set network.wan.proto='dhcp'
+uci set network.wan.device='eth0'
+uci set network.lan=interface
+uci set network.lan.proto='static'
+uci set network.lan.device='eth1'
+uci set network.lan.ipaddr='192.168.1.1'
+uci set network.lan.netmask='255.255.255.0'
+uci set dhcp.wan=dhcp
+uci set dhcp.wan.interface='wan'
+uci set dhcp.wan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+```
+
+Vérifiez que `dhcp.wan.ignore='1'` ; sinon OpenWrt risque de servir du DHCP sur le `vmbr0` amont et de perturber le réseau domestique.
+
+</Step>
+
+<Step where="client" title="Vérifiez le routage depuis un client de test" expected="Le client atteint 192.168.1.1, la passerelle amont et le DNS.">
+
+Créez une VM de test sur `vmbr1` (ou rattachez-y sa carte réseau) et laissez-la obtenir un bail du LAN OpenWrt. Puis :
+
+```sh
+ip route
+ping 192.168.1.1
+ping 192.168.50.1
+nslookup openwrt.org
+```
+
+Si le client n'obtient pas de bail, inspectez `dhcp.lan` et `dnsmasq` d'OpenWrt avant de modifier `vmbr0`.
+
+</Step>
+
+## Vérification
+
+<Figure src={pveConsole} alt="Shell root d'OpenWrt 25.12.6 et avis apk dans la console d'une VM Proxmox VE" caption="Le shell root d'OpenWrt 25.12.6 après le démarrage, dans la console d'une VM Proxmox VE. Capture réalisée sur une VM temporaire ; les noms des cartes réseau, les sous-réseaux et les disques dépendent de votre topologie." />
+
+- `qm status 200` indique que la VM est en cours d'exécution ; `qm config 200` montre `net0` sur `vmbr0` et `net1` sur `vmbr1`.
+- Dans OpenWrt, `ip addr show` affiche le WAN `192.168.50.x` et le LAN `192.168.1.1/24`.
+- Client de test : la passerelle par défaut est `192.168.1.1`, il peut joindre `192.168.50.1` par ping et résout `openwrt.org`.
+- Hôte : `ssh root@192.168.50.2` et l'interface web de PVE fonctionnent toujours.
+- Arrêtez la VM routeur (`qm stop 200`) ; la gestion de l'hôte fonctionne toujours ; `qm start 200` rétablit le routeur.
+
+## Cas d'échec et récupération
+
+### L'hôte est injoignable en SSH
+
+Cessez de modifier le réseau. Utilisez l'écran et le clavier, l'IPMI ou la console cloud, puis vérifiez :
+
+```sh
+ip -br addr show vmbr0
+cat /etc/network/interfaces
+bridge link
+```
+
+Si vous venez de modifier `/etc/network/interfaces`, restaurez la sauvegarde et rechargez :
+
+```sh
+cp /etc/network/interfaces.bak.YYYY-MM-DD /etc/network/interfaces
+ifreload -a
+```
+
+Si seul le `vmbr1` temporaire a causé le problème, confirmez d'abord qu'aucune autre VM ne l'utilise :
+
+```sh
+grep -R "vmbr1" /etc/pve/qemu-server
+```
+
+Ne le supprimez que si cette commande n'affiche rien :
+
+```sh
+ip link set vmbr1 down
+ip link del vmbr1
+```
+
+### OpenWrt n'a pas d'adresse WAN
+
+```sh
+qm config 200
+qm terminal 200
+```
+
+Dans OpenWrt, vérifiez `ip link show`, `uci show network` et `logread`. Confirmez que `net0` est sur `vmbr0` et que `nic0` est actif ; n'ajoutez pas de second serveur DHCP sur `vmbr0`.
+
+### Le client de test n'obtient pas de bail 192.168.1.x
+
+Vérifiez `dhcp.lan` d'OpenWrt et si `dnsmasq` s'exécute ; confirmez que la VM de test est bien rattachée à `vmbr1`. Ne modifiez pas les adresses ni la passerelle de `vmbr0` pour « réparer » le laboratoire.
+
+### L'hôte reste-t-il joignable après l'arrêt de la VM routeur ?
+
+C'est le critère de récupération : après `qm stop 200`, ouvrez `https://192.168.50.2:8006` et connectez-vous en SSH depuis une autre machine. Si ce n'est pas possible, votre chemin de gestion dépend d'OpenWrt ; corrigez cela avant de continuer.
+
+## Essai en laboratoire E2 (2026-10-20)
+
+- Environnement : PVE 9.2.2, un Realtek RTL8111, `vmbr0 192.168.50.2/24` ; VM 200 OpenWrt 25.12.6 x86_64, 512 Mo/2 vCPU.
+- Le WAN d'OpenWrt `eth0` a reçu `192.168.50.77` par DHCP de `192.168.50.1` ; le LAN `eth1` est `192.168.1.1/24`.
+- Un client netns sur le `vmbr1` interne a reçu `192.168.1.191` par DHCP, a utilisé `192.168.1.1` comme route par défaut, a résolu `openwrt.org` et a obtenu un HTTP 200.
+- Après `qm stop 200`, une nouvelle connexion SSH à l'hôte PVE fonctionnait toujours ; `vmbr0` est resté `192.168.50.2/24`.
+- Non testé : clients LAN physiques, disposition à deux cartes réseau, stabilité sur la durée, amont PPPoE/IPv6. Ces points sont hors du périmètre de ce résultat E2.
+
+## Sources et relecture
+
+- Cette page est un essai de laboratoire E2, pas un simple brouillon E1 ; elle n'a pas été relue de façon indépendante ni testée sur un LAN physique.
+- Recette : `tests/recipes/pve-single-nic-25.12.md`. Elle consigne le SHA-256 de l'image, `qm config 200` et les résultats du client.
+- Une seule carte réseau n'est pas deux cartes : n'en faites pas un guide de séparation physique du WAN et du LAN sans deuxième carte ou commutateur VLAN.
+
+<TestRecord
+  status="partial"
+  environment="Proxmox VE 9.2.2, un seul Realtek RTL8111 ; VM OpenWrt 25.12.6 n° 200 ; client DHCP netns"
+  recipe="tests/recipes/pve-single-nic-25.12.md"
+  result="WAN DHCP 192.168.50.77 ; LAN 192.168.1.1 ; DHCP client 192.168.1.191 ; DNS/HTTP réussis ; le SSH de l'hôte fonctionne toujours après qm stop 200"
+  date="2026-10-20"
+/>
+
+<PageSources />

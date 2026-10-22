@@ -1,0 +1,213 @@
+---
+title: "AP filaire/sans fil derrière un routeur existant : DHCP désactivé, nouvelle IP LAN, port LAN"
+description: "Transformez OpenWrt en point d'accès derrière le routeur principal : LAN uniquement, DHCP désactivé, IP LAN hors de la plage, les clients obtiennent toujours leur bail du routeur principal ; le Wi-Fi est vérifié séparément."
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'AP filaire E2 : LAN de l''AP 192.168.1.2/24, DHCP désactivé ; DHCP amont 192.168.1.1 ; client 192.168.1.136 ; pas de WAN ni de Wi-Fi'
+testRecipe: 'tests/recipes/ap-mode-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt ap mode', 'openwrt wireless ap', 'openwrt disable dhcp', 'router as ap', 'openwrt mode point d''accès', 'openwrt désactiver dhcp']
+symptoms: ['les clients de l''AP n''obtiennent pas d''adresse', 'double DHCP sur l''AP', 'tout le réseau tombe après l''AP']
+sources:
+  - label: Configuration réseau d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: DHCP et DNS d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: Configuration Wi-Fi d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/wifi/basic
+  - label: Pare-feu d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: '9f6d131b15ed3652'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="VM PVE 200" tested={true} evidence="E2" />
+
+## Ce que signifie vraiment le mode AP
+
+Un AP n'est pas « un autre routeur » :
+
+- branchez le **port LAN**, pas le WAN ;
+- désactivez le DHCP sur l'AP ; le routeur principal continue d'attribuer les baux ;
+- placez l'IP LAN de l'AP en dehors de la plage DHCP du routeur principal ;
+- ne faites pas de NAT ni de double routage, sauf si vous voulez volontairement un second routeur.
+
+Ce laboratoire vérifie **uniquement un AP filaire + DHCP amont** ; le SSID, le chiffrement et l'itinérance Wi-Fi n'ont pas de matériel et sont E1.
+
+## Topologie
+
+```text
+Main router 192.168.1.1 (DHCP)
+        │ LAN port
+        │
+   OpenWrt AP
+   LAN br-lan 192.168.1.2/24
+   DHCP: ignore
+        │ LAN port
+        │
+   Client 192.168.1.136/24
+   gateway 192.168.1.1
+```
+
+- Le client obtient son bail du routeur principal ; la passerelle est `.1`, pas l'AP `.2` ;
+- l'AP `.2` sert uniquement à l'administration ;
+- si la passerelle du client devient `.2`, il existe un second serveur DHCP ou une mauvaise configuration.
+
+## Configuration
+
+<Step where="router-shell" title="Sauvegarder et confirmer que le WAN n'est pas nécessaire" expected="Vous connaissez l'IP LAN, l'état du DHCP et si le WAN est utilisé.">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+uci show network.wan 2>/dev/null
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+Le mode AP n'a généralement pas besoin du WAN ; s'il subsiste, assurez-vous qu'il ne s'approprie pas la route par défaut ni le NAT.
+
+</Step>
+
+<Step where="luci" title="Changer l'IP LAN, désactiver le DHCP" expected="L'AP est en 192.168.1.2/24 et n'attribue plus de baux.">
+
+**Réseau → Interfaces → LAN → Éditer** :
+
+1. Adresse IPv4 : `192.168.1.2/24` (hors de la plage du routeur principal) ;
+2. **Serveur DHCP → Réglages généraux → Ignorer l'interface** ;
+3. Enregistrez et appliquez.
+
+Ligne de commande :
+
+```sh
+uci set network.lan.ipaddr='192.168.1.2/24'
+uci set dhcp.lan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+Rouvrez ensuite LuCI/SSH à l'adresse `192.168.1.2`.
+
+</Step>
+
+<Step where="client" title="Se connecter au port LAN du routeur principal" expected="Le client obtient son bail du routeur principal, avec la passerelle principale.">
+
+Reliez le **port LAN** d'OpenWrt au **port LAN** du routeur principal ; n'utilisez pas le WAN.
+
+Reconnectez/renouvelez sur le client :
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.1.1
+ping 192.168.1.2
+```
+
+Le client de ce laboratoire a obtenu `192.168.1.136/24`, passerelle `192.168.1.1` ; l'AP `.2` était joignable.
+
+</Step>
+
+<Step where="client" title="Confirmer que l'AP ne sert pas le DHCP" expected="Le serveur DHCP est le routeur principal, pas l'AP.">
+
+```sh
+# Linux example
+udhcpc -i eth0 -f -q -n -t 5
+```
+
+Vérifiez `server 192.168.1.1` ; s'il indique `192.168.1.2`, le DHCP de l'AP est toujours actif.
+
+Ce laboratoire AP seul n'avait pas d'internet, donc l'échec de `ping 1.1.1.1` est attendu ; l'accès réel à internet dépend du routeur principal.
+
+</Step>
+
+## AP sans fil (E1)
+
+Pas de matériel sans fil, donc non vérifié :
+
+- SSID/mot de passe/WPA2/WPA3 ;
+- canal 2,4/5 GHz, largeur, puissance d'émission ;
+- itinérance/802.11r/éjection des signaux faibles ;
+- isolation des clients sans fil ;
+- plusieurs AP avec un même SSID.
+
+Principes :
+
+- reliez l'interface sans fil au pont `br-lan` ;
+- désactivez le DHCP ;
+- utilisez WPA2/WPA3, jamais un réseau ouvert ;
+- décalez les canaux, réutilisez le même SSID/mot de passe sur tous les AP ;
+- vérifiez d'abord le filaire, puis ajoutez le Wi-Fi, afin de ne pas modifier deux couches à la fois.
+
+## Échecs courants
+
+### Tout le réseau tombe après l'ajout de l'AP
+
+- Le DHCP de l'AP est toujours actif et entre en conflit avec le routeur principal ;
+- l'IP LAN de l'AP est en conflit avec le routeur principal ;
+- le port WAN de l'AP a été branché au LAN principal ;
+- une boucle entre le routeur principal et l'AP.
+
+Débranchez l'AP, rétablissez le routeur principal, puis modifiez un élément à la fois.
+
+### Les clients n'obtiennent pas d'adresse
+
+- L'AP n'est pas relié au LAN principal ;
+- le DHCP de l'AP est désactivé mais celui du routeur principal est désactivé/saturé ;
+- VLAN/port isolé ;
+- l'interface sans fil n'est pas reliée en pont à `br-lan`.
+
+### Les clients ont une adresse mais une mauvaise passerelle
+
+- un autre serveur DHCP distribue `.2` ;
+- le client a conservé un ancien bail ;
+- l'AP exécute encore un serveur DHCP ;
+- vérifiez `cat /tmp/dhcp.leases` (l'AP ne devrait avoir aucun nouveau bail).
+
+### Le Wi-Fi se connecte mais pas d'internet
+
+- l'interface sans fil n'est pas dans le pont LAN ;
+- le pare-feu sépare les zones sans fil et LAN ;
+- le routeur principal en amont le bloque ;
+- isolation des clients/réseau invité.
+
+## Démonstration enregistrée (laboratoire 008)
+
+<TerminalCast
+  src="/casts/008-ap.cast"
+  title="Laboratoire 008 : AP filaire, DHCP désactivé, le client obtient son bail de l'amont"
+  caption="VM OpenWrt 25.12.6 réelle : LAN de l'AP en .2, DHCP désactivé ; le client a obtenu 192.168.1.136/24 de l'amont 192.168.1.1, passerelle .1, et pouvait envoyer un ping à l'AP et à l'amont. Ce laboratoire n'a ni internet ni Wi-Fi."
+/>
+
+## Essai en laboratoire E2 (2026-10-20)
+
+- Environnement : VM x86 OpenWrt 25.12.6 200 ; LAN de l'AP `192.168.1.2/24` ; `dhcp.lan.ignore=1` ; netns amont `192.168.1.1/24` + udhcpd de BusyBox ; client `192.168.1.136/24`.
+- DHCP du client : serveur `192.168.1.1`, bail de 864000 s ; passerelle `.1`.
+- Le client a envoyé un ping à l'AP `.2` et à l'amont `.1` ; ce laboratoire AP seul n'avait pas d'internet public, donc `1.1.1.1` a échoué.
+- Non testé : internet réel via le routeur principal, Wi-Fi/SSID/chiffrement/itinérance, clients Windows/téléphone, IPv6/RA.
+- Cast : `public/casts/008-ap.cast` ; recette : `tests/recipes/ap-mode-25.12.md`.
+
+## Sources et relecture
+
+- Ceci est un E2 partiel : l'AP filaire, la couche 2 et le DHCP ont été testés ; le sans-fil et l'internet réel en amont ne l'ont pas été.
+- Pas de relecteur indépendant ; les conclusions se limitent à cet environnement VM/netns.
+- Le mode AP, c'est « LAN uniquement + DHCP désactivé + IP LAN hors de la plage », pas une interface précise.
+
+<TestRecord
+  status="partial"
+  environment="AP filaire E2 : LAN de l'AP 192.168.1.2/24, DHCP désactivé ; DHCP amont 192.168.1.1 ; client 192.168.1.136 ; pas de WAN ni de Wi-Fi"
+  recipe="tests/recipes/ap-mode-25.12.md"
+  result="E2 partiel : le LAN de l'AP est passé à .2 et DHCP ignore=1 ; le client a obtenu 192.168.1.136/24 de l'amont .1 avec la passerelle .1 ; l'AP .2 était joignable et le client pouvait envoyer un ping à l'AP et à l'amont ; ce laboratoire AP seul n'avait pas d'internet ; l'internet en amont et le Wi-Fi n'ont pas été testés."
+  date="2026-10-20"
+/>
+
+<PageSources />

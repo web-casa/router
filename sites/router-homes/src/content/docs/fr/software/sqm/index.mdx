@@ -1,0 +1,247 @@
+---
+title: "SQM et CAKE : éliminer la latence pendant les téléchargements et les envois"
+description: Vérifiez si la latence vient du bufferbloat, limitez le trafic WAN avec SQM/CAKE et validez avec des mesures de latence avant/après. Les cartes réseau virtuelles ne peuvent pas représenter une vraie ligne.
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 VM x86 200 ; sqm-scripts 1.7.2 + luci-app-sqm ; WAN eth1 en DHCP ; qdisc CAKE attaché ; aucune donnée de performance sur une ligne réelle'
+testRecipe: 'tests/recipes/sqm-25.12.md'
+aliases: ['openwrt sqm', 'openwrt cake', 'configurer sqm', 'bufferbloat', 'lag openwrt', 'latence openwrt']
+symptoms: ['lag en jeu pendant un téléchargement', 'visioconférence saccadée', 'pics de latence', 'navigation lente pendant un envoi']
+sources:
+  - label: Documentation OpenWrt SQM
+    url: https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm
+  - label: Paquet OpenWrt SQM scripts
+    url: https://openwrt.org/packages/pkgdata/sqm-scripts
+  - label: Documentation du qdisc CAKE
+    url: https://www.bufferbloat.net/projects/codel/wiki/Cake/
+  - label: Projet Bufferbloat
+    url: https://www.bufferbloat.net/projects/bloat/wiki/Introduction/
+sourceHash: '59a725ea59a5c246'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 VM x86 200" tested={true} evidence="E2" />
+
+## Résultat
+
+- Déterminez si la « latence pendant un téléchargement ou un envoi » est du bufferbloat, et non un problème de Wi-Fi, d'ONT ou de congestion chez le FAI.
+- Installez et configurez `sqm-scripts` et CAKE sur OpenWrt 25.12.
+- Relevez la latence au repos et en charge, les pertes et le débit, au lieu d'affirmer que « ça semble plus rapide ».
+- Sachez quand SQM n'est pas le bon outil et comment le désactiver rapidement.
+
+## Environnement concerné
+
+- OpenWrt 25.12.6 avec `apk` ; `sqm-scripts 1.7.2` ; `luci-app-sqm` en option.
+- Le routeur est la **passerelle NAT principale** et le trafic WAN le traverse. Sur un point d'accès ou un routeur en contournement, SQM peut ne pas voir le trafic principal.
+- CAKE consomme du CPU ; sur les lignes gigabit, vérifiez l'utilisation d'un seul cœur avant d'ajouter une limitation de débit.
+- Cette page est en E2 partiel : l'installation ainsi que l'attachement et l'arrêt de CAKE ont été testés. Les affirmations sur le débit et la latence exigent un vrai WAN et relèvent du niveau E3.
+
+## Est-ce du bufferbloat ?
+
+Signes typiques :
+
+- Le ping au repos est correct, mais la latence explose dès qu'un téléchargement ou un envoi démarre ; les jeux saccadent, les appels hachent.
+- Limiter le débit descendant ou montant fait retomber la latence.
+- Le problème est identique sur les clients filaires et Wi-Fi, ce qui désigne la file d'attente du WAN.
+
+Ce n'est pas du bufferbloat :
+
+- Un seul local ou un seul client Wi-Fi pose problème : vérifiez le signal, les interférences et l'itinérance.
+- Latence ou pertes élevées même au repos : vérifiez l'ONT, le FAI et la ligne.
+- Le CPU du routeur est déjà saturé ; SQM peut aggraver la situation.
+
+## Paramètres clés
+
+| Paramètre | Signification | Erreur courante |
+|---|---|---|
+| `interface` | interface à limiter, généralement `wan` | utiliser `eth0`/`br-lan`, de sorte que le trafic contourne la limitation |
+| `download`/`upload` | débit limité (kbit/s) | utiliser le débit annoncé de l'abonnement, ce qui laisse la file pleine |
+| `qdisc` | `cake` ou `fq_codel` | activer SQM mais laisser le qdisc par défaut |
+| `script` | `piece_of_cake.qos` / `simplest.qos` | mauvais script, les options ne s'appliquent pas |
+| `linklayer`/`overhead` | surcharge de la couche liaison | copier les valeurs Ethernet sur PPPoE/VLAN |
+| CPU | coût de calcul de CAKE | CAKE en gigabit sur un CPU qui ne suit pas |
+
+Commencez à **85 %–95 %** du débit mesuré, puis ajustez d'après la latence en charge. N'écrivez pas « abonnement 100M = 100000 ».
+
+## Avant toute modification
+
+<Step where="router-shell" title="Relever le WAN, le CPU et le qdisc actuel" expected="Vous savez quelle interface vous modifiez et si SQM est déjà actif.">
+
+```sh
+ip -br link
+ip -br addr
+uci show network | grep -E "wan|device"
+uci show sqm 2>/dev/null || echo "sqm not installed"
+top -bn1 | head -15
+```
+
+Notez l'interface logique WAN, le périphérique physique, le débit de l'abonnement ou mesuré et le modèle de CPU. Conservez l'accès LuCI/SSH.
+
+</Step>
+
+<Step where="router-shell" title="Mesurer une référence au repos" expected="La latence et les pertes au repos sont enregistrées pour comparaison.">
+
+```sh
+ping -c 20 1.1.1.1
+ping -c 20 192.168.50.1
+```
+
+Utilisez `irtt`/`flent` s'ils sont disponibles ; sinon, relevez min/moy/max/mdev et les pertes.
+
+</Step>
+
+## Étapes minimales
+
+<Step where="router-shell" title="Installer SQM" expected="sqm-scripts et l'application LuCI sont installés.">
+
+```sh
+apk update
+apk add sqm-scripts luci-app-sqm
+```
+
+`luci-app-sqm` seul n'installe pas les scripts ; vérifiez avec `apk info -e sqm-scripts`.
+
+</Step>
+
+<Step where="luci" title="Configurer SQM dans LuCI" expected="Le WAN utilise cake/piece_of_cake et peut être activé ou désactivé.">
+
+Ouvrez **Réseau → SQM QoS** :
+
+1. Activez-le.
+2. Sélectionnez `wan` (et non `br-lan`).
+3. Réglez le débit descendant et montant à 85 %–95 % du débit mesuré.
+4. Choisissez `cake` et `piece_of_cake.qos`.
+5. Sélectionnez la vraie couche liaison (ne copiez pas les valeurs Ethernet sur PPPoE/VLAN).
+6. Enregistrez et appliquez.
+
+Commencez prudemment ; n'augmentez le débit qu'une fois la latence améliorée.
+
+</Step>
+
+<Step where="router-shell" title="Équivalent en ligne de commande (vérifiez d'abord le nom de la section)" expected="uci show sqm affiche la file que vous avez modifiée.">
+
+```sh
+uci show sqm
+```
+
+La section peut ne pas s'appeler `@queue[0]` ; utilisez son vrai nom. Exemple :
+
+```sh
+uci set sqm.@queue[0].enabled='1'
+uci set sqm.@queue[0].interface='wan'
+uci set sqm.@queue[0].download='90000'
+uci set sqm.@queue[0].upload='18000'
+uci set sqm.@queue[0].qdisc='cake'
+uci set sqm.@queue[0].script='piece_of_cake.qos'
+uci set sqm.@queue[0].linklayer='ethernet'
+uci set sqm.@queue[0].overhead='0'
+uci commit sqm
+/etc/init.d/sqm restart
+```
+
+Ces valeurs sont des exemples, pas les paramètres de votre ligne ; vérifiez `linklayer`/`overhead`.
+
+</Step>
+
+<Step where="router-shell" title="Confirmer que le qdisc est attaché" expected="cake/fq_codel apparaît sur wan et le journal est propre.">
+
+```sh
+tc -s qdisc show dev wan
+tc -s qdisc show | grep -E "cake|fq_codel|ifb"
+logread -e sqm | tail -30
+```
+
+Si vous ne voyez que `noqueue`/`pfifo_fast`, SQM n'est pas actif ; vérifiez l'interface et les journaux de `/etc/init.d/sqm`.
+
+</Step>
+
+## Vérification en charge
+
+<Step where="client" title="Mesurer la latence pendant un téléchargement ou un envoi" expected="Vous disposez de données avant/après, pas d'une impression.">
+
+Gardez un ping actif pendant qu'un autre terminal sature la ligne :
+
+```sh
+# terminal A
+ping -i 0.2 1.1.1.1
+
+# terminal B: use a trusted speed/download tool to saturate the line
+```
+
+Relevez :
+
+- min/moy/max/mdev au repos et en charge ;
+- les pertes ;
+- si le débit a nettement baissé ;
+- si un cœur du CPU du routeur est saturé.
+
+Sans ces données, n'écrivez pas « SQM a réduit la latence ».
+
+</Step>
+
+## Cas d'échec et récupération
+
+### SQM ne démarre pas / aucun qdisc
+
+```sh
+logread -e sqm | tail -50
+tc -s qdisc show dev wan
+uci show sqm
+```
+
+Causes courantes : mauvaise interface, `sqm-scripts` absent, combinaison qdisc/script non prise en charge, erreurs de `tc`. Désactivez SQM et rétablissez l'état précédent avant de poursuivre le diagnostic.
+
+### Le débit s'effondre / le CPU sature
+
+- Débit réglé trop bas : relevez-le par paliers à partir de la valeur mesurée.
+- CAKE trop coûteux sur un CPU faible : utilisez `fq_codel` ou un débit plus bas.
+- Mauvaise surcharge de liaison : corrigez-la pour PPPoE/VLAN.
+- Désactivez SQM et confirmez que le débit revient.
+
+### Aucun effet
+
+- Le trafic contourne le routeur (point d'accès, contournement, switch).
+- Le goulot d'étranglement est le Wi-Fi ou la congestion chez le FAI.
+- Seul le sens descendant est limité ; le sens montant reste congestionné.
+- Vous avez mesuré la latence au repos, pas en charge.
+
+### Désactivation rapide
+
+```sh
+uci set sqm.@queue[0].enabled='0'
+uci commit sqm
+/etc/init.d/sqm restart
+```
+
+Ou restaurez la sauvegarde précédente de `/etc/config/sqm`.
+
+## Essai de laboratoire E2 (2026-10-20)
+
+- Environnement : OpenWrt 25.12.6 VM x86 200 ; WAN `eth1` en DHCP `192.168.50.158/24` ; `sqm-scripts 1.7.2-r1`, `luci-app-sqm`.
+- Configuration : `eth1`, download `100000 Kbps`, upload `20000 Kbps`, `piece_of_cake.qos`, `cake`.
+- Démarrage : `SQM: ... started on eth1 successfully` ; `tc -s qdisc show dev eth1` affichait `qdisc cake ... bandwidth 20Mbit`.
+- Arrêt : `SQM: Stopping SQM on eth1` ; le qdisc est revenu à `fq_codel`.
+- **N'utilisez pas** ces valeurs de VM pour affirmer une latence plus faible ou une meilleure expérience ; il n'y a ni vraie ligne, ni latence en charge, ni comparaison de débit.
+- Non testé : bufferbloat réel sur une ligne haut débit avant/après, utilisation d'un seul cœur du CPU, surcharge PPPoE/VLAN, goulot d'étranglement Wi-Fi.
+- Recette : `tests/recipes/sqm-25.12.md`.
+
+## Statut E2 et sources
+
+- Il s'agit d'un E2 partiel : l'installation, l'attachement et l'arrêt de CAKE ainsi que la récupération ont été testés ; les performances sur une ligne réelle restent du ressort de E3.
+- Une VM prouve seulement les commandes et l'attachement du qdisc ; elle ne peut pas représenter une connexion domestique. N'utilisez pas les valeurs de la VM pour affirmer que « ça fonctionne ».
+- Dans un environnement réel, relevez la ligne, le CPU et le qdisc, la latence au repos et en charge ainsi que le débit avant de décider de conserver SQM.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 VM x86 200 ; sqm-scripts 1.7.2 + luci-app-sqm ; WAN eth1 en DHCP ; qdisc CAKE attaché ; aucune donnée de performance sur une ligne réelle"
+  recipe="tests/recipes/sqm-25.12.md"
+  result="E2 partiel : SQM démarré sur eth1 à 100/20 Mbit avec piece_of_cake.qos ; tc affichait cake 20Mbit ; l'arrêt a rétabli fq_codel ; aucune donnée de débit ou de latence sur une ligne réelle"
+/>
+
+<PageSources />

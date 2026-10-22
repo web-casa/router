@@ -1,0 +1,176 @@
+---
+title: "Quel OpenWrt est-ce : officiel, ImmortalWrt, iStoreOS ou firmware constructeur ?"
+description: Lisez la distribution, la version, la cible, le gestionnaire de paquets et le modèle matériel avec des commandes en lecture seule, pour choisir la bonne image et les bons dépôts.
+pageType: troubleshoot
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Relevé sur appareil en attente ; les commandes sont en lecture seule et ne dépendent pas du laboratoire'
+testRecipe: 'tests/recipes/which-openwrt.md'
+aliases: ['version openwrt', 'immortalwrt ou openwrt', 'istoreos openwrt', 'identifier firmware openwrt', 'openwrt version', 'immortalwrt vs openwrt']
+symptoms: ['je ne sais pas quelle image flasher', 'le paquet ne s’installe pas', 'origine du firmware inconnue']
+sources:
+  - label: Notes de version OpenWrt 25.12
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: Sélecteur de firmware OpenWrt
+    url: https://firmware-selector.openwrt.org/
+  - label: Gestionnaire de paquets OpenWrt (apk)
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: ImmortalWrt
+    url: https://immortalwrt.org/
+  - label: iStoreOS
+    url: https://www.istoreos.com/
+sourceHash: 'c81d8dfe3c689c0e'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="unknown" version="—" packageManager="—" device="tout appareil de type OpenWrt" tested={false} evidence="E1" />
+
+## Résultat attendu
+
+- Déterminer si l'appareil exécute **OpenWrt officiel, ImmortalWrt, iStoreOS ou un firmware constructeur**.
+- Lire la distribution, la version, la révision, la cible, l'architecture et le modèle matériel.
+- Savoir si le gestionnaire de paquets est `apk` ou `opkg`, et quels dépôts lui correspondent.
+- Choisir la bonne image sysupgrade ou constructeur au lieu d'en flasher une mauvaise.
+
+## Commencez par trois commandes en lecture seule
+
+<Step where="router-shell" title="Lisez les données de la carte système" expected="Vous voyez la distribution, la version, la cible et le modèle.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+```
+
+Les quatre champs clés sont `release.distribution`, `release.version`, `release.target` et `model`.
+
+</Step>
+
+<Step where="router-shell" title="Lisez le gestionnaire de paquets et l'architecture" expected="Vous savez s'il s'agit d'apk ou d'opkg, et connaissez l'architecture du CPU.">
+
+```sh
+command -v apk
+command -v opkg
+cat /etc/apk/arch 2>/dev/null
+opkg print-architecture 2>/dev/null
+uname -a
+```
+
+Ne devinez pas le gestionnaire de paquets d'après le numéro de version : l'OpenWrt officiel 25.12 utilise généralement `apk`, la 24.10 utilise `opkg`, mais les forks et les images constructeur peuvent différer. Fiez-vous à la commande qui existe.
+
+</Step>
+
+<Step where="router-shell" title="Lisez le modèle et la révision matérielle" expected="Le modèle et le nom de la carte correspondent à l'étiquette de l'appareil.">
+
+x86 :
+
+```sh
+cat /sys/class/dmi/id/sys_vendor
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/board_version
+cat /sys/class/dmi/id/bios_version
+```
+
+ARM/routeur :
+
+```sh
+cat /tmp/sysinfo/model
+cat /tmp/sysinfo/board_name
+```
+
+`model` n'est pas la révision matérielle ; un même modèle peut exister en plusieurs révisions. Avant de flasher, appuyez-vous sur l'étiquette, `board_name` et la page de téléchargement du constructeur.
+
+</Step>
+
+## Tableau de décision
+
+| Champ/indice | OpenWrt officiel | ImmortalWrt | iStoreOS | Firmware constructeur |
+|---|---|---|---|---|
+| `release.distribution` | `OpenWrt` | généralement `ImmortalWrt` | généralement `iStoreOS`/constructeur | constructeur |
+| Dépôts | `downloads.openwrt.org` | dépôts ImmortalWrt | dépôts iStoreOS | boutique du constructeur |
+| Gestionnaire de paquets | `apk` (25.12) ou `opkg` (24.10) | vérifiez la commande | généralement `opkg` | peut être absent ou restreint |
+| Interface web | LuCI | LuCI + personnalisations | interface iStoreOS | interface du constructeur |
+| Image de mise à niveau | sysupgrade OpenWrt | image ImmortalWrt | image iStoreOS | firmware constructeur |
+| Support | communauté OpenWrt | communauté ImmortalWrt | communauté iStoreOS | constructeur |
+
+**Ne mélangez pas** les dépôts officiels OpenWrt dans ImmortalWrt ou iStoreOS, et ne flashez pas le sysupgrade d'un autre modèle : l'ABI, le noyau et la disposition des partitions peuvent ne pas correspondre.
+
+## Pourquoi la page « À propos » ne suffit pas
+
+- Certaines images constructeur changent l'apparence de LuCI mais ne sont pas de l'OpenWrt officiel en dessous.
+- `DISTRIB_DESCRIPTION` peut être personnalisé et ne suffit pas à lui seul.
+- Un même numéro de version n'implique pas la même cible ni le même profil.
+- Le gestionnaire de paquets et les dépôts sont ce qui compte vraiment pour installer des extensions.
+
+Recoupez `ubus call system board`, `/etc/openwrt_release` et le gestionnaire de paquets.
+
+## Choisir l'image de mise à niveau
+
+<Step where="router-shell" title="Notez la cible et board_name" expected="Vous trouvez une correspondance exacte dans le sélecteur de firmware ou sur la page du constructeur.">
+
+```sh
+ubus call system board
+```
+
+Concentrez-vous sur :
+
+- `release.target` (par ex. `x86/64`, `mediatek/filogic`) ;
+- `board_name` ;
+- `model` ;
+- la version et la révision actuelles.
+
+Pour les appareils officiels, utilisez le [sélecteur de firmware OpenWrt](https://firmware-selector.openwrt.org/) avec la cible et le modèle exacts. Les appareils ImmortalWrt, iStoreOS ou constructeur utilisent leurs propres pages de téléchargement. **Ne flashez jamais un sysupgrade provenant d'un autre modèle ou d'une autre cible.**
+
+</Step>
+
+<Step where="router-shell" title="Confirmez le type d'image" expected="Vous savez s'il s'agit d'un sysupgrade ou d'une image factory/constructeur.">
+
+- La mise à niveau d'un OpenWrt existant utilise généralement `sysupgrade`.
+- La première installation depuis un firmware constructeur utilise généralement une image de transition `factory`/constructeur.
+- Les x86 peuvent utiliser des images combined/ext4 écrites différemment.
+- En cas de doute, lisez la page de l'appareil ; ne devinez pas d'après le nom du fichier.
+
+</Step>
+
+## Branches d'échec et récupération
+
+### `ubus` est absent ou échoue
+
+Il peut s'agir d'un firmware constructeur ou d'un système qui n'est pas OpenWrt. Consultez la page « À propos/Système » de l'interface web et l'étiquette de l'appareil ; ne flashez pas OpenWrt à l'aveugle.
+
+### Interface web uniquement, pas de SSH
+
+Le firmware constructeur peut désactiver SSH. Consultez d'abord la documentation du constructeur et la garantie ; ne flashez pas uniquement pour obtenir root. Si vous avez besoin des fonctions du constructeur, utilisez sa procédure de mise à niveau.
+
+### Les paquets ne s'installent pas
+
+- Le gestionnaire de paquets ne correspond pas au firmware (`apk` ou `opkg`) ;
+- architecture ou version du dépôt incompatible ;
+- ABI des modules du noyau incompatible ;
+- des dépôts d'un autre fork sont mélangés.
+
+Revenez à `ubus call system board` et au gestionnaire de paquets, confirmez la source, puis diagnostiquez.
+
+### Mauvaise image / appareil briqué
+
+Arrêtez de flasher. Utilisez le failsafe de l'appareil, TFTP ou la procédure de récupération du constructeur. Si vous n'avez aucune voie de récupération, n'essayez pas « encore une image ».
+
+## Statut E1 et sources
+
+- Il s'agit d'un E1 : les champs, le tableau de décision et la méthode de choix d'image reposent sur la documentation publique ; aucun appareil n'a été relevé dans cet environnement.
+- Les forks et les sorties constructeur peuvent différer ; exécutez `tests/recipes/which-openwrt.md` sur un appareil réel, enregistrez les champs et les captures d'écran, puis passez en E2.
+- Cette page ne sert qu'à identifier le firmware ; elle ne fournit ni flashage entre modèles ni contournement des restrictions constructeur.
+
+<TestRecord
+  status="planned"
+  environment="Relevé sur appareil en attente ; commandes en lecture seule, sans dépendance au laboratoire"
+  recipe="tests/recipes/which-openwrt.md"
+  result="E1 : champs, tableau de décision et méthode de choix d'image documentés ; pas encore de relevé sur appareil"
+/>
+
+<PageSources />

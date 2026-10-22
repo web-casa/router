@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "topK": 5,
+  "queries": [
+    {
+      "id": "fr-dns-01",
+      "locale": "fr",
+      "query": "serveur DNS amont dnsmasq",
+      "expectedUrls": [
+        "/fr/network/dns/"
+      ],
+      "category": "dns",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-proxmox-01",
+      "locale": "fr",
+      "query": "proxmox une seule carte réseau openwrt",
+      "expectedUrls": [
+        "/fr/installation/proxmox/"
+      ],
+      "category": "proxmox",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-agh-01",
+      "locale": "fr",
+      "query": "adguard home port 5353",
+      "expectedUrls": [
+        "/fr/software/adguard-home/"
+      ],
+      "category": "agh",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-sqm-01",
+      "locale": "fr",
+      "query": "sqm cake bufferbloat",
+      "expectedUrls": [
+        "/fr/software/sqm/"
+      ],
+      "category": "sqm",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-luci-01",
+      "locale": "fr",
+      "query": "première connexion luci mot de passe",
+      "expectedUrls": [
+        "/fr/getting-started/luci-first-login/"
+      ],
+      "category": "luci",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-fw-01",
+      "locale": "fr",
+      "query": "immortalwrt istoreos différences",
+      "expectedUrls": [
+        "/fr/getting-started/which-openwrt/"
+      ],
+      "category": "fw",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-oc-01",
+      "locale": "fr",
+      "query": "openclash conflit dns",
+      "expectedUrls": [
+        "/fr/software/openclash/"
+      ],
+      "category": "oc",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-pkg-01",
+      "locale": "fr",
+      "query": "apk opkg dépôts miroir",
+      "expectedUrls": [
+        "/fr/software/package-sources/"
+      ],
+      "category": "pkg",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-rec-01",
+      "locale": "fr",
+      "query": "luci inaccessible 192.168.1.1",
+      "expectedUrls": [
+        "/fr/troubleshooting/no-web-ui/"
+      ],
+      "category": "rec",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-lan-01",
+      "locale": "fr",
+      "query": "changer l'adresse lan",
+      "expectedUrls": [
+        "/fr/network/lan-address/"
+      ],
+      "category": "lan",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-bak-01",
+      "locale": "fr",
+      "query": "sauvegarde restauration configuration",
+      "expectedUrls": [
+        "/fr/recovery/backup-restore/"
+      ],
+      "category": "bak",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-upg-01",
+      "locale": "fr",
+      "query": "mise à jour firmware sysupgrade",
+      "expectedUrls": [
+        "/fr/recovery/firmware-upgrade/"
+      ],
+      "category": "upg",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-wg-01",
+      "locale": "fr",
+      "query": "serveur wireguard",
+      "expectedUrls": [
+        "/fr/remote-access/wireguard-server/"
+      ],
+      "category": "wg",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-vlan-01",
+      "locale": "fr",
+      "query": "vlan dsa ports",
+      "expectedUrls": [
+        "/fr/wireless-vlan/dsa-vlan/"
+      ],
+      "category": "vlan",
+      "aliasCase": false
+    },
+    {
+      "id": "fr-guest-01",
+      "locale": "fr",
+      "query": "wifi invité",
+      "expectedUrls": [
+        "/fr/wireless-vlan/guest-wifi/"
+      ],
+      "category": "guest",
+      "aliasCase": false
+    }
+  ]
+}

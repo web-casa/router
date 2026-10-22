@@ -1,0 +1,199 @@
+---
+title: "OpenClash : bases, compatibilité, conflits DNS et désactivation propre"
+description: Vérifiez la compatibilité d'OpenClash avec le micrologiciel, l'architecture et le paquet dans un cadre légal, résolvez les conflits DNS et gardez la connectivité de base récupérable après la désactivation.
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 VM x86 200 ; installation, démarrage et arrêt de luci-app-openclash 0.48.002 via apk ; aucun point d''accès proxy ni abonnement'
+testRecipe: 'tests/recipes/openclash-25.12.md'
+aliases: ['openclash install', 'openclash compatibility', 'openclash dns', 'installer openclash', 'conflit dns openclash']
+symptoms: ['OpenClash ne s''installe pas', 'plus d''accès à Internet après activation d''OpenClash', 'conflit DNS']
+sources:
+  - label: Projet OpenClash
+    url: https://github.com/vernesong/OpenClash
+  - label: Format des paquets OpenWrt
+    url: https://openwrt.org/docs/guide-user/additional-software/package-format
+  - label: DHCP et DNS sous OpenWrt
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: Cœur Mihomo
+    url: https://github.com/MetaCubeX/mihomo
+sourceHash: '1fba7eb75b5f204d'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 VM x86 200" tested={true} evidence="E2" />
+
+> **Périmètre** : cette page traite de la compatibilité, des conflits DNS, du démarrage et de l'arrêt, et de la récupération dans un cadre légal. Elle ne fournit ni serveurs proxy, ni liens d'abonnement, ni jeux de règles, ni méthodes pour contourner des contrôles réseau ou des restrictions de service ou de région. Vérifiez la législation locale, les conditions de votre FAI et celles du service auquel vous accédez avant toute utilisation.
+
+## Résultat
+
+- Déterminez si votre micrologiciel, votre architecture et votre format de paquet correspondent à une version d'OpenClash.
+- Vérifiez s'il entrera en conflit avec dnsmasq ou AdGuard Home sur le port 53.
+- Vérifiez l'état du processus, des journaux et des ports au lieu de vous fier uniquement à la page LuCI.
+- Rétablissez le DNS et la connectivité de base après la désactivation.
+- Sachez ce que cette page ne couvre volontairement pas.
+
+## Environnement concerné et hypothèses
+
+- OpenWrt 25.12.6 (`apk`) ou 24.10 (`opkg`) ; x86/ARM doit correspondre au paquet de la version.
+- OpenClash est une application LuCI tierce et nécessite généralement un cœur Mihomo/Meta correspondant ; l'interface, le cœur et le micrologiciel doivent être compatibles.
+- `apk` sur 25.12 et `ipk` sur 24.10 sont des formats différents. Ne renommez pas un `.ipk` en `.apk` et ne forcez pas l'installation d'un paquet d'une autre architecture.
+- Sur un micrologiciel constructeur, ImmortalWrt ou iStoreOS, identifiez d'abord la source et le gestionnaire de paquets (voir la page d'identification du micrologiciel).
+
+## Vérifications avant l'installation
+
+<Step where="router-shell" title="Vérifier le micrologiciel, l'architecture et l'espace libre" expected="Vous connaissez le format de paquet, l'architecture du CPU et l'espace disponible.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+uname -m
+command -v apk
+command -v opkg
+df -h /
+free -h
+```
+
+Notez `release.target`, `DISTRIB_ARCH`, le gestionnaire de paquets et l'espace libre. OpenClash, son cœur et ses données de règles peuvent occuper plusieurs dizaines de Mo ; ne le forcez pas sur un rootfs plein.
+
+</Step>
+
+<Step where="router-shell" title="Trouver un paquet de version correspondant" expected="Vous trouvez un apk/ipk adapté au micrologiciel et à l'architecture exacts.">
+
+Utilisez uniquement la page officielle des versions d'OpenClash et vérifiez :
+
+- la version majeure du micrologiciel (25.12 / 24.10) ;
+- le format de paquet (apk / ipk) ;
+- l'architecture du CPU (x86_64, aarch64, etc.) ;
+- les dépendances (modules du noyau, bash/curl, selon les notes de version) ;
+- la somme SHA-256 ou le checksum de la page des versions.
+
+S'il n'existe aucun paquet correspondant, arrêtez-vous. Ne forcez pas un paquet « universel » ni une version compilée par quelqu'un d'autre.
+
+</Step>
+
+<Step where="router-shell" title="Relever l'état de référence du DNS et des ports" expected="Vous savez qui occupe le port 53 et ce que signifie restaurer.">
+
+```sh
+netstat -lnp | grep -E ':53|:5353|:7874|:9090'
+cat /tmp/resolv.conf.d/resolv.conf.auto
+nslookup openwrt.org 127.0.0.1
+```
+
+Si AdGuard Home occupe le port 53 et dnsmasq le port 5353, OpenClash ne doit pas prendre aussi le 53. Décidez qui gère le DNS avant de le démarrer.
+
+</Step>
+
+## Configuration minimale (sans point d'accès proxy)
+
+<Step where="luci" title="Démarrer d'abord l'interface et le cœur, sans reprise du DNS" expected="Le service démarre et LuCI affiche son état.">
+
+Dans **Services → OpenClash** :
+
+1. Sélectionnez un cœur correspondant à l'architecture.
+2. Laissez pour l'instant la prise en charge ou le détournement du DNS désactivé.
+3. Enregistrez et démarrez.
+4. Ouvrez la page des journaux et vérifiez l'absence de « core mismatch / port in use / missing dependency ».
+
+Cette page ne fournit ni serveurs proxy, ni abonnements, ni règles. Si vous n'avez pas de configuration légale, arrêtez-vous ici ; ne collez pas un abonnement inconnu uniquement pour « le faire fonctionner ».
+
+</Step>
+
+<Step where="router-shell" title="Confirmer le processus, les ports et les journaux" expected="OpenClash et son cœur s'exécutent sans conflit sur le port 53.">
+
+```sh
+ps w | grep -Ei 'openclash|mihomo|clash' | grep -v grep
+netstat -lnp | grep -E ':7874|:9090|:53'
+logread | grep -i openclash | tail -30
+```
+
+Les ports dépendent de votre configuration ; la règle essentielle est : **ne laissez jamais deux processus se lier au port 53**. Si le journal signale un échec de liaison DNS, désactivez OpenClash au lieu de le redémarrer en boucle.
+
+</Step>
+
+## Désactiver et récupérer
+
+<Step where="router-shell" title="Désactiver et confirmer la connectivité de base" expected="La résolution de noms et Internet fonctionnent sans OpenClash.">
+
+```sh
+/etc/init.d/openclash stop
+/etc/init.d/openclash disable
+uci show openclash
+/etc/init.d/dnsmasq restart
+nslookup openwrt.org 127.0.0.1
+```
+
+Si vous avez modifié auparavant le port de dnsmasq ou l'option DHCP 6, rétablissez-les en suivant les pages DNS/AGH ; assurez-vous que les clients ne pointent plus vers le DNS d'un OpenClash arrêté.
+
+</Step>
+
+## Cas d'échec et récupération
+
+### Plus d'accès à Internet après l'activation d'OpenClash
+
+1. Accédez à l'appareil via le LAN ou la console.
+2. Arrêtez OpenClash.
+3. Rétablissez le port 53 de dnsmasq et le DNS fourni par le DHCP.
+4. Vérifiez s'il reste des règles de pare-feu ou de détournement DNS.
+5. Redémarrez si nécessaire ; rétablissez la connectivité de base avant de poursuivre le diagnostic.
+
+### LuCI est inaccessible
+
+Ne cliquez pas à répétition sur « redémarrer ». Utilisez SSH ou la console pour arrêter le service :
+
+```sh
+/etc/init.d/openclash stop
+/etc/init.d/openclash disable
+logread | tail -50
+```
+
+Si une règle de pare-feu bloque l'administration, récupérez l'accès depuis la console ; ne réinitialisez pas aux paramètres d'usine à l'aveugle.
+
+### Incompatibilité de format de paquet ou d'architecture
+
+- 25.12 utilise apk ; 24.10 utilise ipk ; ils ne sont pas interchangeables.
+- Les paquets x86_64 et aarch64 ne sont pas interchangeables.
+- Si les versions de l'interface et du cœur ne correspondent pas, revenez à la combinaison indiquée sur la page des versions.
+- Ne désactivez pas toutes les vérifications de signature uniquement pour l'installer.
+
+### Conflit ou boucle DNS
+
+- Un seul point d'entrée DNS principal doit occuper le port 53.
+- AdGuard Home, dnsmasq et le DNS d'OpenClash ne doivent pas pointer les uns vers les autres en boucle.
+- Arrêtez OpenClash, rétablissez dnsmasq/AGH, puis ajoutez les composants un par un.
+- Testez séparément `127.0.0.1`, l'adresse LAN et le serveur amont avec `nslookup`.
+
+## Conformité et limites de version
+
+- Utilisez-le uniquement sur des réseaux et selon des conditions de service qui l'autorisent. Cette page ne fournit ni contournement, ni moyen d'échapper aux restrictions de région ou de contrôle d'accès, ni contenu d'abonnement ou de compte partagé.
+- OpenClash et Mihomo sont des projets tiers dont les versions et les dépendances évoluent vite ; lisez les notes de version et conservez un paquet de retour arrière.
+- Ceci n'est pas un avis juridique ; réglez les questions de conformité avant le déploiement.
+
+## Essai de laboratoire E2 (2026-10-20)
+
+- Environnement : OpenWrt 25.12.6 VM x86 200 ; `.apk` officiel de `luci-app-openclash 0.48.002`.
+- `apk add --allow-untrusted` a installé 43 paquets (dont `luci-compat`, Ruby, unzip) ; `/etc/init.d/openclash` et le contrôleur LuCI existent.
+- Sans configuration ni point d'accès proxy, `start` a indiqué `inactive` ; cette page n'affirme pas que « le proxy fonctionne ».
+- Après `stop` + `disable`, `nslookup openwrt.org 127.0.0.1` a renvoyé « connection refused » ; `/etc/init.d/dnsmasq restart` a rétabli le DNS et le ping vers l'extérieur fonctionnait.
+- Non testé : point d'accès proxy ou abonnement réel, correspondance de routage et de DNS, cœur Mihomo, TUN et règles de pare-feu, performances et stabilité.
+- Recette : `tests/recipes/openclash-25.12.md`.
+
+## Statut E2 et sources
+
+- Il s'agit d'un E2 partiel : l'installation du `.apk` 25.12, le démarrage sans configuration, la désactivation et la récupération du DNS ont été testés ; le proxy et le routage réels restent en E1/E3.
+- Sans point d'accès ni configuration légaux, ne transformez pas « installé » en « le proxy fonctionne ».
+- N'étendez pas cette page en tutoriel d'abonnement proxy ou de contournement ; cela est hors périmètre.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 VM x86 200 ; installation, démarrage et arrêt de luci-app-openclash 0.48.002 via apk ; aucun point d'accès proxy ni abonnement"
+  recipe="tests/recipes/openclash-25.12.md"
+  result="E2 partiel : 0.48.002 apk installé (43 paquets dont luci-compat/ruby) ; le démarrage sans configuration est resté inactive ; après stop/disable le DNS était refusé jusqu'au redémarrage de dnsmasq ; aucun test de point d'accès proxy ni de routage"
+/>
+
+<PageSources />

@@ -1,0 +1,58 @@
+---
+title: "Linux 6.12 et la chaîne d'outils 25.12 : pourquoi les modules noyau doivent correspondre"
+description: "OpenWrt 25.12 passe de Linux 6.6 à 6.12 et de GCC 13.3 à 14.3. Ce que cela implique pour les paquets kmod et les dépôts tiers."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt kernel version", "openwrt 25.12 kernel", "openwrt kmod mismatch", "version du noyau openwrt", "kmod incompatible openwrt"]
+sources:
+  - label: "Annonce de la version OpenWrt 25.12.0"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: "Version de maintenance OpenWrt 25.12.6"
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: "Annonce de la version OpenWrt 24.10.0"
+    url: https://forum.openwrt.org/t/openwrt-24-10-0-first-stable-release/223845
+sourceHash: 'b6196d9a49934dce'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="kernel-toolchain" />
+
+## En une phrase
+
+25.12 fait passer toutes les cibles de Linux 6.6 à 6.12 et met à jour la chaîne d'outils, de sorte que les modules noyau compilés pour 24.10 ne se chargeront pas sur 25.12.
+
+## Versions côte à côte
+
+| Composant | 24.10.0 | 25.12.0 |
+|---|---|---|
+| Noyau Linux | 6.6.73 | 6.12.71 |
+| GCC | 13.3.0 | 14.3.0 |
+| binutils | 2.42 | 2.44 |
+| musl | 1.2.5 | 1.2.5 |
+| glibc | 2.38 | 2.41 |
+
+25.12.6 fait passer le noyau à 6.12.112. Dans 25.12.0, la pile sans fil (cfg80211/mac80211) provient du noyau 6.18.7, avec dnsmasq 2.91, dropbear 2025.89 et busybox 1.37.0.
+
+## Pourquoi cela compte à la maison
+
+- Les paquets `kmod-*` sont compilés pour un noyau précis. Le chemin du dépôt contient le hachage du noyau, comme dans `targets/<target>/kmods/<kernel-hash>/`, et il doit correspondre au noyau en cours d'exécution.
+- Un kmod d'une autre version, d'une autre compilation ou d'un miroir avec un hachage différent échouera à l'installation ou au chargement. C'est une cause fréquente de « le paquet ne s'installe pas ».
+- Les compilations tierces embarquent souvent leur propre noyau. Les kmods officiels peuvent ne pas leur convenir du tout.
+
+## Le voir sur votre routeur
+
+```sh
+uname -r
+grep -E 'RELEASE|TARGET' /etc/openwrt_release
+```
+
+## Guides associés
+
+- [Sources de paquets](/fr/software/package-sources/)
+- [Le paquet ne s'installe pas](/fr/troubleshooting/plugin-install/)
+- [Quel OpenWrt est-ce ?](/fr/getting-started/which-openwrt/)
+
+<PageSources />

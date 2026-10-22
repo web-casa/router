@@ -1,0 +1,178 @@
+---
+title: "apk de 25.12 et opkg de 24.10 : commandes, format des paquets et limites de migration"
+description: 25.12 utilise apk et 24.10 utilise opkg ; comparez le format des paquets, les fichiers de dépôts et les commandes de mise à jour/installation/requête, et voyez pourquoi une mise à niveau exige de réinstaller les paquets plutôt que de les convertir.
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'VM x86 OpenWrt 25.12.6 200 ; dépôts apk officiel/TUNA 11220 paquets ; SQM installé ; opkg 24.10 non exécuté'
+testRecipe: 'tests/recipes/apk-vs-opkg.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['apk vs opkg', 'openwrt apk', 'openwrt opkg', 'openwrt package manager', 'openwrt gestionnaire de paquets']
+symptoms: ['commande apk introuvable', 'commande opkg introuvable', 'le ipk ne s''installe pas', 'le gestionnaire de paquets a changé après la mise à niveau']
+sources:
+  - label: Gestionnaire de paquets apk d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: Gestionnaire de paquets opkg d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg
+  - label: Aide-mémoire opkg vers apk d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: Notes de version d'OpenWrt 25.12
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+sourceHash: '6add07f476cef0f1'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="VM PVE 200" tested={true} evidence="E2" />
+
+## En une ligne
+
+- **25.12+** : `apk`, les paquets sont des `.apk` ;
+- **24.10 et antérieures** : `opkg`, les paquets sont des `.ipk` ;
+- Ils ne sont pas liés par un simple renommage ; **ne renommez pas un `.ipk` en `.apk`** ;
+- Après la mise à niveau vers 25.12, réinstallez les extensions depuis les dépôts `apk` ; la configuration peut être sauvegardée/restaurée.
+
+## Vérifier de quel côté vous êtes
+
+```sh
+cat /etc/openwrt_release
+command -v apk
+command -v opkg
+```
+
+Ce laboratoire : 25.12.6, `apk` existe, `opkg` n'existe pas.
+
+## Comparaison
+
+| Élément | `apk` de 25.12 | `opkg` de 24.10 |
+|---|---|---|
+| Format | `.apk` | `.ipk` |
+| Fichier de dépôts | `/etc/apk/repositories.d/distfeeds.list` | `/etc/opkg/distfeeds.conf` |
+| Mettre à jour l'index | `apk update` | `opkg update` |
+| Installer | `apk add <pkg>` | `opkg install <pkg>` |
+| Supprimer | `apk del <pkg>` | `opkg remove <pkg>` |
+| Rechercher | `apk search <term>` | `opkg list \| grep <term>` |
+| Installés | `apk list --installed` | `opkg list-installed` |
+| Infos sur un paquet | `apk info -a <pkg>` | `opkg info <pkg>` |
+| Vider le cache | `apk cache clean` | `opkg clean` |
+
+## Dépôts et architecture
+
+25.12 :
+
+```text
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/packages/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/packages/x86_64/base/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/kmods/<kernel-hash>/packages.adb
+```
+
+24.10 :
+
+```text
+src/gz openwrt_core https://downloads.openwrt.org/releases/24.10.8/targets/x86/64/packages
+src/gz openwrt_base https://downloads.openwrt.org/releases/24.10.8/packages/x86_64/base
+```
+
+- La version (`release`), la cible (`target`), l'architecture (`arch`) et le hash des kmods doivent correspondre ;
+- Mélanger les dépôts officiels/ImmortalWrt/iStoreOS peut casser l'ABI, les signatures ou les noms ;
+- Un miroir chinois ne change que le préfixe d'hôte/de chemin ; ne changez ni la cible ni l'architecture.
+
+## Opérations courantes
+
+<Step where="router-shell" title="Installer un paquet sous 25.12" expected="La mise à jour, la recherche, l'installation et la vérification utilisent toutes apk.">
+
+```sh
+apk update
+apk search -x sqm-scripts
+apk add sqm-scripts
+apk info -e sqm-scripts
+apk list --installed | wc -l
+```
+
+Ce laboratoire : officiel et TUNA avaient tous deux 11220 paquets ; `sqm-scripts 1.7.2-r1` installé.
+
+</Step>
+
+<Step where="router-shell" title="Équivalent sous 24.10" expected="Les commandes et le format sont opkg/ipk ; ne mélangez pas avec apk.">
+
+```sh
+opkg update
+opkg list | grep sqm-scripts
+opkg install sqm-scripts
+opkg list-installed | grep sqm-scripts
+```
+
+Ce sont les commandes équivalentes officielles, **non exécutées ici** (pas d'appareil 24.10) ; ne les présentez pas comme une sortie mesurée.
+
+</Step>
+
+## Lors de la mise à niveau vers 25.12
+
+1. Sauvegardez `/etc/config` et la liste des paquets (voir 018) ;
+2. Notez `opkg list-installed` de 24.10 ;
+3. Mettez à niveau/reflashez 25.12 (voir 019) ;
+4. Réinstallez les extensions depuis les dépôts `apk` ;
+5. Restaurez la configuration, vérifiez LuCI, les services et le DNS ;
+6. Ne convertissez pas les `.ipk` en `.apk` et ne copiez pas d'anciens répertoires de paquets.
+
+Dans ce laboratoire, le sysupgrade de 25.12 a conservé la configuration mais fait passer les paquets de 239 à 182 ; SQM/OpenClash ont dû être réinstallés.
+
+## Échecs courants
+
+### `apk: not found`
+
+- Le firmware est en 24.10 ou plus ancien ; utilisez `opkg` ;
+- « Installer un gestionnaire de paquets apk » n'est pas la solution ; vérifiez d'abord la version.
+
+### `opkg: not found`
+
+- Le firmware est en 25.12+ ; utilisez `apk` ;
+- Les anciens tutoriels/scripts qui utilisent `opkg` ne s'appliquent pas directement.
+
+### Le `.ipk` ne s'installe pas
+
+- 25.12 utilise des `.apk` ;
+- Renommer ne change pas le format ;
+- Trouvez le `.apk` correspondant à la version/cible/architecture, ou recompilez.
+
+### Erreurs 404/signature/dépendances
+
+- incompatibilité version/cible/architecture/hash des kmods ;
+- dépôts mélangés ;
+- heure système/certificats ;
+- ne contournez pas systématiquement avec `--allow-untrusted`.
+
+### Aucun menu LuCI après la mise à niveau
+
+- le programme principal est installé sans `luci-app-*` ;
+- l'ancienne extension n'a pas été réinstallée ;
+- cache du navigateur/reconnexion ;
+- voir 017.
+
+## Essai en laboratoire E2 (2026-10-20)
+
+- Environnement : VM x86 OpenWrt 25.12.6 200 ; `apk` ; dépôts officiel/TUNA.
+- `apk update` officiel/TUNA : 11220 paquets dans les deux cas ; `apk add sqm-scripts` a réussi.
+- Après le `sysupgrade` de 25.12 : paquets 239→182 ; SQM/OpenClash ont disparu et ont dû être réinstallés.
+- Non exécuté : update/install/list d'`opkg` sous 24.10, vraie migration 24.10→25.12, paquets d'architectures différentes.
+- Recette : `tests/recipes/apk-vs-opkg.md`.
+
+## Sources et relecture
+
+- Ceci est un E2 partiel : apk de 25.12 a été testé ; opkg de 24.10 est une référence de commandes officielle, non exécutée ici.
+- Ne transformez pas une comparaison de commandes en « migration vérifiée » ; sauvegardez et testez d'abord dans une VM.
+- Pas de relecteur indépendant ; les conclusions se limitent à cet environnement x86 25.12.
+
+<TestRecord
+  status="partial"
+  environment="VM x86 OpenWrt 25.12.6 200 ; dépôts apk officiel/TUNA 11220 paquets ; SQM installé ; opkg 24.10 non exécuté"
+  recipe="tests/recipes/apk-vs-opkg.md"
+  result="E2 partiel : apk update/search/install de 25.12 et le changement de miroir ont été testés ; le sysupgrade de 25.12 a fait passer les paquets de 239 à 182 ; les commandes/format d'opkg 24.10 sont de la documentation uniquement, non exécutées"
+  date="2026-10-20"
+/>
+
+<PageSources />

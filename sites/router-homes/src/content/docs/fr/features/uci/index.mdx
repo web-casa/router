@@ -1,0 +1,53 @@
+---
+title: "UCI : comment OpenWrt conserve tous ses réglages dans /etc/config"
+description: "UCI est le système de configuration d'OpenWrt. Où se trouvent les fichiers, comment les modifications sont mises en attente puis validées, et son lien avec LuCI."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt uci", "uci commit", "openwrt /etc/config", "openwrt configuration uci"]
+sources:
+  - label: "UCI d'OpenWrt"
+    url: https://openwrt.org/docs/guide-user/base-system/uci
+  - label: "Notions essentielles de LuCI"
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+sourceHash: 'af6a6bb6c4e60fdd'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="uci" />
+
+## En une phrase
+
+UCI (Unified Configuration Interface) conserve la configuration des services d'OpenWrt dans des fichiers texte brut sous `/etc/config/`. LuCI et la commande `uci` modifient ces mêmes fichiers.
+
+## Comment cela fonctionne
+
+- Il y a un fichier par sous-système, tel que `network`, `wireless`, `dhcp`, `firewall` et `system`.
+- `uci set`, `uci add`, `uci rename` et `uci delete` sont d'abord mis en attente. `uci commit` les écrit en flash en une seule fois.
+- Une modification validée ne prend effet qu'après le rechargement ou le redémarrage du service via son script d'initialisation. L'exemple officiel change le port d'uhttpd, valide, puis exécute `/etc/init.d/uhttpd restart`.
+- LuCI est une interface frontale : ses pages lisent et écrivent les mêmes fichiers UCI via des API.
+
+## Voir cela sur votre routeur
+
+Ces commandes ne font que lire :
+
+```sh
+uci show network.lan
+uci get network.lan.ipaddr
+uci export dhcp
+```
+
+## Attention
+
+- Une modification que vous validez sans jamais la recharger n'est pas encore active. Elle prendra effet au prochain redémarrage du service ou de l'appareil, longtemps après que vous l'aurez oubliée.
+- Copiez `/etc/config` en lieu sûr avant de modifier à la main. [Sauvegarde et restauration](/fr/recovery/backup-restore/) décrit une sauvegarde complète.
+
+## Guides associés
+
+- [Adresse du LAN](/fr/network/lan-address/)
+- [DNS](/fr/network/dns/)
+- [Sauvegarde et restauration](/fr/recovery/backup-restore/)
+
+<PageSources />

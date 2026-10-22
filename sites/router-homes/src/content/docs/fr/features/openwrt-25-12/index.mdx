@@ -1,0 +1,65 @@
+---
+title: "OpenWrt 25.12 : ce qui change depuis la 24.10 et quand mettre à niveau"
+description: "OpenWrt 25.12 « Dave’s Guitar » passe à apk, place toutes les cibles sous Linux 6.12 et prend en charge plus de 2200 appareils. Ce qui a changé et ce qu’il faut vérifier avant de mettre à niveau."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt 25.12", "openwrt 25.12 release", "what is new in openwrt 25.12", "nouveautés openwrt 25.12"]
+sources:
+  - label: "Annonce de la version OpenWrt 25.12.0"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: "Version de maintenance OpenWrt 25.12.6"
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: "Notes de version OpenWrt 25.12.0"
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: "Annonce de la version OpenWrt 24.10.0"
+    url: https://forum.openwrt.org/t/openwrt-24-10-0-first-stable-release/223845
+sourceHash: 'bf464024aeedffe3'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="openwrt-25-12" />
+
+## En une phrase
+
+OpenWrt 25.12 est la série stable actuelle. Les images 25.12.0 datent du 2026-03-03, et la 25.12.6 (2026-10-18) est la dernière version de maintenance à la date de rédaction.
+
+## Ce qui a changé depuis la 24.10
+
+- **Gestionnaire de paquets.** apk remplace opkg. Peu de noms de paquets ont changé, mais les arguments de la ligne de commande sont différents. Voir [apk remplace opkg](/fr/features/apk/).
+- **Noyau.** Toutes les cibles utilisent Linux 6.12 : 6.12.71 dans la 25.12.0 et 6.12.112 dans la 25.12.6. La 24.10 utilisait la 6.6. Voir [noyau et chaîne d'outils](/fr/features/kernel-toolchain/).
+- **Chaîne d'outils.** GCC 14.3.0, binutils 2.44, musl 1.2.5, glibc 2.41.
+- **Mises à niveau.** L'application LuCI attended sysupgrade est installée par défaut. Sur les appareils dotés de plus de mémoire flash, `owut` est également inclus.
+- **Sous le capot.** Les scripts Wi-Fi ont été réécrits en ucode, et l'historique du shell est désormais conservé dans un système de fichiers en RAM.
+- **Matériel.** Plus de 2200 appareils pris en charge, dont plus de 180 nouveaux. Les nouvelles cibles incluent siflower, sunxi/arm926ejs et microchipsw/lan969x.
+
+La version est nommée « Dave's Guitar » en hommage à Dave Täht, et elle apporte plus de 4700 commits depuis la 24.10.
+
+## Faut-il mettre à niveau ?
+
+- **Sous 24.10 :** l'annonce de la 25.12.0 indique que la 24.10 ne reçoit plus de mises à jour de sécurité après septembre 2026. Planifiez la migration.
+- **Sous 23.05 :** passer directement de la 23.05 à la 25.12 avec sysupgrade n'est pas officiellement pris en charge. Lisez les notes de version avant de choisir une méthode.
+- **Sous firmware constructeur ou tiers :** vérifiez d'abord ce que vous utilisez réellement avec [Quel OpenWrt est-ce ?](/fr/getting-started/which-openwrt/).
+
+Avant toute mise à niveau, faites une sauvegarde et gardez un accès filaire au routeur. [Mise à niveau du firmware](/fr/recovery/firmware-upgrade/) vous guide pas à pas.
+
+## Le voir sur votre routeur
+
+Ces commandes ne font que lire :
+
+```sh
+cat /etc/openwrt_release
+uname -r
+```
+
+`DISTRIB_RELEASE` indique la version, et `uname -r` indique la version du noyau.
+
+## Guides associés
+
+- [Mise à niveau du firmware](/fr/recovery/firmware-upgrade/)
+- [Sauvegarde et restauration](/fr/recovery/backup-restore/)
+- [apk et opkg](/fr/software/apk-vs-opkg/)
+
+<PageSources />

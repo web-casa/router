@@ -1,0 +1,193 @@
+---
+title: "Wi-Fi invités : SSID séparé, VLAN, DHCP et isolation"
+description: "Isolez les invités avec un SSID, un sous-réseau, un DHCP et une zone de pare-feu séparés, n'autorisez que l'accès à internet et bloquez l'accès au LAN principal. Le Wi-Fi et le VLAN ne sont pas vérifiés sur du matériel réel."
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Compilé à partir de la documentation OpenWrt 25.12 sur le Wi-Fi/VLAN/pare-feu ; aucune validation sur du matériel sans-fil/commutateur réel'
+testRecipe: 'tests/recipes/guest-wifi-25.12.md'
+aliases: ['openwrt guest wifi', 'openwrt guest network', 'openwrt wifi isolation', 'openwrt guest wi-fi', 'openwrt wifi invités', 'openwrt réseau invité']
+symptoms: ['les invités accèdent au LAN', 'les invités n''ont pas internet', 'le Wi-Fi invités n''obtient pas d''adresse', 'l''isolation VLAN échoue']
+sources:
+  - label: Wi-Fi invités d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/wifi/guestwifi/guest-wlan
+  - label: Configuration Wi-Fi d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/wifi/basic
+  - label: Zones du pare-feu d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: VLAN DSA d'OpenWrt
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+sourceHash: 'b918dd049823d2a8'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="Appareil sans-fil + DSA (non testé)" tested={false} evidence="E1" />
+
+> **État** : documentation E1. L'isolation des invités touche le Wi-Fi, le VLAN, le DHCP et le pare-feu ; sans matériel sans-fil réel, ne prétendez pas « isolé ».
+
+## Objectifs
+
+- les invités utilisent un SSID séparé ;
+- les invités obtiennent un sous-réseau séparé ;
+- les invités accèdent à internet, pas au LAN principal ni à l'interface de gestion ;
+- le LAN principal ne peut pas initier d'accès vers les invités (selon la politique) ;
+- le réseau invités peut être désactivé rapidement.
+
+## Options
+
+| Option | Isolation | Nécessite |
+|---|---|---|
+| même pont + SSID/zone séparés | moyenne | plusieurs SSID ; pare-feu |
+| VLAN + SSID séparés | plus forte | VLAN DSA/commutateur ; étiquetage sur le point d'accès |
+| point d'accès séparé / isolation physique | la plus forte | appareil/port séparé |
+
+Cette page couvre « SSID séparé + zone invités » et la façon dont un VLAN la renforce ; les détails du VLAN sont dans la page 023.
+
+## 1. Créer le sous-réseau invités
+
+```sh
+uci set network.guest=interface
+uci set network.guest.proto='static'
+uci set network.guest.device='br-guest'
+uci set network.guest.ipaddr='192.168.50.1/24'
+uci set network.guest.ip6assign='60'
+uci commit network
+```
+
+`br-guest` peut être un pont séparé (avec l'interface sans-fil ajoutée) ou une interface VLAN ; ne le mélangez pas dans `br-lan` en comptant uniquement sur le pare-feu.
+
+## 2. DHCP/DNS pour les invités
+
+```sh
+uci set dhcp.guest=dhcp
+uci set dhcp.guest.interface='guest'
+uci set dhcp.guest.start='100'
+uci set dhcp.guest.limit='100'
+uci set dhcp.guest.leasetime='1h'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+```
+
+Si le réseau invités est un VLAN, liez le DHCP à cette interface ; ne distribuez pas le pool du LAN principal.
+
+## 3. Pare-feu : internet uniquement
+
+```sh
+uci add firewall zone
+uci set firewall.@zone[-1].name='guest'
+uci set firewall.@zone[-1].input='REJECT'
+uci set firewall.@zone[-1].output='ACCEPT'
+uci set firewall.@zone[-1].forward='REJECT'
+uci add_list firewall.@zone[-1].network='guest'
+uci commit firewall
+
+uci add firewall forwarding
+uci set firewall.@forwarding[-1].src='guest'
+uci set firewall.@forwarding[-1].dest='wan'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+Points clés :
+
+- **N'ajoutez pas** de transfert guest→lan ;
+- le transfert guest→wan est autorisé ; le NAT dépend du masquerade de la zone wan ;
+- si le DHCP/DNS sont bloqués par l'entrée REJECT, ajoutez des règles guest→routeur 53/67 au lieu de mettre l'entrée en ACCEPT ;
+- le LAN principal ne peut pas initier vers les invités par défaut ; autorisez séparément l'impression/la diffusion si nécessaire.
+
+## 4. Ajouter le SSID invités
+
+```sh
+uci set wireless.guest=wifi-iface
+uci set wireless.guest.device='radio0'
+uci set wireless.guest.network='guest'
+uci set wireless.guest.mode='ap'
+uci set wireless.guest.ssid='OpenWrt-Guest'
+uci set wireless.guest.encryption='psk2'
+uci set wireless.guest.key='<guest-password>'
+uci set wireless.guest.isolate='1'
+uci commit wireless
+wifi reload
+```
+
+- `network='guest'` doit correspondre à l'interface invités ;
+- `isolate='1'` isole les clients sans-fil entre eux, pas du LAN principal ; l'isolation du LAN exige toujours le pare-feu/VLAN ;
+- ajustez 2,4/5 GHz, canal et largeur selon l'appareil ;
+- plusieurs points d'accès : même SSID/mot de passe/sécurité, canaux décalés.
+
+## 5. En cas d'utilisation d'un VLAN
+
+- créez un VLAN invités dédié (par ex. 20) sur le DSA/commutateur ;
+- reliez le SSID invités à ce VLAN ;
+- étiquetez le trunk aux deux extrémités et autorisez le VLAN 20 ;
+- liez l'interface invités/le DHCP au VLAN 20 ;
+- ne définissez pas le VLAN invités comme PVID non étiqueté sur le VLAN de gestion.
+
+Voir la page 023 pour la syntaxe `bridge-vlan`.
+
+## Vérifier (avec le matériel)
+
+```sh
+iwinfo
+ip -4 addr show
+bridge vlan show
+```
+
+Client :
+
+- rejoint `OpenWrt-Guest`, obtient `192.168.50.x` ;
+- accède à internet/au DNS ;
+- **ne peut pas** accéder au LAN principal `192.168.1.0/24`, à la gestion LuCI, au NAS/à l'imprimante ;
+- le LAN principal ne peut pas initier vers les invités (selon la politique) ;
+- la désactivation du SSID invités ne casse pas le LAN principal.
+
+Sans matériel sans-fil/VLAN, rien de tout cela n'est « vérifié ».
+
+## Défaillances courantes
+
+### Les invités accèdent au LAN principal
+
+- pas de zone/transfert séparés ;
+- invités et lan partagent un même pont ;
+- règle, ordre ou zone du pare-feu incorrects ;
+- le VLAN n'est pas isolé, seul le SSID a changé.
+
+### Les invités n'obtiennent pas d'adresse
+
+- le DHCP n'est pas lié à l'interface invités ;
+- l'interface invités est inactive ;
+- mauvais étiquetage VLAN/PVID ;
+- le pare-feu bloque le DHCP/DNS.
+
+### Les invités n'ont pas internet
+
+- pas de transfert guest→wan ;
+- masquerade/NAT du WAN ;
+- DNS non autorisé ;
+- route amont.
+
+### La désactivation des invités casse le LAN principal
+
+- invités et lan partagent un pont/VLAN ;
+- PVID/étiquette du port de gestion modifié ;
+- récupérez via la console ; ne réinitialisez pas aux paramètres d'usine.
+
+## État E1
+
+- Documentation uniquement ; non vérifiée sur du matériel sans-fil/DSA réel ; aucune affirmation du type « l'isolation des invités est active ».
+- Un vrai E2 exige : un point d'accès avec plusieurs SSID, un commutateur compatible VLAN ou un appareil DSA, deux clients, une console et une configuration de retour.
+- Après les tests, consignez le modèle de l'appareil, le VLAN/SSID, la zone de pare-feu, le DHCP et le résultat de l'isolation.
+
+<TestRecord
+  status="planned"
+  environment="Compilé à partir de la documentation OpenWrt 25.12 sur le Wi-Fi/VLAN/pare-feu ; aucune validation sur du matériel sans-fil/commutateur réel"
+  recipe="tests/recipes/guest-wifi-25.12.md"
+  result="E1 : SSID, sous-réseau, DHCP et zone de pare-feu séparés, isolation et approche VLAN documentés ; non vérifiés sur du matériel sans-fil/commutateur réel"
+/>
+
+<PageSources />

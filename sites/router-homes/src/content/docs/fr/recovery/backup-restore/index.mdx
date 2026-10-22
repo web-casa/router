@@ -1,0 +1,206 @@
+---
+title: "Sauvegarde et restauration : vérifier séparément la configuration, les paquets et la gestion"
+description: Utilisez sysupgrade -b/-r pour sauvegarder et restaurer la configuration OpenWrt, distinguez l'archive de configuration des paquets et des images complètes, et vérifiez LAN/HTTP/SSH/DHCP après la restauration.
+pageType: recovery
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200 ; sysupgrade -b 4,2 Mo/59 entrées ; restauration sysupgrade -r ; LAN/HTTP/SSH vérifiés'
+testRecipe: 'tests/recipes/backup-restore-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt backup', 'openwrt restore config', 'sysupgrade backup', 'openwrt restore after reinstall', 'sauvegarde openwrt', 'restaurer configuration openwrt', 'sysupgrade -b']
+symptoms: ['configuration perdue après reflashage', 'comment restaurer une sauvegarde', 'sysupgrade -b échoue', "accès impossible après la restauration"]
+sources:
+  - label: Sauvegarde et restauration OpenWrt
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+  - label: sysupgrade OpenWrt
+    url: https://openwrt.org/docs/guide-user/installation/sysupgrade.owut
+  - label: Gestionnaire de paquets OpenWrt
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: Sauvegarde Proxmox VE
+    url: https://pve.proxmox.com/pve-docs/chapter-vzdump.html
+sourceHash: 'eb78c790dd7db4e1'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="VM PVE 200" tested={true} evidence="E2" />
+
+## Trois « sauvegardes » différentes
+
+| Type | Contient | Ne contient pas | Usage typique |
+|---|---|---|---|
+| Archive de configuration `sysupgrade -b` | `/etc/config` et les fichiers listés dans `sysupgrade.conf` | micrologiciel, paquets installés, disque entier | restaurer les réglages après un reflashage ou une mise à niveau |
+| Liste des paquets | noms, versions, dépôts | binaires des paquets | liste de contrôle pour réinstaller |
+| Sauvegarde d'image complète ou de VM | disque/VM entier | rien (plus volumineux) | retour arrière de toute la machine, remplacement de disque |
+
+**Une sauvegarde de configuration n'est pas une sauvegarde du micrologiciel.** Restaurer la configuration ne réinstalle pas les paquets que vous avez supprimés.
+
+## Avant la sauvegarde
+
+<Step where="router-shell" title="Relever la version, la cible et la liste des paquets" expected="Vous savez de quelle version/cible/architecture provient la sauvegarde.">
+
+```sh
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+apk list --installed > /tmp/packages-$(date +%F).txt
+wc -l /tmp/packages-$(date +%F).txt
+sysupgrade -l
+```
+
+Dans ce labo : `25.12.6`, `x86/64`, 239 paquets installés ; `sysupgrade -b` a archivé 59 entrées.
+
+</Step>
+
+<Step where="router-shell" title="Créer l'archive de configuration" expected="Un .tar.gz vérifiable, copié hors de l'appareil.">
+
+```sh
+sysupgrade -b /tmp/backup-$(date +%F).tar.gz
+ls -lh /tmp/backup-*.tar.gz
+tar -tzf /tmp/backup-$(date +%F).tar.gz | head
+sha256sum /tmp/backup-$(date +%F).tar.gz
+```
+
+Dans ce labo : 4,2 Mo, 59 entrées, dont `etc/config/network`, `dhcp`, `firewall`, `openclash`, `sqm`.
+
+> L'archive peut contenir des mots de passe Wi-Fi, des identifiants PPPoE, la configuration DDNS ou proxy. Ne la téléversez pas sur un disque cloud public ni dans un dépôt ; traitez-la comme sensible.
+
+</Step>
+
+<Step where="client" title="Copier l'archive hors de l'appareil" expected="Une sauvegarde existe encore si l'appareil est brické ou reflashé.">
+
+```sh
+# pull from the router to the admin machine
+scp root@192.168.1.2:/tmp/backup-2026-10-20.tar.gz ./
+sha256sum backup-2026-10-20.tar.gz
+```
+
+Ne la laissez pas seulement dans `/tmp` : un redémarrage la perd, un reflashage la perd à coup sûr.
+
+</Step>
+
+## Trois méthodes de restauration
+
+### 1. Restauration à la même version pendant l'exécution (ce labo)
+
+```sh
+sysupgrade -r /tmp/backup-2026-10-20.tar.gz
+```
+
+`-r` restaure la configuration puis se termine ; il ne flashe pas de micrologiciel. Redémarrez ensuite les services concernés, ou redémarrez l'appareil, pour recharger le réseau, le DHCP et le DNS.
+
+Dans ce labo, `network.lan.e2_marker='before-restore'` a été écrit ; après `sysupgrade -r`, le marqueur avait disparu, le LAN était toujours `192.168.1.2/24`, HTTP 200 et SSH fonctionnaient.
+
+### 2. Restauration pendant le reflashage ou la mise à niveau
+
+```sh
+sysupgrade -f /tmp/backup-2026-10-20.tar.gz <firmware.img>
+```
+
+`-f` restaure la configuration pendant une mise à niveau ; ne considérez pas la sauvegarde comme un micrologiciel et ne restaurez pas aveuglément d'une version ou d'une cible à une autre.
+
+### 3. Retour arrière de toute la VM ou de l'image
+
+PVE utilise `vzdump` ou les instantanés pour restaurer le disque et la configuration de toute la VM ; cela rétablit micrologiciel + paquets + configuration, mais c'est plus volumineux et peut écraser de nouvelles données. Les archives de configuration et les sauvegardes de machine entière ne se substituent pas l'une à l'autre.
+
+## Vérifier après la restauration
+
+<Step where="client" title="Point d'entrée de gestion" expected="Vérifiez au moins une fois l'IP du LAN, HTTP, SSH et le DHCP.">
+
+```sh
+ping -c 2 192.168.1.2
+curl -sSI --max-time 5 http://192.168.1.2/ | head -3
+ssh root@192.168.1.2 'uci show network.lan | grep ipaddr'
+```
+
+- HTTP 200 ne prouve pas que le DHCP fonctionne ;
+- l'accès SSH ne prouve pas que la configuration LuCI est correcte ;
+- les clients doivent renouveler leur bail et recevoir une adresse de la plage restaurée.
+
+</Step>
+
+<Step where="router-shell" title="Réseau/DHCP/DNS" expected="La configuration restaurée est réellement appliquée, pas seulement extraite.">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+ubus call network.interface.lan status
+logread | grep -Ei 'dnsmasq|dhcp|netifd' | tail -30
+```
+
+Redémarrez si nécessaire :
+
+```sh
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+</Step>
+
+<Step where="router-shell" title="Paquets" expected="Vous savez quels paquets réinstaller ; restaurer la configuration ne restaure pas les paquets.">
+
+```sh
+apk list --installed | wc -l
+apk list --installed | grep -E 'openclash|sqm|adguard|luci-app' || true
+```
+
+Une archive de configuration ne contient pas de binaires. Après un reflashage, réinstallez à partir de la liste des paquets et des dépôts. La configuration d'OpenClash, SQM ou AGH peut subsister, mais les programmes et modules noyau doivent être réinstallés et vérifiés.
+
+</Step>
+
+## Échecs courants
+
+### L'ancienne configuration est toujours là après la restauration
+
+- les services ou l'appareil n'ont pas été redémarrés après `sysupgrade -r` ;
+- vous avez restauré une autre archive ;
+- une commande UCI ultérieure l'a écrasée ;
+- l'archive ne contient pas ce fichier (vérifiez avec `sysupgrade -l` ou `tar -tzf`).
+
+### Accès impossible après la restauration
+
+- la sauvegarde provenait d'un autre sous-réseau LAN ;
+- le DHCP ou le pare-feu n'a pas été rechargé ;
+- l'archive contient d'anciens mots de passe ou réglages SSH ;
+- utilisez la console : `ip -4 addr show br-lan` ; ne réinitialisez pas aussitôt aux paramètres d'usine.
+
+### Les paquets ne sont pas revenus
+
+- les sauvegardes de configuration ne contiennent pas les fichiers des paquets ;
+- incohérence de dépôt ou de version ;
+- réinstallez les `luci-app-*` et les modules noyau ;
+- « la configuration existe » ne signifie pas « le programme est installé ».
+
+### Restauration entre versions
+
+- incohérence de version, de cible ou d'architecture ;
+- options renommées ou supprimées dans la nouvelle version ;
+- testez d'abord dans une VM ;
+- conservez l'ancien micrologiciel et une sauvegarde de la machine entière pour revenir en arrière.
+
+## Test de labo E2 (2026-10-20)
+
+- Environnement : OpenWrt 25.12.6 x86 VM 200 ; LAN `192.168.1.2/24` ; `apk` ; 239 paquets installés.
+- `sysupgrade -b /tmp/backup-e2.tar.gz` : 4,2 Mo, 59 entrées ; `tar -tzf` a montré `etc/config/network`, `dhcp`, `firewall`, `openclash`, `sqm`.
+- `network.lan.e2_marker='before-restore'` écrit ; après `sysupgrade -r`, le marqueur avait disparu, le LAN était toujours `.2`, HTTP 200 et SSH fonctionnaient.
+- Non testé : restauration d'une sauvegarde PVE complète, restauration entre versions, réinstallation des paquets, coupure de courant ou brick sur un appareil réel.
+- Recette : `tests/recipes/backup-restore-25.12.md`.
+
+## Sources et relecture
+
+- Niveau E2 partiel : la sauvegarde/restauration de configuration à la même version et le point d'entrée de gestion ont été testés ; la machine entière, l'entre-versions et la reconstruction des paquets ne l'ont pas été.
+- Les archives de configuration contiennent des données sensibles ; ne les versionnez pas et ne les partagez pas.
+- Aucun relecteur indépendant ; les conclusions se limitent à cet environnement VM.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200 ; sysupgrade -b 4,2 Mo/59 entrées ; restauration sysupgrade -r ; LAN/HTTP/SSH vérifiés"
+  recipe="tests/recipes/backup-restore-25.12.md"
+  result="E2 partiel : sysupgrade -b a produit une archive de configuration de 4,2 Mo/59 entrées ; après ajout d'un marqueur de test, sysupgrade -r l'a supprimé et le LAN 192.168.1.2, HTTP 200 et SSH fonctionnaient toujours ; image complète, restauration entre versions et réinstallation des paquets non testées"
+  date="2026-10-20"
+/>
+
+<PageSources />
