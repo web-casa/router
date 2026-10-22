@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-10-21T17:20:05.764Z",
-  "base": "http://127.0.0.1:40973",
+  "generatedAt": "2026-10-22T16:04:29.928Z",
+  "base": "http://127.0.0.1:44831",
   "topK": 5,
   "positive": {
-    "total": 43,
-    "passed": 43,
+    "total": 122,
+    "passed": 122,
     "failed": 0,
     "aliasCases": {
-      "total": 22,
-      "passed": 22
+      "total": 30,
+      "passed": 30
     },
     "results": [
       {
@@ -1233,6 +1233,2363 @@
           {
             "url": "/en/recovery/firmware-upgrade/",
             "title": "Firmware upgrade: keep config, rebuild packages, verify DNS/management",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-dns-01",
+        "locale": "zh-hant",
+        "query": "openwrt dns 設定",
+        "category": "dns",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh-hant/network/dns/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/network/dns/",
+            "title": "設定 DNS，並確認路由器、用戶端與瀏覽器各自使用的 DNS",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-dns-02",
+        "locale": "zh-hant",
+        "query": "dnsmasq 上游 dns",
+        "category": "dns",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh-hant/network/dns/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/network/dns/",
+            "title": "設定 DNS，並確認路由器、用戶端與瀏覽器各自使用的 DNS",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/adguard-home/",
+            "title": "AdGuard Home：從網頁介面到用戶端過濾",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/troubleshooting/no-internet/",
+            "title": "無法上網或間歇斷線：全部裝置、單一用戶端、單一應用程式",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/network/lan-address/",
+            "title": "修改 LAN 位址並重新進入管理介面：新舊網段、DHCP 與復原",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/openclash/",
+            "title": "OpenClash 基礎：相容性、DNS 衝突與乾淨停用",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-dns-03",
+        "locale": "zh-hant",
+        "query": "DNS 解析失敗",
+        "category": "dns",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh-hant/network/dns/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/network/dns/",
+            "title": "設定 DNS，並確認路由器、用戶端與瀏覽器各自使用的 DNS",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/adguard-home/",
+            "title": "AdGuard Home：從網頁介面到用戶端過濾",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/network/bypass-gateway/",
+            "title": "旁路閘道：停用 DHCP、設定用戶端閘道／DNS，以及切換回去",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/installation/proxmox/",
+            "title": "在單網卡 Proxmox VE 主機上安裝 OpenWrt",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/openclash/",
+            "title": "OpenClash 基礎：相容性、DNS 衝突與乾淨停用",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-pve-01",
+        "locale": "zh-hant",
+        "query": "pve 單網卡 openwrt",
+        "category": "pve",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh-hant/installation/proxmox/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/installation/proxmox/",
+            "title": "在單網卡 Proxmox VE 主機上安裝 OpenWrt",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/adguard-home/",
+            "title": "AdGuard Home：從網頁介面到用戶端過濾",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/network/dns/",
+            "title": "設定 DNS，並確認路由器、用戶端與瀏覽器各自使用的 DNS",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-pve-02",
+        "locale": "zh-hant",
+        "query": "proxmox 安裝 openwrt",
+        "category": "pve",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh-hant/installation/proxmox/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/installation/proxmox/",
+            "title": "在單網卡 Proxmox VE 主機上安裝 OpenWrt",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/getting-started/x86-image/",
+            "title": "選擇 x86 映像檔：combined、ext4、squashfs、EFI/BIOS",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/recovery/backup-restore/",
+            "title": "備份與還原：分別驗證設定、套件與管理功能",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-agh-01",
+        "locale": "zh-hant",
+        "query": "adguard home openwrt",
+        "category": "adguard-home",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh-hant/software/adguard-home/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/software/adguard-home/",
+            "title": "AdGuard Home：從網頁介面到用戶端過濾",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/openclash/",
+            "title": "OpenClash 基礎：相容性、DNS 衝突與乾淨停用",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/",
+            "title": "使用 OpenWrt，卻不弄丟你的網路",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/installation/proxmox/",
+            "title": "在單網卡 Proxmox VE 主機上安裝 OpenWrt",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/recovery/backup-restore/",
+            "title": "備份與還原：分別驗證設定、套件與管理功能",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-agh-02",
+        "locale": "zh-hant",
+        "query": "adguard home 連接埠",
+        "category": "adguard-home",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh-hant/software/adguard-home/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/software/adguard-home/",
+            "title": "AdGuard Home：從網頁介面到用戶端過濾",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/openclash/",
+            "title": "OpenClash 基礎：相容性、DNS 衝突與乾淨停用",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/",
+            "title": "使用 OpenWrt，卻不弄丟你的網路",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/installation/proxmox/",
+            "title": "在單網卡 Proxmox VE 主機上安裝 OpenWrt",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-agh-03",
+        "locale": "zh-hant",
+        "query": "dnsmasq 5353",
+        "category": "adguard-home",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh-hant/software/adguard-home/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/software/adguard-home/",
+            "title": "AdGuard Home：從網頁介面到用戶端過濾",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/openclash/",
+            "title": "OpenClash 基礎：相容性、DNS 衝突與乾淨停用",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-sqm-01",
+        "locale": "zh-hant",
+        "query": "sqm cake",
+        "category": "sqm",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh-hant/software/sqm/"
+        ],
+        "rank": 2,
+        "results": [
+          {
+            "url": "/zh-hant/features/sqm/",
+            "title": "OpenWrt 上的 SQM 與 CAKE：線路滿載時仍保持低延遲",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/sqm/",
+            "title": "下載或上傳時遊戲、會議變卡：SQM 與 CAKE 如何設定與測試",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/",
+            "title": "使用 OpenWrt，卻不弄丟你的網路",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-sqm-02",
+        "locale": "zh-hant",
+        "query": "bufferbloat 延遲",
+        "category": "sqm",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh-hant/software/sqm/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/software/sqm/",
+            "title": "下載或上傳時遊戲、會議變卡：SQM 與 CAKE 如何設定與測試",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/features/sqm/",
+            "title": "OpenWrt 上的 SQM 與 CAKE：線路滿載時仍保持低延遲",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-sqm-03",
+        "locale": "zh-hant",
+        "query": "下載時遊戲延遲",
+        "category": "sqm",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh-hant/software/sqm/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/software/sqm/",
+            "title": "下載或上傳時遊戲、會議變卡：SQM 與 CAKE 如何設定與測試",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-luci-01",
+        "locale": "zh-hant",
+        "query": "luci 首次登入",
+        "category": "luci",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh-hant/getting-started/luci-first-login/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/getting-started/luci-first-login/",
+            "title": "首次登入 LuCI：位址、密碼與中文介面",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/",
+            "title": "使用 OpenWrt，卻不弄丟你的網路",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-fw-01",
+        "locale": "zh-hant",
+        "query": "immortalwrt istoreos",
+        "category": "firmware",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh-hant/getting-started/which-openwrt/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/getting-started/which-openwrt/",
+            "title": "這是哪一種 OpenWrt：官方版、ImmortalWrt、iStoreOS 還是原廠韌體？",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/download/",
+            "title": "下載 OpenWrt，一次就選對",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/package-sources/",
+            "title": "套件來源與中國鏡像站：分開處理 apk 與 opkg",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/apk-vs-opkg/",
+            "title": "25.12 apk 與 24.10 opkg：指令、套件格式與遷移邊界",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/getting-started/luci-first-login/",
+            "title": "首次登入 LuCI：位址、密碼與中文介面",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-fw-02",
+        "locale": "zh-hant",
+        "query": "openwrt 韌體 target",
+        "category": "firmware",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh-hant/getting-started/which-openwrt/"
+        ],
+        "rank": 3,
+        "results": [
+          {
+            "url": "/zh-hant/software/package-sources/",
+            "title": "套件來源與中國鏡像站：分開處理 apk 與 opkg",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/getting-started/firmware-download/",
+            "title": "下載韌體之前：型號、版本、target/profile 與復原方式",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/getting-started/which-openwrt/",
+            "title": "這是哪一種 OpenWrt：官方版、ImmortalWrt、iStoreOS 還是原廠韌體？",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/apk-vs-opkg/",
+            "title": "25.12 apk 與 24.10 opkg：指令、套件格式與遷移邊界",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/download/",
+            "title": "下載 OpenWrt，一次就選對",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-oc-01",
+        "locale": "zh-hant",
+        "query": "openclash dns 衝突",
+        "category": "openclash",
+        "aliasCase": true,
+        "expectedUrls": [
+          "/zh-hant/software/openclash/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/software/openclash/",
+            "title": "OpenClash 基礎：相容性、DNS 衝突與乾淨停用",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-oc-02",
+        "locale": "zh-hant",
+        "query": "openclash 停用 還原",
+        "category": "openclash",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh-hant/software/openclash/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/software/openclash/",
+            "title": "OpenClash 基礎：相容性、DNS 衝突與乾淨停用",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/recovery/firmware-upgrade/",
+            "title": "韌體升級：保留設定、重建套件、驗證 DNS 與管理功能",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/installation/proxmox/",
+            "title": "在單網卡 Proxmox VE 主機上安裝 OpenWrt",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-pkg-01",
+        "locale": "zh-hant",
+        "query": "apk opkg 差異",
+        "category": "package-sources",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh-hant/software/package-sources/"
+        ],
+        "rank": 2,
+        "results": [
+          {
+            "url": "/zh-hant/features/apk/",
+            "title": "OpenWrt 25.12 的 apk：取代 opkg 的套件管理員",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/package-sources/",
+            "title": "套件來源與中國鏡像站：分開處理 apk 與 opkg",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/",
+            "title": "使用 OpenWrt，卻不弄丟你的網路",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-rec-01",
+        "locale": "zh-hant",
+        "query": "管理 IP 被更改",
+        "category": "recovery",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh-hant/troubleshooting/no-web-ui/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/troubleshooting/no-web-ui/",
+            "title": "無法連到 LuCI：IP、連接埠、DHCP 與主控台復原",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/getting-started/luci-first-login/",
+            "title": "首次登入 LuCI：位址、密碼與中文介面",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/software/adguard-home/",
+            "title": "AdGuard Home：從網頁介面到用戶端過濾",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "zh-hant-rec-02",
+        "locale": "zh-hant",
+        "query": "uhttpd failsafe",
+        "category": "recovery",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/zh-hant/troubleshooting/no-web-ui/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/zh-hant/troubleshooting/no-web-ui/",
+            "title": "無法連到 LuCI：IP、連接埠、DHCP 與主控台復原",
+            "excerpt": ""
+          },
+          {
+            "url": "/zh-hant/recovery/firmware-upgrade/",
+            "title": "韌體升級：保留設定、重建套件、驗證 DNS 與管理功能",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-dns-01",
+        "locale": "es",
+        "query": "servidor DNS ascendente dnsmasq",
+        "category": "dns",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/network/dns/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/network/dns/",
+            "title": "Configura el DNS y verifica el router, el cliente y el navegador",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/network/bypass-gateway/",
+            "title": "Puerta de enlace bypass: desactiva DHCP, configura puerta de enlace/DNS en los clientes y vuelve atrás",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/software/openclash/",
+            "title": "Conceptos básicos de OpenClash: compatibilidad, conflictos de DNS y desactivación limpia",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/network/ap-mode/",
+            "title": "AP por cable/inalámbrico bajo un router existente: DHCP desactivado, nueva IP de LAN, puerto LAN",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/installation/proxmox/",
+            "title": "Instala OpenWrt en un host Proxmox VE con una sola NIC",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-proxmox-01",
+        "locale": "es",
+        "query": "proxmox una sola nic openwrt",
+        "category": "proxmox",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/installation/proxmox/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/installation/proxmox/",
+            "title": "Instala OpenWrt en un host Proxmox VE con una sola NIC",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/getting-started/x86-image/",
+            "title": "Elige una imagen x86: combined, ext4, squashfs, EFI/BIOS",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-agh-01",
+        "locale": "es",
+        "query": "adguard home puerto 5353",
+        "category": "agh",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/software/adguard-home/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/software/adguard-home/",
+            "title": "AdGuard Home: de la interfaz web al filtrado por cliente",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/software/openclash/",
+            "title": "Conceptos básicos de OpenClash: compatibilidad, conflictos de DNS y desactivación limpia",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-sqm-01",
+        "locale": "es",
+        "query": "sqm cake bufferbloat",
+        "category": "sqm",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/software/sqm/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/software/sqm/",
+            "title": "SQM y CAKE: elimina el lag durante descargas y subidas",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/features/sqm/",
+            "title": "SQM y CAKE en OpenWrt: baja latencia cuando la línea está llena",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-luci-01",
+        "locale": "es",
+        "query": "primer acceso luci contraseña",
+        "category": "luci",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/getting-started/luci-first-login/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/getting-started/luci-first-login/",
+            "title": "Primer acceso a LuCI: dirección, contraseña e interfaz en chino",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/software/adguard-home/",
+            "title": "AdGuard Home: de la interfaz web al filtrado por cliente",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/recovery/backup-restore/",
+            "title": "Copia de seguridad y restauración: verifica por separado configuración, paquetes y administración",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/network/ap-mode/",
+            "title": "AP por cable/inalámbrico bajo un router existente: DHCP desactivado, nueva IP de LAN, puerto LAN",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/wireless-vlan/guest-wifi/",
+            "title": "Wi-Fi para invitados: SSID separado, VLAN, DHCP y aislamiento",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-fw-01",
+        "locale": "es",
+        "query": "immortalwrt istoreos fabricante",
+        "category": "fw",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/getting-started/which-openwrt/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/getting-started/which-openwrt/",
+            "title": "¿Qué OpenWrt es este? OpenWrt oficial, ImmortalWrt, iStoreOS o firmware del fabricante",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/download/",
+            "title": "Descarga OpenWrt, bien a la primera",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/getting-started/luci-first-login/",
+            "title": "Primer acceso a LuCI: dirección, contraseña e interfaz en chino",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/software/openclash/",
+            "title": "Conceptos básicos de OpenClash: compatibilidad, conflictos de DNS y desactivación limpia",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-oc-01",
+        "locale": "es",
+        "query": "openclash conflicto dns",
+        "category": "oc",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/software/openclash/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/software/openclash/",
+            "title": "Conceptos básicos de OpenClash: compatibilidad, conflictos de DNS y desactivación limpia",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-pkg-01",
+        "locale": "es",
+        "query": "apk opkg feeds mirror",
+        "category": "pkg",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/software/package-sources/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/software/package-sources/",
+            "title": "Feeds de paquetes y mirrors de China: mantén apk y opkg separados",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/software/apk-vs-opkg/",
+            "title": "apk de 25.12 frente a opkg de 24.10: comandos, formato de paquete y límites de migración",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/troubleshooting/plugin-install/",
+            "title": "El paquete no se instala: descarga, arquitectura, dependencias, LuCI y postinst",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-rec-01",
+        "locale": "es",
+        "query": "no puedo acceder a luci 192.168.1.1",
+        "category": "rec",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/troubleshooting/no-web-ui/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/troubleshooting/no-web-ui/",
+            "title": "No se puede acceder a LuCI: IP, puerto, DHCP y recuperación por consola",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/getting-started/luci-first-login/",
+            "title": "Primer acceso a LuCI: dirección, contraseña e interfaz en chino",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/network/bypass-gateway/",
+            "title": "Puerta de enlace bypass: desactiva DHCP, configura puerta de enlace/DNS en los clientes y vuelve atrás",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/features/failsafe/",
+            "title": "Modo failsafe y sysupgrade: las vías de retorno integradas de OpenWrt",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/network/lan-address/",
+            "title": "Cambiar la dirección LAN y volver a entrar: subred anterior y nueva, DHCP y recuperación",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-lan-01",
+        "locale": "es",
+        "query": "cambiar dirección ip lan",
+        "category": "lan",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/network/lan-address/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/network/lan-address/",
+            "title": "Cambiar la dirección LAN y volver a entrar: subred anterior y nueva, DHCP y recuperación",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/network/ap-mode/",
+            "title": "AP por cable/inalámbrico bajo un router existente: DHCP desactivado, nueva IP de LAN, puerto LAN",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/getting-started/luci-first-login/",
+            "title": "Primer acceso a LuCI: dirección, contraseña e interfaz en chino",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/troubleshooting/no-web-ui/",
+            "title": "No se puede acceder a LuCI: IP, puerto, DHCP y recuperación por consola",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/network/wan-connectivity/",
+            "title": "Conectividad del router principal: verifica por separado WAN DHCP y PPPoE",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-bak-01",
+        "locale": "es",
+        "query": "copia de seguridad restaurar configuración",
+        "category": "bak",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/recovery/backup-restore/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/recovery/backup-restore/",
+            "title": "Copia de seguridad y restauración: verifica por separado configuración, paquetes y administración",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/network/dns/",
+            "title": "Configura el DNS y verifica el router, el cliente y el navegador",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/",
+            "title": "OpenWrt, sin perder tu red",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/recovery/firmware-upgrade/",
+            "title": "Actualización del firmware: conserva la configuración, reconstruye los paquetes y verifica DNS y administración",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/troubleshooting/no-web-ui/",
+            "title": "No se puede acceder a LuCI: IP, puerto, DHCP y recuperación por consola",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-upg-01",
+        "locale": "es",
+        "query": "actualizar firmware sysupgrade",
+        "category": "upg",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/recovery/firmware-upgrade/"
+        ],
+        "rank": 2,
+        "results": [
+          {
+            "url": "/es/features/failsafe/",
+            "title": "Modo failsafe y sysupgrade: las vías de retorno integradas de OpenWrt",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/recovery/firmware-upgrade/",
+            "title": "Actualización del firmware: conserva la configuración, reconstruye los paquetes y verifica DNS y administración",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/features/openwrt-25-12/",
+            "title": "OpenWrt 25.12: qué cambió desde la 24.10 y cuándo actualizar",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/recovery/backup-restore/",
+            "title": "Copia de seguridad y restauración: verifica por separado configuración, paquetes y administración",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/getting-started/which-openwrt/",
+            "title": "¿Qué OpenWrt es este? OpenWrt oficial, ImmortalWrt, iStoreOS o firmware del fabricante",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-wg-01",
+        "locale": "es",
+        "query": "servidor wireguard",
+        "category": "wg",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/remote-access/wireguard-server/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/remote-access/wireguard-server/",
+            "title": "Acceso remoto a casa con WireGuard: servidor, peer, cortafuegos y verificación del túnel",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/remote-access/wireguard-client/",
+            "title": "Cliente WireGuard: configuración, AllowedIPs, DNS y reconexión",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/features/wireguard/",
+            "title": "WireGuard en OpenWrt: una VPN en el kernel configurada como interfaz de red",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/",
+            "title": "OpenWrt, sin perder tu red",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/features/firewall4/",
+            "title": "firewall4: el cortafuegos nftables de OpenWrt y sus zonas",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-vlan-01",
+        "locale": "es",
+        "query": "vlan dsa puertos",
+        "category": "vlan",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/wireless-vlan/dsa-vlan/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/wireless-vlan/dsa-vlan/",
+            "title": "VLAN con DSA: puertos, PVID, tagged/untagged y reversión",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/features/dsa/",
+            "title": "DSA en OpenWrt: puertos del switch como interfaces Linux, VLAN en br-lan",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/wireless-vlan/guest-wifi/",
+            "title": "Wi-Fi para invitados: SSID separado, VLAN, DHCP y aislamiento",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/",
+            "title": "OpenWrt, sin perder tu red",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "es-guest-01",
+        "locale": "es",
+        "query": "wifi de invitados",
+        "category": "guest",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/es/wireless-vlan/guest-wifi/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/es/wireless-vlan/guest-wifi/",
+            "title": "Wi-Fi para invitados: SSID separado, VLAN, DHCP y aislamiento",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/network/ap-mode/",
+            "title": "AP por cable/inalámbrico bajo un router existente: DHCP desactivado, nueva IP de LAN, puerto LAN",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/features/firewall4/",
+            "title": "firewall4: el cortafuegos nftables de OpenWrt y sus zonas",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/",
+            "title": "OpenWrt, sin perder tu red",
+            "excerpt": ""
+          },
+          {
+            "url": "/es/features/dsa/",
+            "title": "DSA en OpenWrt: puertos del switch como interfaces Linux, VLAN en br-lan",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-dns-01",
+        "locale": "de",
+        "query": "DNS-Server upstream dnsmasq",
+        "category": "dns",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/network/dns/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/network/dns/",
+            "title": "DNS konfigurieren und Router, Client und Browser prüfen",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-proxmox-01",
+        "locale": "de",
+        "query": "proxmox nur einer netzwerkkarte openwrt",
+        "category": "proxmox",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/installation/proxmox/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/installation/proxmox/",
+            "title": "OpenWrt auf einem Proxmox-VE-Host mit nur einer Netzwerkkarte installieren",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/getting-started/x86-image/",
+            "title": "Ein x86-Image auswählen: combined, ext4, squashfs, EFI/BIOS",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-agh-01",
+        "locale": "de",
+        "query": "adguard home port 5353",
+        "category": "agh",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/software/adguard-home/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/software/adguard-home/",
+            "title": "AdGuard Home: von der Web-Oberfläche bis zur Client-Filterung",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/software/openclash/",
+            "title": "OpenClash-Grundlagen: Kompatibilität, DNS-Konflikte und sauberes Deaktivieren",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-sqm-01",
+        "locale": "de",
+        "query": "sqm cake bufferbloat",
+        "category": "sqm",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/software/sqm/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/software/sqm/",
+            "title": "SQM und CAKE: Lag bei Download und Upload beseitigen",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/features/sqm/",
+            "title": "SQM und CAKE unter OpenWrt: niedrige Latenz bei voller Leitung",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-luci-01",
+        "locale": "de",
+        "query": "erste anmeldung luci passwort",
+        "category": "luci",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/getting-started/luci-first-login/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/getting-started/luci-first-login/",
+            "title": "Erste LuCI-Anmeldung: Adresse, Passwort und chinesische Oberfläche",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-fw-01",
+        "locale": "de",
+        "query": "immortalwrt istoreos hersteller-firmware",
+        "category": "fw",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/getting-started/which-openwrt/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/getting-started/which-openwrt/",
+            "title": "Welches OpenWrt ist das: offiziell, ImmortalWrt, iStoreOS oder Hersteller-Firmware?",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/download/",
+            "title": "OpenWrt herunterladen, gleich beim ersten Mal richtig",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/getting-started/luci-first-login/",
+            "title": "Erste LuCI-Anmeldung: Adresse, Passwort und chinesische Oberfläche",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-oc-01",
+        "locale": "de",
+        "query": "openclash dns konflikt",
+        "category": "oc",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/software/openclash/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/software/openclash/",
+            "title": "OpenClash-Grundlagen: Kompatibilität, DNS-Konflikte und sauberes Deaktivieren",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-pkg-01",
+        "locale": "de",
+        "query": "apk opkg paket-feeds mirror",
+        "category": "pkg",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/software/package-sources/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/software/package-sources/",
+            "title": "Paket-Feeds und China-Mirror: apk und opkg getrennt halten",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-rec-01",
+        "locale": "de",
+        "query": "luci nicht erreichbar 192.168.1.1",
+        "category": "rec",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/troubleshooting/no-web-ui/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/troubleshooting/no-web-ui/",
+            "title": "LuCI nicht erreichbar: IP, Port, DHCP und Wiederherstellung per Konsole",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/getting-started/luci-first-login/",
+            "title": "Erste LuCI-Anmeldung: Adresse, Passwort und chinesische Oberfläche",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/network/dns/",
+            "title": "DNS konfigurieren und Router, Client und Browser prüfen",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/network/ap-mode/",
+            "title": "Kabelgebundener/WLAN-AP hinter einem bestehenden Router: DHCP aus, neue LAN-IP, LAN-Port",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/network/bypass-gateway/",
+            "title": "Bypass-Gateway: DHCP deaktivieren, Gateway/DNS der Clients setzen und zurückwechseln",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-lan-01",
+        "locale": "de",
+        "query": "lan-adresse ändern",
+        "category": "lan",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/network/lan-address/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/network/lan-address/",
+            "title": "LAN-Adresse ändern und wieder Zugriff erhalten: altes/neues Subnetz, DHCP und Wiederherstellung",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/troubleshooting/no-web-ui/",
+            "title": "LuCI nicht erreichbar: IP, Port, DHCP und Wiederherstellung per Konsole",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/getting-started/luci-first-login/",
+            "title": "Erste LuCI-Anmeldung: Adresse, Passwort und chinesische Oberfläche",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/installation/proxmox/",
+            "title": "OpenWrt auf einem Proxmox-VE-Host mit nur einer Netzwerkkarte installieren",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/network/dns/",
+            "title": "DNS konfigurieren und Router, Client und Browser prüfen",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-bak-01",
+        "locale": "de",
+        "query": "sichern wiederherstellen konfiguration",
+        "category": "bak",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/recovery/backup-restore/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/recovery/backup-restore/",
+            "title": "Sichern und Wiederherstellen: Konfiguration, Pakete und Verwaltung getrennt prüfen",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/troubleshooting/no-web-ui/",
+            "title": "LuCI nicht erreichbar: IP, Port, DHCP und Wiederherstellung per Konsole",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/network/lan-address/",
+            "title": "LAN-Adresse ändern und wieder Zugriff erhalten: altes/neues Subnetz, DHCP und Wiederherstellung",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/getting-started/firmware-download/",
+            "title": "Vor dem Firmware-Download: Modell, Revision, Target/Profil und Wiederherstellung",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/recovery/firmware-upgrade/",
+            "title": "Firmware-Upgrade: Konfiguration behalten, Pakete neu aufbauen, DNS/Verwaltung prüfen",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-upg-01",
+        "locale": "de",
+        "query": "firmware-upgrade konfiguration behalten",
+        "category": "upg",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/recovery/firmware-upgrade/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/recovery/firmware-upgrade/",
+            "title": "Firmware-Upgrade: Konfiguration behalten, Pakete neu aufbauen, DNS/Verwaltung prüfen",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/features/failsafe/",
+            "title": "Failsafe-Modus und sysupgrade: die eingebauten Wege zurück in OpenWrt",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-wg-01",
+        "locale": "de",
+        "query": "wireguard server",
+        "category": "wg",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/remote-access/wireguard-server/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/remote-access/wireguard-server/",
+            "title": "WireGuard-Heimzugriff: Server, Peer, Firewall und Tunnelprüfung",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/features/wireguard/",
+            "title": "WireGuard unter OpenWrt: ein Kernel-VPN, das als Netzwerkschnittstelle eingerichtet wird",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/remote-access/wireguard-client/",
+            "title": "WireGuard-Client: Konfiguration, AllowedIPs, DNS und Wiederverbindung",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/",
+            "title": "OpenWrt, ohne Ihr Netzwerk zu verlieren",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/features/firewall4/",
+            "title": "firewall4: Die nftables-Firewall von OpenWrt und ihre Zonen",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-vlan-01",
+        "locale": "de",
+        "query": "vlan dsa ports",
+        "category": "vlan",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/wireless-vlan/dsa-vlan/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/wireless-vlan/dsa-vlan/",
+            "title": "DSA-VLAN: Ports, PVID, tagged/untagged und Rollback",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/features/dsa/",
+            "title": "DSA in OpenWrt: Switch-Ports als Linux-Schnittstellen, VLANs auf br-lan",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/wireless-vlan/guest-wifi/",
+            "title": "Gast-WLAN: separate SSID, VLAN, DHCP und Isolation",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/",
+            "title": "OpenWrt, ohne Ihr Netzwerk zu verlieren",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "de-guest-01",
+        "locale": "de",
+        "query": "gast-wlan",
+        "category": "guest",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/de/wireless-vlan/guest-wifi/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/de/wireless-vlan/guest-wifi/",
+            "title": "Gast-WLAN: separate SSID, VLAN, DHCP und Isolation",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/features/dsa/",
+            "title": "DSA in OpenWrt: Switch-Ports als Linux-Schnittstellen, VLANs auf br-lan",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/features/firewall4/",
+            "title": "firewall4: Die nftables-Firewall von OpenWrt und ihre Zonen",
+            "excerpt": ""
+          },
+          {
+            "url": "/de/",
+            "title": "OpenWrt, ohne Ihr Netzwerk zu verlieren",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-dns-01",
+        "locale": "fr",
+        "query": "serveur DNS amont dnsmasq",
+        "category": "dns",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/network/dns/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/network/dns/",
+            "title": "Configurer le DNS et vérifier le routeur, le client et le navigateur",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/network/ap-mode/",
+            "title": "AP filaire/sans fil derrière un routeur existant : DHCP désactivé, nouvelle IP LAN, port LAN",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/network/bypass-gateway/",
+            "title": "Passerelle en contournement : désactiver le DHCP, définir passerelle/DNS des clients et revenir en arrière",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/installation/proxmox/",
+            "title": "Installer OpenWrt sur un hôte Proxmox VE à une seule carte réseau",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/software/openclash/",
+            "title": "OpenClash : bases, compatibilité, conflits DNS et désactivation propre",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-proxmox-01",
+        "locale": "fr",
+        "query": "proxmox une seule carte réseau openwrt",
+        "category": "proxmox",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/installation/proxmox/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/installation/proxmox/",
+            "title": "Installer OpenWrt sur un hôte Proxmox VE à une seule carte réseau",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/getting-started/x86-image/",
+            "title": "Choisir une image x86 : combined, ext4, squashfs, EFI/BIOS",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-agh-01",
+        "locale": "fr",
+        "query": "adguard home port 5353",
+        "category": "agh",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/software/adguard-home/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/software/adguard-home/",
+            "title": "AdGuard Home : de l'interface web au filtrage des clients",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/software/openclash/",
+            "title": "OpenClash : bases, compatibilité, conflits DNS et désactivation propre",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-sqm-01",
+        "locale": "fr",
+        "query": "sqm cake bufferbloat",
+        "category": "sqm",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/software/sqm/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/software/sqm/",
+            "title": "SQM et CAKE : éliminer la latence pendant les téléchargements et les envois",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/features/sqm/",
+            "title": "SQM et CAKE sur OpenWrt : une faible latence quand la ligne est saturée",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-luci-01",
+        "locale": "fr",
+        "query": "première connexion luci mot de passe",
+        "category": "luci",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/getting-started/luci-first-login/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/getting-started/luci-first-login/",
+            "title": "Première connexion à LuCI : adresse, mot de passe et interface en chinois",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-fw-01",
+        "locale": "fr",
+        "query": "immortalwrt istoreos différences",
+        "category": "fw",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/getting-started/which-openwrt/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/getting-started/which-openwrt/",
+            "title": "Quel OpenWrt est-ce : officiel, ImmortalWrt, iStoreOS ou firmware constructeur ?",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/download/",
+            "title": "Téléchargez OpenWrt, du premier coup",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/software/package-sources/",
+            "title": "Dépôts de paquets et miroirs chinois : séparer apk et opkg",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/getting-started/luci-first-login/",
+            "title": "Première connexion à LuCI : adresse, mot de passe et interface en chinois",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/software/openclash/",
+            "title": "OpenClash : bases, compatibilité, conflits DNS et désactivation propre",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-oc-01",
+        "locale": "fr",
+        "query": "openclash conflit dns",
+        "category": "oc",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/software/openclash/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/software/openclash/",
+            "title": "OpenClash : bases, compatibilité, conflits DNS et désactivation propre",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-pkg-01",
+        "locale": "fr",
+        "query": "apk opkg dépôts miroir",
+        "category": "pkg",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/software/package-sources/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/software/package-sources/",
+            "title": "Dépôts de paquets et miroirs chinois : séparer apk et opkg",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/software/apk-vs-opkg/",
+            "title": "apk de 25.12 et opkg de 24.10 : commandes, format des paquets et limites de migration",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/troubleshooting/plugin-install/",
+            "title": "Le paquet ne s'installe pas : téléchargement, architecture, dépendances, LuCI et postinst",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-rec-01",
+        "locale": "fr",
+        "query": "luci inaccessible 192.168.1.1",
+        "category": "rec",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/troubleshooting/no-web-ui/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/troubleshooting/no-web-ui/",
+            "title": "LuCI inaccessible : IP, port, DHCP et récupération par la console",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/getting-started/luci-first-login/",
+            "title": "Première connexion à LuCI : adresse, mot de passe et interface en chinois",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/network/dns/",
+            "title": "Configurer le DNS et vérifier le routeur, le client et le navigateur",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/",
+            "title": "OpenWrt, sans perdre votre réseau",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-lan-01",
+        "locale": "fr",
+        "query": "changer l'adresse lan",
+        "category": "lan",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/network/lan-address/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/network/lan-address/",
+            "title": "Changer l'adresse LAN et récupérer l'accès : ancien/nouveau sous-réseau, DHCP et récupération",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/troubleshooting/no-web-ui/",
+            "title": "LuCI inaccessible : IP, port, DHCP et récupération par la console",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/installation/proxmox/",
+            "title": "Installer OpenWrt sur un hôte Proxmox VE à une seule carte réseau",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/network/bypass-gateway/",
+            "title": "Passerelle en contournement : désactiver le DHCP, définir passerelle/DNS des clients et revenir en arrière",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/network/dns/",
+            "title": "Configurer le DNS et vérifier le routeur, le client et le navigateur",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-bak-01",
+        "locale": "fr",
+        "query": "sauvegarde restauration configuration",
+        "category": "bak",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/recovery/backup-restore/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/recovery/backup-restore/",
+            "title": "Sauvegarde et restauration : vérifier séparément la configuration, les paquets et la gestion",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/recovery/firmware-upgrade/",
+            "title": "Mise à niveau du micrologiciel : conserver la configuration, reconstruire les paquets, vérifier DNS et gestion",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/troubleshooting/plugin-install/",
+            "title": "Le paquet ne s'installe pas : téléchargement, architecture, dépendances, LuCI et postinst",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/network/dns/",
+            "title": "Configurer le DNS et vérifier le routeur, le client et le navigateur",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/features/failsafe/",
+            "title": "Mode failsafe et sysupgrade : les retours en arrière intégrés d'OpenWrt",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-upg-01",
+        "locale": "fr",
+        "query": "mise à jour firmware sysupgrade",
+        "category": "upg",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/recovery/firmware-upgrade/"
+        ],
+        "rank": 2,
+        "results": [
+          {
+            "url": "/fr/features/failsafe/",
+            "title": "Mode failsafe et sysupgrade : les retours en arrière intégrés d'OpenWrt",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/recovery/firmware-upgrade/",
+            "title": "Mise à niveau du micrologiciel : conserver la configuration, reconstruire les paquets, vérifier DNS et gestion",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/recovery/backup-restore/",
+            "title": "Sauvegarde et restauration : vérifier séparément la configuration, les paquets et la gestion",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/",
+            "title": "OpenWrt, sans perdre votre réseau",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/getting-started/which-openwrt/",
+            "title": "Quel OpenWrt est-ce : officiel, ImmortalWrt, iStoreOS ou firmware constructeur ?",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-wg-01",
+        "locale": "fr",
+        "query": "serveur wireguard",
+        "category": "wg",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/remote-access/wireguard-server/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/remote-access/wireguard-server/",
+            "title": "Accès WireGuard à la maison : serveur, pair, pare-feu et vérification du tunnel",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/remote-access/wireguard-client/",
+            "title": "Client WireGuard : configuration, AllowedIPs, DNS et reconnexion",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/features/wireguard/",
+            "title": "WireGuard sur OpenWrt : un VPN noyau configuré comme une interface réseau",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/",
+            "title": "OpenWrt, sans perdre votre réseau",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/features/firewall4/",
+            "title": "firewall4 : le pare-feu nftables d’OpenWrt et ses zones",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-vlan-01",
+        "locale": "fr",
+        "query": "vlan dsa ports",
+        "category": "vlan",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/wireless-vlan/dsa-vlan/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/wireless-vlan/dsa-vlan/",
+            "title": "VLAN DSA : ports, PVID, tagged/untagged et retour arrière",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/features/dsa/",
+            "title": "DSA dans OpenWrt : les ports du commutateur comme interfaces Linux, VLAN sur br-lan",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/wireless-vlan/guest-wifi/",
+            "title": "Wi-Fi invités : SSID séparé, VLAN, DHCP et isolation",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/",
+            "title": "OpenWrt, sans perdre votre réseau",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "fr-guest-01",
+        "locale": "fr",
+        "query": "wifi invité",
+        "category": "guest",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/fr/wireless-vlan/guest-wifi/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/fr/wireless-vlan/guest-wifi/",
+            "title": "Wi-Fi invités : SSID séparé, VLAN, DHCP et isolation",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/network/ap-mode/",
+            "title": "AP filaire/sans fil derrière un routeur existant : DHCP désactivé, nouvelle IP LAN, port LAN",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/",
+            "title": "OpenWrt, sans perdre votre réseau",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/features/firewall4/",
+            "title": "firewall4 : le pare-feu nftables d’OpenWrt et ses zones",
+            "excerpt": ""
+          },
+          {
+            "url": "/fr/features/dsa/",
+            "title": "DSA dans OpenWrt : les ports du commutateur comme interfaces Linux, VLAN sur br-lan",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-dns-01",
+        "locale": "ja",
+        "query": "DNS ブラウザー",
+        "category": "dns",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/network/dns/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/network/dns/",
+            "title": "DNSを設定し、ルーター・クライアント・ブラウザーで確認する",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/software/adguard-home/",
+            "title": "AdGuard Home: Web UI からクライアントのフィルタリングまで",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/troubleshooting/no-internet/",
+            "title": "インターネットに繋がらない/断続的に切れる：全デバイス、1台のクライアント、1つのアプリ",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/network/lan-address/",
+            "title": "LANアドレスの変更と再接続: 新旧サブネット、DHCP、復旧",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/troubleshooting/plugin-install/",
+            "title": "パッケージをインストールできない: ダウンロード、アーキテクチャ、依存関係、LuCI、postinst",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-proxmox-01",
+        "locale": "ja",
+        "query": "proxmox NIC openwrt",
+        "category": "proxmox",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/installation/proxmox/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/installation/proxmox/",
+            "title": "NIC が1つの Proxmox VE ホストに OpenWrt をインストールする",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/getting-started/x86-image/",
+            "title": "x86イメージの選び方：combined、ext4、squashfs、EFI/BIOS",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-agh-01",
+        "locale": "ja",
+        "query": "adguard home クライアント",
+        "category": "agh",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/software/adguard-home/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/software/adguard-home/",
+            "title": "AdGuard Home: Web UI からクライアントのフィルタリングまで",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/software/openclash/",
+            "title": "OpenClashの基本：互換性、DNSの競合、きれいな無効化",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/installation/proxmox/",
+            "title": "NIC が1つの Proxmox VE ホストに OpenWrt をインストールする",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/",
+            "title": "OpenWrt を、今のネットワークを損なわずに",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/recovery/backup-restore/",
+            "title": "バックアップと復元: 設定、パッケージ、管理アクセスを個別に確認する",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-sqm-01",
+        "locale": "ja",
+        "query": "sqm cake ラグ",
+        "category": "sqm",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/software/sqm/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/software/sqm/",
+            "title": "SQMとCAKE：ダウンロード・アップロード中のラグを解消",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/",
+            "title": "OpenWrt を、今のネットワークを損なわずに",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-luci-01",
+        "locale": "ja",
+        "query": "LuCI 初回ログイン",
+        "category": "luci",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/getting-started/luci-first-login/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/getting-started/luci-first-login/",
+            "title": "LuCI への初回ログイン: アドレス、パスワード、中国語 UI",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/",
+            "title": "OpenWrt を、今のネットワークを損なわずに",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/network/lan-address/",
+            "title": "LANアドレスの変更と再接続: 新旧サブネット、DHCP、復旧",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-fw-01",
+        "locale": "ja",
+        "query": "immortalwrt istoreos ベンダー",
+        "category": "fw",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/getting-started/which-openwrt/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/getting-started/which-openwrt/",
+            "title": "これはどの OpenWrt か: 公式、ImmortalWrt、iStoreOS、ベンダー製ファームウェア",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/download/",
+            "title": "OpenWrtのダウンロードは、最初から正しく",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/getting-started/luci-first-login/",
+            "title": "LuCI への初回ログイン: アドレス、パスワード、中国語 UI",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/software/openclash/",
+            "title": "OpenClashの基本：互換性、DNSの競合、きれいな無効化",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-oc-01",
+        "locale": "ja",
+        "query": "openclash 無効化",
+        "category": "oc",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/software/openclash/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/software/openclash/",
+            "title": "OpenClashの基本：互換性、DNSの競合、きれいな無効化",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/recovery/firmware-upgrade/",
+            "title": "ファームウェアのアップグレード: 設定を維持し、パッケージを再構築し、DNS/管理アクセスを確認する",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/installation/proxmox/",
+            "title": "NIC が1つの Proxmox VE ホストに OpenWrt をインストールする",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-pkg-01",
+        "locale": "ja",
+        "query": "apk opkg ミラー",
+        "category": "pkg",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/software/package-sources/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/software/package-sources/",
+            "title": "パッケージフィードと中国ミラー: apkとopkgを混同しない",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/software/apk-vs-opkg/",
+            "title": "25.12のapkと24.10のopkg: コマンド、パッケージ形式、移行の境界",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/troubleshooting/plugin-install/",
+            "title": "パッケージをインストールできない: ダウンロード、アーキテクチャ、依存関係、LuCI、postinst",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-rec-01",
+        "locale": "ja",
+        "query": "LuCI 接続 コンソール",
+        "category": "rec",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/troubleshooting/no-web-ui/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/troubleshooting/no-web-ui/",
+            "title": "LuCI に接続できない: IP、ポート、DHCP、コンソールでの復旧",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/getting-started/luci-first-login/",
+            "title": "LuCI への初回ログイン: アドレス、パスワード、中国語 UI",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/network/lan-address/",
+            "title": "LANアドレスの変更と再接続: 新旧サブネット、DHCP、復旧",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/software/openclash/",
+            "title": "OpenClashの基本：互換性、DNSの競合、きれいな無効化",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/wireless-vlan/dsa-vlan/",
+            "title": "DSA VLAN: ポート、PVID、tagged/untagged とロールバック",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-lan-01",
+        "locale": "ja",
+        "query": "lan サブネット 変更",
+        "category": "lan",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/network/lan-address/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/network/lan-address/",
+            "title": "LANアドレスの変更と再接続: 新旧サブネット、DHCP、復旧",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/troubleshooting/no-web-ui/",
+            "title": "LuCI に接続できない: IP、ポート、DHCP、コンソールでの復旧",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/installation/proxmox/",
+            "title": "NIC が1つの Proxmox VE ホストに OpenWrt をインストールする",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/network/bypass-gateway/",
+            "title": "バイパスゲートウェイ: DHCP の無効化、クライアントのゲートウェイ/DNS の設定、元に戻す方法",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/network/dns/",
+            "title": "DNSを設定し、ルーター・クライアント・ブラウザーで確認する",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-bak-01",
+        "locale": "ja",
+        "query": "バックアップ 復元",
+        "category": "bak",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/recovery/backup-restore/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/recovery/backup-restore/",
+            "title": "バックアップと復元: 設定、パッケージ、管理アクセスを個別に確認する",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/recovery/firmware-upgrade/",
+            "title": "ファームウェアのアップグレード: 設定を維持し、パッケージを再構築し、DNS/管理アクセスを確認する",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/troubleshooting/plugin-install/",
+            "title": "パッケージをインストールできない: ダウンロード、アーキテクチャ、依存関係、LuCI、postinst",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/features/failsafe/",
+            "title": "フェイルセーフモードとsysupgrade: OpenWrt標準の復旧手段",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/network/dns/",
+            "title": "DNSを設定し、ルーター・クライアント・ブラウザーで確認する",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-upg-01",
+        "locale": "ja",
+        "query": "ファームウェア アップグレード",
+        "category": "upg",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/recovery/firmware-upgrade/"
+        ],
+        "rank": 4,
+        "results": [
+          {
+            "url": "/ja/troubleshooting/no-internet/",
+            "title": "インターネットに繋がらない/断続的に切れる：全デバイス、1台のクライアント、1つのアプリ",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/software/openclash/",
+            "title": "OpenClashの基本：互換性、DNSの競合、きれいな無効化",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/download/",
+            "title": "OpenWrtのダウンロードは、最初から正しく",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/recovery/firmware-upgrade/",
+            "title": "ファームウェアのアップグレード: 設定を維持し、パッケージを再構築し、DNS/管理アクセスを確認する",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/getting-started/firmware-download/",
+            "title": "ファームウェアをダウンロードする前に：モデル、リビジョン、ターゲット/プロファイル、復旧",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-wg-01",
+        "locale": "ja",
+        "query": "wireguard サーバー ピア",
+        "category": "wg",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/remote-access/wireguard-server/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/remote-access/wireguard-server/",
+            "title": "WireGuard で自宅にアクセス: サーバー、ピア、ファイアウォール、トンネルの確認",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/remote-access/wireguard-client/",
+            "title": "WireGuardクライアント: 設定、AllowedIPs、DNS、再接続",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/features/wireguard/",
+            "title": "OpenWrtのWireGuard: ネットワークインターフェースとして設定するカーネルVPN",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-vlan-01",
+        "locale": "ja",
+        "query": "dsa vlan pvid",
+        "category": "vlan",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/wireless-vlan/dsa-vlan/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/wireless-vlan/dsa-vlan/",
+            "title": "DSA VLAN: ポート、PVID、tagged/untagged とロールバック",
+            "excerpt": ""
+          },
+          {
+            "url": "/ja/wireless-vlan/guest-wifi/",
+            "title": "ゲスト Wi-Fi: 専用 SSID、VLAN、DHCP、分離",
+            "excerpt": ""
+          }
+        ]
+      },
+      {
+        "id": "ja-guest-01",
+        "locale": "ja",
+        "query": "ゲスト wifi ssid",
+        "category": "guest",
+        "aliasCase": false,
+        "expectedUrls": [
+          "/ja/wireless-vlan/guest-wifi/"
+        ],
+        "rank": 1,
+        "results": [
+          {
+            "url": "/ja/wireless-vlan/guest-wifi/",
+            "title": "ゲスト Wi-Fi: 専用 SSID、VLAN、DHCP、分離",
             "excerpt": ""
           }
         ]
