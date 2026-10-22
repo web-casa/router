@@ -1,0 +1,208 @@
+---
+title: "ファームウェアをダウンロードする前に：モデル、リビジョン、ターゲット/プロファイル、復旧"
+description: ファームウェアをダウンロードまたは書き込む前に、読み取り専用の確認で、正確なモデル/リビジョン、ターゲット、プロファイル、イメージの種類、復旧手段を確かめます。
+pageType: overview
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: '特定のデバイスは未定；読み取り専用のチェックリスト、書き込みなし'
+testRecipe: 'tests/recipes/firmware-download-check.md'
+aliases: ['openwrt firmware download', 'openwrt model', 'openwrt hardware revision', 'sysupgrade image', 'factory image', 'openwrt ファームウェア ダウンロード', 'openwrt イメージ 選び方', 'openwrt sysupgrade factory 違い', 'openwrt ハードウェアリビジョン 確認', 'openwrt チェックサム 確認']
+symptoms: ['ファームウェアを間違えた', 'どのイメージか分からない', 'モデルの不一致', 'チェックサムの失敗']
+sources:
+  - label: OpenWrt Firmware Selector
+    url: https://firmware-selector.openwrt.org/
+  - label: OpenWrt sysupgradeドキュメント
+    url: https://openwrt.org/docs/guide-user/installation/sysupgrade
+  - label: OpenWrt 25.12 リリースノート
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: OpenWrt デバイスページ
+    url: https://openwrt.org/toh/start
+sourceHash: 'c06b58c12c079954'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="—" device="デバイス未定" tested={false} evidence="E1" />
+
+## 達成できること
+
+- 「似ているモデル」ではなく、正確なモデルとハードウェアリビジョンを把握します。
+- OpenWrtのターゲット/サブターゲット/プロファイルと、ダウンロードすべきイメージを把握します。
+- `sysupgrade`、`factory`、x86のcombinedイメージを正しく選びます。
+- ファイルの入手元とチェックサムを検証します。
+- 書き込み前に復旧手段を把握し、失敗した場合にどの経路を取るか決めておきます。
+
+> これはダウンロード前のチェックリストであり、書き込みガイドではありません。ベアメタルへの書き込み、ブートローダーの復旧、メジャーバージョンをまたぐ移行はR2です。独立したレビューとデバイスのドキュメントを使ってください。このページを汎用の書き込みチュートリアルとして扱わないでください。
+
+## まずラベルを確認する
+
+<Step where="client" title="モデルとハードウェアリビジョンを記録する" expected="モデル、リビジョン、地域、ラベルの詳細が書き留められます。">
+
+底面のラベル、箱、マニュアルを確認し、次を記録します。
+
+- ベンダー + 完全なモデル名（シリーズ名だけではない）
+- ハードウェアリビジョン（v1、v2、V2.1など）
+- 地域/事業者向けのバリエーション
+- FCC IDとシリアル番号のプレフィックス（ある場合。公開しないでください）
+- 復旧方法（リセットボタン、TFTP、シリアル、ベンダーのツール）
+
+1つのモデルに複数のリビジョンがあり、フラッシュ、Wi-Fiチップ、パーティションレイアウトが異なることがあります。**同じモデル名でも、共通のイメージが1つあるとは限りません。**
+
+</Step>
+
+<Step where="router-shell" title="既存のOpenWrtでボードデータを読み取る" expected="distribution/target/model/board_nameがデバイスページと一致します。">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+cat /tmp/sysinfo/model 2>/dev/null
+cat /tmp/sysinfo/board_name 2>/dev/null
+```
+
+重要なフィールド：`release.distribution`、`release.version`、`release.target`、`model`、`board_name`。`model` はハードウェアリビジョンではありません。この行だけでイメージを選ばないでください。
+
+</Step>
+
+<Step where="router-shell" title="x86ではDMI/BIOSを読み取る" expected="ボード/デバイスのモデルが分かり、PC用とVM用のイメージを混同しません。">
+
+```sh
+cat /sys/class/dmi/id/sys_vendor
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/board_version
+cat /sys/class/dmi/id/bios_version
+```
+
+BIOS/LegacyかUEFIか、ディスクインターフェース、イメージがcombined/ext4かどうかも確認します。これらが起動できるかを左右します。「x86/64」だけでは不十分です。
+
+</Step>
+
+## ファームウェアセレクターで確認する
+
+<Step where="client" title="ファイル名ではなく、ターゲット/プロファイルで選ぶ" expected="正確なデバイスページとイメージが見つかります。">
+
+[OpenWrt Firmware Selector](https://firmware-selector.openwrt.org/) を開きます。
+
+1. 正しいリリース（例：25.12.6）を選択します。
+2. 完全なモデル名で検索し、デバイスページを開きます。
+3. ターゲット/サブターゲット、プロファイル、ハードウェアリビジョンを確認します。
+4. デバイスページの「Installation」セクションで、初回インストールとアップグレードのイメージの種類を確認します。
+5. ダウンロードしてSHA-256を検証します。ファイルをリネームするだけで済ませないでください。
+
+セレクターとデバイスページが一致しない場合は、そこで止めてモデル/リビジョンを確認してください。最も近いものを選ばないでください。
+
+</Step>
+
+## イメージの種類
+
+| イメージ/シナリオ | 用途 | 主なリスク |
+|---|---|---|
+| `sysupgrade` | 既存のOpenWrtで、設定の保持あり/なしでアップグレード | バージョンをまたぐ場合のパッケージ/カーネルモジュールの非互換 |
+| `factory` / ベンダーからの移行 | ベンダーのファームウェアからの初回インストール | パーティション/フラッシュ方式の不一致で文鎮化の恐れ |
+| x86 combined/ext4 | x86またはVMのディスク全体のイメージ | BIOS/UEFI、ディスクレイアウト、書き込み方法 |
+| ベンダーのファームウェア | ベンダーのWeb UI/復旧ツール | OpenWrtのイメージと混同しない |
+| 「汎用/分解不要」パッケージ | 出所不明 | 避ける。ターゲット/プロファイル/チェックサムを検証できない |
+
+ファイル名に `sysupgrade` が含まれていても、それだけでは根拠になりません。ターゲット、プロファイル、リビジョン、チェックサムがすべて一致する必要があります。
+
+## ダウンロードと検証
+
+<Step where="client" title="公式/ベンダーの入手元だけを使う" expected="ファイルの入手元をたどれ、チェックサムがあります。">
+
+優先する入手元：
+
+- OpenWrtの `downloads.openwrt.org` またはFirmware Selector
+- デバイスベンダーの公式ダウンロードページ
+- プロジェクトの公式リリースページ（サードパーティのファームウェアは、メンテナーや署名の追加確認が必要）
+
+クラウドストレージのミラー、フォーラムの添付ファイル、チャットで渡された「改造済み」パッケージは使わないでください。再パッケージされたものには、スクリプト、古いカーネル、不一致のドライバーが含まれることがあります。
+
+</Step>
+
+<Step where="client" title="SHA-256とファイルサイズを検証する" expected="チェックサムが公式のリリースページと一致します。">
+
+Linux：
+
+```sh
+sha256sum openwrt-*.img.gz
+```
+
+macOS：
+
+```sh
+shasum -a 256 openwrt-*.img.gz
+```
+
+Windows：
+
+```powershell
+certutil -hashfile openwrt-*.img.gz SHA256
+```
+
+公式の `sha256sums`/リリースページと比較します。異なる場合は再ダウンロードしてください。「書き込んで試す」はしないでください。
+
+</Step>
+
+## 書き込み前の復旧準備
+
+<Step where="client" title="復旧手段を書き留める" expected="書き込みに失敗した場合に、failsafe/リカバリーに入る方法が分かります。">
+
+最低限、次を確認します。
+
+- failsafeに入る方法（ボタンのタイミング/シリアル/IP）
+- TFTP/シリアル/ベンダーの復旧が使えるか
+- 管理用LANアドレス、ゲートウェイ、rootパスワード
+- 設定のバックアップ：既存のOpenWrtでは `sysupgrade -b`、ベンダーのファームウェアではベンダーのエクスポート
+- アップグレード後に再構築するパッケージ/カーネルモジュール
+- 安定した電源。書き込み中に抜かないこと
+
+復旧手段、チェックサム、バックアップのいずれかがない場合は、開始しないでください。
+
+</Step>
+
+## よくある間違い
+
+- リビジョンを確認せず、モデルだけを確認する
+- `sysupgrade` を `factory` として使う、またはその逆
+- 別のターゲットのイメージをリネームして書き込む
+- チェックサムが一致しないのに続行する
+- 出所不明の「汎用/拡張」パッケージを使う
+- 書き込み中に電源を失う、またはケーブルを抜く
+- アップグレード後にDNS/ファイアウォール/パッケージを確認せず、成功したと思い込む
+
+## 失敗時の分岐
+
+### 間違ったモデルをダウンロードした
+
+削除して、デバイスページからダウンロードし直してください。「試す」ことはしないでください。すでに書き込んだ場合は、デバイスの復旧ドキュメント（failsafe/TFTP/シリアル）に従ってください。異なるイメージを書き込み続けないでください。
+
+### チェックサムが一致しない
+
+再ダウンロードし、プロキシやミラーによる欠損がないか確認し、公式の入手元に切り替えます。検証を無効にしないでください。
+
+### お使いのリビジョンが一覧にない
+
+ベンダーのページやラベル、またはOpenWrtフォーラム/デバイスページを確認してください。明示的な対応がない場合は、互換性があると想定しないでください。
+
+### ベンダーのファームウェアがロックされている
+
+ベンダーの手順に従ってください。OpenWrtをインストールするためだけに、署名やロックを回避しないでください。先に、保証やベンダー機能とのトレードオフを確認します。
+
+## E1の状況と情報源
+
+- これはE1です。フィールド、イメージの種類、復旧は公開ドキュメントに基づいており、デバイスでのダウンロードや書き込みは行っていません。
+- モデル/リビジョンはラベルとベンダーのページから確認してください。x86 VMでの経験をルーターに一般化しないでください。
+- レシピ：`tests/recipes/firmware-download-check.md`。書き込み手順は対象外です。
+
+<TestRecord
+  status="planned"
+  environment="特定のデバイスは未定；読み取り専用のチェックリスト、書き込みなし"
+  recipe="tests/recipes/firmware-download-check.md"
+  result="E1：モデル/リビジョン、ターゲット/プロファイル、イメージの種類、チェックサム、復旧手段を文書化；デバイスでは未実行"
+/>
+
+<PageSources />

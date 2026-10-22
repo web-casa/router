@@ -1,0 +1,213 @@
+---
+title: "既存ルーター配下の有線/無線AP: DHCPオフ、新しいLAN IP、LANポート"
+description: "OpenWrtをメインルーター配下のAPにします。LANのみ、DHCPオフ、LAN IPはプール外、クライアントはメインルーターからリースを受けます。Wi-Fiは別に検証します。"
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: '有線AP E2: AP LAN 192.168.1.2/24、DHCPオフ。上流DHCP 192.168.1.1、クライアント 192.168.1.136。WAN/Wi-Fiなし'
+testRecipe: 'tests/recipes/ap-mode-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt ap mode', 'openwrt ap モード', 'openwrt アクセスポイント 設定', 'openwrt wireless ap', 'openwrt dhcp 無効', 'openwrt dhcp オフ', 'ルーター ap モード 切り替え', 'openwrt ブリッジモード']
+symptoms: ['APのクライアントにアドレスが配られない', 'APでDHCPが二重になる', 'APを追加したらネットワーク全体が止まった']
+sources:
+  - label: OpenWrt ネットワーク設定
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP and DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt Wi-Fi設定
+    url: https://openwrt.org/docs/guide-user/network/wifi/basic
+  - label: OpenWrt ファイアウォール
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: '9f6d131b15ed3652'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## APモードとは何か
+
+APは「もう1台のルーター」ではありません。
+
+- **LANポート**を接続し、WANは使いません。
+- APのDHCPを無効にし、メインルーターが引き続きリースを配ります。
+- APのLAN IPは、メインルーターのDHCPプールの外に置きます。
+- 2台目のルーターを意図的に作る場合を除き、NATや二重ルーティングはしません。
+
+このラボで検証したのは**有線AP + 上流DHCP**のみです。Wi-FiのSSID/暗号化/ローミングは機材がなく、E1です。
+
+## トポロジー
+
+```text
+メインルーター 192.168.1.1 (DHCP)
+        │ LANポート
+        │
+   OpenWrt AP
+   LAN br-lan 192.168.1.2/24
+   DHCP: 無視
+        │ LANポート
+        │
+   クライアント 192.168.1.136/24
+   ゲートウェイ 192.168.1.1
+```
+
+- クライアントはメインルーターからリースを受け、ゲートウェイはAPの `.2` ではなく `.1` です。
+- APの `.2` は管理専用です。
+- クライアントのゲートウェイが `.2` になっている場合は、2台目のDHCPサーバーがあるか、設定が誤っています。
+
+## 設定
+
+<Step where="router-shell" title="バックアップし、WANが不要であることを確認する" expected="LAN IP、DHCPの状態、WANを使うかどうかがわかる。">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+uci show network.wan 2>/dev/null
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+APモードでは通常WANは不要です。WANを残す場合は、デフォルトルートやNATを奪わないようにしてください。
+
+</Step>
+
+<Step where="luci" title="LAN IPを変更し、DHCPを無効にする" expected="APが192.168.1.2/24になり、アドレスを配らなくなる。">
+
+**ネットワーク → インターフェース → LAN → 編集**:
+
+1. IPv4 アドレス: `192.168.1.2/24`（メインルーターのプール外）
+2. **DHCPサーバー → 一般設定 → インターフェースを無視**
+3. 保存して適用します。
+
+CLI:
+
+```sh
+uci set network.lan.ipaddr='192.168.1.2/24'
+uci set dhcp.lan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+その後、`192.168.1.2` でLuCI/SSHに再接続します。
+
+</Step>
+
+<Step where="client" title="メインルーターのLANポートに接続する" expected="クライアントがメインルーターからリースを受け、ゲートウェイもメインルーターになる。">
+
+OpenWrtの**LANポート**をメインルーターの**LANポート**に接続します。WANは使いません。
+
+クライアントで再接続/更新します。
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.1.1
+ping 192.168.1.2
+```
+
+このラボのクライアントは `192.168.1.136/24`、ゲートウェイ `192.168.1.1` を取得し、AP `.2` にも到達できました。
+
+</Step>
+
+<Step where="client" title="APがDHCPを配っていないことを確認する" expected="DHCPサーバーがAPではなくメインルーターである。">
+
+```sh
+# Linuxの例
+udhcpc -i eth0 -f -q -n -t 5
+```
+
+`server 192.168.1.1` であることを確認します。`192.168.1.2` と表示される場合は、APのDHCPがまだ有効です。
+
+このAP単体のラボにはインターネットがないため、`ping 1.1.1.1` が失敗するのは想定どおりです。実際のインターネット接続はメインルーターに依存します。
+
+</Step>
+
+## 無線AP（E1）
+
+無線機材がないため、次の項目は未検証です。
+
+- SSID/パスワード/WPA2/WPA3
+- 2.4/5 GHzのチャンネル、帯域幅、送信出力
+- ローミング/802.11r/弱電界での切り離し
+- 無線クライアントの分離
+- 同一SSIDで複数のAP
+
+原則:
+
+- 無線インターフェースを `br-lan` にブリッジします。
+- DHCPを無効にします。
+- WPA2/WPA3を使い、オープンにはしません。
+- チャンネルはずらし、SSIDとパスワードはAP間で共通にします。
+- 先に有線を検証してからWi-Fiを追加し、2つの層を同時に変更しないようにします。
+
+## よくある障害
+
+### APを追加したらネットワーク全体が止まった
+
+- APのDHCPがまだ有効で、メインルーターと競合している
+- APのLAN IPがメインルーターと競合している
+- APのWANポートをメインのLANに接続した
+- メインルーターとAPの間でループしている
+
+APを切り離してメインルーターを復旧させ、1項目ずつ変更してください。
+
+### クライアントにアドレスが配られない
+
+- APがメインのLANに接続されていない
+- APのDHCPはオフだが、メインのDHCPがオフ、またはプールが枯渇している
+- VLAN/分離されたポート
+- 無線インターフェースが `br-lan` にブリッジされていない
+
+### アドレスはあるがゲートウェイが違う
+
+- 別のDHCPサーバーが `.2` を配っている
+- クライアントが古いリースを保持している
+- APでまだDHCPサーバーが動いている
+- `cat /tmp/dhcp.leases` を確認する（APには新しいリースがないはず）
+
+### Wi-Fiにはつながるがインターネットに出られない
+
+- 無線インターフェースがLANブリッジに入っていない
+- ファイアウォールが無線とLANのゾーンを分けている
+- 上流のメインルーターが遮断している
+- クライアント分離/ゲストネットワーク
+
+## 録画デモ（008ラボ）
+
+<TerminalCast
+  src="/casts/008-ap.cast"
+  title="008ラボ: 有線AP、DHCPオフ、クライアントは上流からリース"
+  caption="実際のOpenWrt 25.12.6 VM: APのLANを.2にしてDHCPを無効化。クライアントは上流192.168.1.1から192.168.1.136/24をリースされ、ゲートウェイは.1で、AP/上流にpingできました。このラボにインターネットとWi-Fiはありません。"
+/>
+
+## E2ラボ検証（2026-10-20）
+
+- 環境: OpenWrt 25.12.6 x86 VM 200、AP LAN `192.168.1.2/24`、`dhcp.lan.ignore=1`、上流はnetns `192.168.1.1/24` + BusyBox udhcpd、クライアント `192.168.1.136/24`
+- クライアントのDHCP: サーバー `192.168.1.1`、リース864000秒、ゲートウェイ `.1`
+- クライアントからAP `.2` と上流 `.1` にpingできた。このAP単体のラボには公開インターネットがなく、`1.1.1.1` は失敗した。
+- 未検証: 実際のメインルーターのインターネット、Wi-Fi/SSID/暗号化/ローミング、Windows/スマートフォンのクライアント、IPv6/RA
+- キャスト: `public/casts/008-ap.cast`、レシピ: `tests/recipes/ap-mode-25.12.md`
+
+## 出典とレビュー
+
+- これはE2の部分的な検証です。有線AP/L2/DHCPは検証しましたが、無線と実際の上流インターネットは検証していません。
+- 独立したレビュアーはおらず、結論はこのVM/netns環境に限られます。
+- APモードとは「LANのみ + DHCPオフ + プール外のLAN IP」であり、特定のUIを指すものではありません。
+
+<TestRecord
+  status="partial"
+  environment="有線AP E2: AP LAN 192.168.1.2/24、DHCPオフ。上流DHCP 192.168.1.1、クライアント 192.168.1.136。WAN/Wi-Fiなし"
+  recipe="tests/recipes/ap-mode-25.12.md"
+  result="E2部分検証: AP LANを.2に変更しDHCP ignore=1を設定。クライアントは上流.1から192.168.1.136/24をリースされ、ゲートウェイは.1。AP .2に到達でき、AP/上流にpingできた。このAP単体のラボにインターネットはなく、上流のインターネットとWi-Fiは未検証。"
+  date="2026-10-20"
+/>
+
+<PageSources />

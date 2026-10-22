@@ -1,0 +1,58 @@
+---
+title: "Linux 6.12と25.12のツールチェーン: カーネルモジュールが一致しなければならない理由"
+description: "OpenWrt 25.12ではLinux 6.6から6.12へ、GCC 13.3から14.3へ更新されます。kmodパッケージとサードパーティのフィードにとっての意味を説明します。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt カーネル バージョン", "openwrt 25.12 カーネル", "openwrt kmod 不一致", "openwrt kmod インストール できない"]
+sources:
+  - label: "OpenWrt 25.12.0 リリース告知"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: "OpenWrt 25.12.6 サービスリリース"
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: "OpenWrt 24.10.0 リリース告知"
+    url: https://forum.openwrt.org/t/openwrt-24-10-0-first-stable-release/223845
+sourceHash: 'b6196d9a49934dce'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="kernel-toolchain" />
+
+## 一言で言うと
+
+25.12ではすべてのターゲットがLinux 6.6から6.12へ移行し、ツールチェーンも更新されるため、24.10向けにビルドされたカーネルモジュールは25.12ではロードできません。
+
+## バージョン比較
+
+| コンポーネント | 24.10.0 | 25.12.0 |
+|---|---|---|
+| Linuxカーネル | 6.6.73 | 6.12.71 |
+| GCC | 13.3.0 | 14.3.0 |
+| binutils | 2.42 | 2.44 |
+| musl | 1.2.5 | 1.2.5 |
+| glibc | 2.38 | 2.41 |
+
+25.12.6ではカーネルが6.12.112になります。25.12.0では、ワイヤレススタック（cfg80211/mac80211）はカーネル6.18.7のものが使われ、dnsmasq 2.91、dropbear 2025.89、busybox 1.37.0も含まれます。
+
+## 家庭で重要になる理由
+
+- `kmod-*` パッケージは、ある特定のカーネルに合わせてビルドされています。フィードのパスには `targets/<target>/kmods/<kernel-hash>/` のようにカーネルのハッシュが含まれ、実行中のカーネルと一致している必要があります。
+- 別のリリース、別のビルド、またはハッシュの異なるミラーのkmodは、インストールやロードに失敗します。これは、パッケージを「インストールできない」よくある原因です。
+- サードパーティのビルドは、独自のカーネルを同梱していることがよくあります。公式のkmodはまったく適合しない場合があります。
+
+## ルーターで確認する
+
+```sh
+uname -r
+grep -E 'RELEASE|TARGET' /etc/openwrt_release
+```
+
+## 関連ガイド
+
+- [パッケージソース](/ja/software/package-sources/)
+- [パッケージをインストールできない](/ja/troubleshooting/plugin-install/)
+- [このOpenWrtはどれ？](/ja/getting-started/which-openwrt/)
+
+<PageSources />

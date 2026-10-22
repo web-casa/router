@@ -1,0 +1,51 @@
+---
+title: "firewall4: OpenWrt の nftables ファイアウォールとゾーン"
+description: "22.03 以降、OpenWrt のファイアウォールは nftables 上の firewall4 です。設定はこれまでと同じゾーン方式の UCI 構文です。読み方と、もう当てはまらない点を説明します。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt firewall4", "openwrt fw4", "openwrt nftables", "openwrt ファイアウォール 設定", "openwrt ファイアウォール ゾーン", "fw4 とは"]
+sources:
+  - label: "OpenWrt 22.03.0 リリース告知"
+    url: https://forum.openwrt.org/t/openwrt-22-03-0-first-stable-release/136252
+  - label: "OpenWrt ファイアウォール設定"
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: 'df759f219b1c8f62'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="firewall4" />
+
+## 一言でいうと
+
+22.03 以降、OpenWrt の標準ファイアウォールは firewall4 (fw4) です。iptables ではなく nftables のルールを生成し、`/etc/config/firewall` では従来の fw3 と同じ UCI 構文を使います。
+
+## ルールの一覧ではなくゾーン
+
+- インターフェースは、通常 `lan` と `wan` といったゾーンにまとめられます。ポリシーとフォワーディングはゾーン間に設定します。
+- 初期設定では LAN と WAN は別のゾーンで、LAN の通信は WAN へ転送されます。ルールを追加しない限り、WAN から内側への接続は転送されません。
+- ゲストネットワークや WireGuard トンネルなどの新しいインターフェースには、通常は専用のゾーンを作るか、既存のゾーンに加える必要があります。
+
+## ルーターで確認する
+
+```sh
+uci show firewall | grep '=zone'
+fw4 print
+```
+
+`fw4 print` は、fw4 が読み込むテーブル、チェーン、ルールの構造を、適用せずに表示します。設定を編集したあとは `fw4 reload` で適用します。
+
+## 注意点
+
+- `iptables -A …` コマンドを前提にしたガイドは fw4 には当てはまりません。ルールは UCI で記述してください。
+- 新しいインターフェースのゾーンが間違っていると、トンネルやゲストネットワークが「接続はできるのにインターネットに出られない」状態になりがちです。
+
+## 関連ガイド
+
+- [WireGuard サーバー](/ja/remote-access/wireguard-server/)
+- [ゲスト Wi-Fi](/ja/wireless-vlan/guest-wifi/)
+- [バイパスゲートウェイ](/ja/network/bypass-gateway/)
+
+<PageSources />

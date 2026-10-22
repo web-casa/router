@@ -1,0 +1,241 @@
+---
+title: "LANアドレスの変更と再接続: 新旧サブネット、DHCP、復旧"
+description: OpenWrtのLANを192.168.1.1から192.168.10.1へ移し、旧アドレスが応答しなくなることを確認して新アドレスに接続し、DHCPとコンソールでのロールバックを残します。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; LAN 192.168.1.1→192.168.10.1; 再起動後にDHCPリースを確認'
+testRecipe: 'tests/recipes/lan-address-change-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt lan ip 変更', 'openwrt lan アドレス 変更', 'openwrt lan 変更 luci に繋がらない', 'openwrt サブネット 変更', 'openwrt 192.168.1.1 変更', 'dhcp 新しいサブネット']
+symptoms: ['LAN変更後に接続できなくなった', '旧アドレスが開かない', 'クライアントがネットワークに接続できない']
+sources:
+  - label: OpenWrt ネットワーク設定
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCPとDNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt LuCIのネットワーク
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt フェイルセーフ
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+sourceHash: '1c7601a56e42e0af'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import lanEdit from '@assets/screenshots/luci/lan-edit-192-168-10.webp';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## 目的
+
+- WAN、上流、VPNと重複しない新しいLANサブネットを選ぶ
+- 旧アドレスがすぐに使えなくなる理由と、新アドレスへの接続方法を理解する
+- クライアントと管理端末を新しいサブネットへ移す
+- DHCPの範囲、ゲートウェイ、DNSをまとめて更新する
+- 問題が起きたら、新アドレス、コンソール、バックアップのいずれかで復旧する
+
+## 新しいサブネットを選ぶ
+
+- RFC1918のプライベート範囲を使います。例: `192.168.10.0/24`、`10.10.0.0/24`
+- WAN上流、VPN、他のLAN/VLANと重複させないでください
+- 上流のONUやメインルーターがすでに `192.168.1.0/24` を使っている場合は避けてください
+- 新しいゲートウェイは `192.168.10.1`、DHCPプールは `192.168.10.100–199` とします
+- 旧アドレス、ゲートウェイ、DHCP範囲を記録しておきます
+
+このページでは `192.168.1.1/24 → 192.168.10.1/24` を使います。
+
+## 変更する前に
+
+<Step where="router-shell" title="LAN/DHCP設定を記録してバックアップする" expected="旧アドレスとDHCP範囲を復元できる状態になります。">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+ip -4 addr show br-lan
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+LuCI/SSHで接続できることを確認し、できればシリアルまたはPVEコンソールも用意してください。LANを変更する間、単一のWebセッションだけに頼らないでください。
+
+</Step>
+
+## LANを変更する
+
+<Step where="luci" title="LuCIでIPv4アドレスを編集する" expected="LANが新しいサブネットを使い、DHCP範囲も追従します。">
+
+**ネットワーク → インターフェース → LAN → 編集** を開きます。
+
+1. プロトコルは `静的アドレス` のままにします。
+2. IPv4 アドレスを `192.168.10.1/24` に設定します。
+3. IPv4 ゲートウェイは空のままにします（LANはWANのゲートウェイではありません）。
+4. **DHCPサーバー** で Start を `100`、Limit を `100`、リース期間を `12h` に設定します。
+5. 保存して適用します。
+
+<Figure src={lanEdit} alt="IPv4アドレス192.168.10.1/24を設定したLuCIのLAN編集ダイアログ" caption="LAN編集ページの例です。MAC/IPv6は伏せてあります。この例ではなく、ご自身のサブネットを使ってください。" />
+
+</Step>
+
+<Step where="router-shell" title="CLIでの同等の操作" expected="uciのnetwork.lanとdhcp.lanに新しいサブネットが設定されます。">
+
+```sh
+uci set network.lan.ipaddr='192.168.10.1/24'
+uci commit network
+
+uci set dhcp.lan.start='100'
+uci set dhcp.lan.limit='100'
+uci set dhcp.lan.leasetime='12h'
+uci commit dhcp
+
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+`network reload` を実行すると、それまでのSSH/Webセッションはすぐに切断されます。これは想定どおりの動作です。コマンドがタイムアウトや切断で終わることがありますが、失敗を意味するわけではありません。
+
+初回の実行では、`network reload` と `dnsmasq restart` だけではDHCPクライアントにリースが払い出されず、**OpenWrtを再起動した後**に同じクライアントが `192.168.10.191/24` を取得しました。DHCPがリースを出さない場合は、dnsmasqの再起動を繰り返すのではなく、再起動してください。
+
+</Step>
+
+## 再接続する
+
+<Step where="client" title="新しいサブネットへ移る" expected="新アドレスでLuCI/SSHが開き、旧アドレスは応答しなくなります。">
+
+- 管理端末に一時的な静的アドレス `192.168.10.2/24`、ゲートウェイ `192.168.10.1` を設定します
+- または、DHCPを解放/更新してクライアントが `192.168.10.x` を取得するようにします
+- `http://192.168.10.1/` を開きます
+- 旧 `192.168.1.1` は、旧ページが開くのではなくタイムアウトするはずです
+
+```sh
+curl -I http://192.168.10.1/
+ssh root@192.168.10.1
+```
+
+旧アドレスがまだ開く場合は、ブラウザーのキャッシュ、古いタブ、旧IPを保持している別の機器、または現在のLANを変更していないことを確認してください。
+
+</Step>
+
+## 確認
+
+<Step where="router-shell" title="インターフェースとDHCP設定を確認する" expected="br-lanが新アドレスを使い、dhcp-rangeが新しいサブネットを使っています。">
+
+```sh
+ip -4 addr show br-lan
+uci show network.lan
+uci show dhcp.lan
+ubus call network.interface.lan status | head -20
+grep -R "dhcp-range" /var/etc/dnsmasq.conf* /tmp/etc/dnsmasq.conf* 2>/dev/null
+```
+
+`dhcp-range` には `192.168.10.100,192.168.10.199` と `/24` が含まれているはずです。
+
+</Step>
+
+<Step where="client" title="DHCPを個別に確認する" expected="クライアントが192.168.10.xを取得し、ゲートウェイ/DNSは192.168.10.1になります。">
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.10.1
+```
+
+旧リースを解放して再接続してください。クライアントがまだ `192.168.1.x` を取得する場合は、DHCP範囲、2台目のDHCPサーバー、クライアントが旧セグメントに残っていないかを確認してください。
+
+> このE2テストではDHCPを2段階で確認しました。`network reload` と `dnsmasq restart` だけではnetnsクライアントにリースは払い出されず、`reboot` 後に同じnetnsクライアントが `192.168.10.191/24` とゲートウェイ `192.168.10.1` を取得しました。そのため、このページでは「リロードで足りる」と仮定せず、「再起動してからDHCPを再テストする」ことを必須の手順としています。
+
+</Step>
+
+<Step where="router-shell" title="WANが正常であることを確認する" expected="WANは引き続き動作し、LANの変更でリセットされていません。">
+
+```sh
+ip -4 addr show eth1
+ping -c 3 192.168.50.1
+nslookup openwrt.org 192.168.10.1
+```
+
+LANだけを変更してもWANのDHCP/PPPoEはリセットされないはずです。WANも変更した場合は、別途確認してください。
+
+</Step>
+
+## ロールバック
+
+<Step where="router-shell" title="新アドレスから元に戻す" expected="旧アドレスが再び使え、新アドレスはタイムアウトします。">
+
+```sh
+uci set network.lan.ipaddr='192.168.1.1/24'
+uci commit network
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+管理セッションは再び切断されます。クライアントを `192.168.1.x` またはDHCPに戻し、旧アドレスを確認してください。
+
+</Step>
+
+<Step where="console" title="まったく接続できない場合" expected="工場出荷状態へのリセットなしで復旧できます。">
+
+- シリアル/HDMI/PVEコンソールからログインします
+- `uci show network.lan` と `ip -4 addr show br-lan` を確認します
+- 旧アドレス、または到達できるサブネットに戻します
+- 設定が壊れている場合は、`/etc/config/network.bak.*` と `/etc/config/dhcp.bak.*` を復元します
+- 工場出荷状態へのリセットは最後の手段です。設定がすべて消去されます
+
+</Step>
+
+## よくある失敗
+
+### 旧アドレスがまだ開く
+
+ブラウザーのキャッシュ、古いタブ、旧IPを保持している別の機器、またはクライアントが旧セグメントに残っている可能性があります。プライベートウィンドウや新しいターミナルを使い、`curl` が新しいIPに届くことを確認してください。
+
+### 新アドレスが開かない
+
+- クライアントが `192.168.10.0/24` にいない
+- 静的アドレス/ゲートウェイが間違っている
+- ARPキャッシュが古い: `ip neigh flush dev <iface>`
+- ファイアウォールがLANからの管理をブロックしている
+- WANや別のインターフェースを変更してしまった
+
+### DHCPが動作しない
+
+- `dhcp.lan.start/limit` が新しいサブネットの範囲外になっている
+- `dnsmasq` を再起動していない、または `/var/etc/dnsmasq.conf*` に旧範囲が残っている
+- リロードだけではリースが払い出されない: OpenWrtを再起動して再テストする（このテスト環境ではこれで動作しました）
+- 別のルーターやVMなど、2台目のDHCPサーバーが存在する
+- クライアントが旧リースを解放していない
+- `logread | grep dnsmasq` で `no address range` やインターフェースのエラーを確認する
+
+### 新しいサブネットが競合する
+
+上流のONU、VPN、他のLAN/VLANと重複すると、ルーティングや名前解決に問題が生じます。別のサブネットを選び、無理に使わないでください。
+
+## E2テスト結果 (2026-10-20)
+
+- 環境: PVE 9.2.2、OpenWrt 25.12.6 x86 VM 200、LAN `192.168.1.1/24` → `192.168.10.1/24`、DHCP `100–199`
+- 変更後: 旧 `192.168.1.1` は100%パケットロス。新 `192.168.10.1` はpingとHTTP 200が成功し、LuCI/SSHも動作
+- ロールバック: 旧アドレスはHTTP 200、新アドレスはタイムアウト
+- DHCP: リロードだけではリースなし。再起動後にnetnsクライアントが `192.168.10.191/24` とゲートウェイ `192.168.10.1` を取得
+- 未検証: 物理クライアント、IPv6、上流との競合シナリオ
+- スクリーンショット: `src/assets/screenshots/luci/lan-edit-192-168-10.webp`（MAC/IPv6は伏せています）
+
+## 出典とレビュー
+
+- 本ページはE2です。アドレスの切り替え、旧アドレスの無効化、再起動後のDHCPリース、ロールバックをテストしました。物理クライアント、IPv6、上流との競合はテストしていません。
+- レシピ: `tests/recipes/lan-address-change-25.12.md`
+- 独立したレビュアーはいません。結論はこのVM環境に限られます。
+
+<TestRecord
+  status="verified"
+  environment="OpenWrt 25.12.6 x86 VM 200; LAN 192.168.1.1→192.168.10.1; 再起動後にDHCPリースを確認"
+  recipe="tests/recipes/lan-address-change-25.12.md"
+  result="E2: 旧アドレスはタイムアウトし、新アドレスでLuCI/SSHが動作。リロードだけではDHCPリースが出ず、再起動後にnetnsクライアントが192.168.10.191/24を取得。ロールバックで旧アドレスが復旧し、新アドレスはタイムアウト"
+  date="2026-10-20"
+/>
+
+<PageSources />

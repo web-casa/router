@@ -1,0 +1,178 @@
+---
+title: "25.12のapkと24.10のopkg: コマンド、パッケージ形式、移行の境界"
+description: 25.12はapk、24.10はopkgを使います。パッケージ形式、フィードファイル、更新/インストール/照会のコマンドを比較し、アップグレードでパッケージの変換ではなく再インストールが必要な理由を説明します。
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200、apkの公式/TUNAフィードは11220パッケージ、SQMをインストール。24.10のopkgは未実行'
+testRecipe: 'tests/recipes/apk-vs-opkg.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['apk vs opkg', 'openwrt apk', 'openwrt opkg', 'openwrt apk opkg 違い', 'openwrt パッケージマネージャー', 'openwrt opkg 使えない', 'openwrt apk コマンド', 'openwrt パッケージ インストール']
+symptoms: ['apk コマンドが見つからない', 'opkg コマンドが見つからない', 'ipk がインストールできない', 'アップグレード後にパッケージマネージャーが変わった']
+sources:
+  - label: OpenWrt apk パッケージマネージャー
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: OpenWrt opkg パッケージマネージャー
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg
+  - label: OpenWrt opkgからapkへの対応表
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: OpenWrt 25.12 リリースノート
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+sourceHash: '6add07f476cef0f1'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## 要点
+
+- **25.12以降**: `apk`、パッケージは `.apk`
+- **24.10以前**: `opkg`、パッケージは `.ipk`
+- 両者は名前変更で変換できる関係ではありません。**`.ipk` を `.apk` に名前変更しないでください**。
+- 25.12にアップグレードしたら、プラグインは `apk` フィードから再インストールします。設定はバックアップ/復元できます。
+
+## どちらを使っているか確認する
+
+```sh
+cat /etc/openwrt_release
+command -v apk
+command -v opkg
+```
+
+このラボでは25.12.6で、`apk` はあり、`opkg` はありません。
+
+## 比較
+
+| 項目 | 25.12 `apk` | 24.10 `opkg` |
+|---|---|---|
+| 形式 | `.apk` | `.ipk` |
+| フィードファイル | `/etc/apk/repositories.d/distfeeds.list` | `/etc/opkg/distfeeds.conf` |
+| インデックスの更新 | `apk update` | `opkg update` |
+| インストール | `apk add <pkg>` | `opkg install <pkg>` |
+| 削除 | `apk del <pkg>` | `opkg remove <pkg>` |
+| 検索 | `apk search <term>` | `opkg list \| grep <term>` |
+| インストール済み一覧 | `apk list --installed` | `opkg list-installed` |
+| パッケージ情報 | `apk info -a <pkg>` | `opkg info <pkg>` |
+| キャッシュ削除 | `apk cache clean` | `opkg clean` |
+
+## フィードとアーキテクチャ
+
+25.12:
+
+```text
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/packages/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/packages/x86_64/base/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/kmods/<kernel-hash>/packages.adb
+```
+
+24.10:
+
+```text
+src/gz openwrt_core https://downloads.openwrt.org/releases/24.10.8/targets/x86/64/packages
+src/gz openwrt_base https://downloads.openwrt.org/releases/24.10.8/packages/x86_64/base
+```
+
+- `release`、`target`、`arch`、kmodのハッシュが一致している必要があります。
+- 公式、ImmortalWrt、iStoreOSのフィードを混在させると、ABI/署名/名前が壊れる可能性があります。
+- 中国のミラーで変わるのはホスト/パスの先頭部分だけです。ターゲットやアーキテクチャは変えないでください。
+
+## 基本操作
+
+<Step where="router-shell" title="25.12でパッケージをインストールする" expected="更新、検索、インストール、確認のすべてにapkを使う。">
+
+```sh
+apk update
+apk search -x sqm-scripts
+apk add sqm-scripts
+apk info -e sqm-scripts
+apk list --installed | wc -l
+```
+
+このラボでは、公式/TUNAともに11220パッケージで、`sqm-scripts 1.7.2-r1` をインストールできました。
+
+</Step>
+
+<Step where="router-shell" title="24.10での同等の操作" expected="コマンドと形式はopkg/ipkで、apkを混ぜない。">
+
+```sh
+opkg update
+opkg list | grep sqm-scripts
+opkg install sqm-scripts
+opkg list-installed | grep sqm-scripts
+```
+
+これらは公式ドキュメントに基づく同等のコマンドで、**ここでは実行していません**（24.10のデバイスがないため）。実測の出力として扱わないでください。
+
+</Step>
+
+## 25.12へアップグレードするとき
+
+1. `/etc/config` とパッケージ一覧をバックアップする（018を参照）
+2. 24.10の `opkg list-installed` を記録する
+3. 25.12へアップグレード/書き込みする（019を参照）
+4. `apk` フィードからプラグインを再インストールする
+5. 設定を復元し、LuCI/サービス/DNSを確認する
+6. `.ipk` を `.apk` に変換したり、古いパッケージのディレクトリをコピーしたりしない
+
+このラボでは、25.12のsysupgradeで設定は保持されましたが、パッケージは239から182に減り、SQM/OpenClashは再インストールが必要でした。
+
+## よくある障害
+
+### `apk: not found`
+
+- ファームウェアが24.10以前なので `opkg` を使う
+- 「apkパッケージマネージャーをインストールする」は解決策ではありません。先にリリースを確認します。
+
+### `opkg: not found`
+
+- ファームウェアが25.12以降なので `apk` を使う
+- `opkg` を使う古いチュートリアルやスクリプトは、そのままでは使えません。
+
+### `.ipk` がインストールできない
+
+- 25.12は `.apk` を使う
+- 名前を変えても形式は変わらない
+- リリース/ターゲット/アーキテクチャに合った `.apk` を探すか、再ビルドする
+
+### 404/署名/依存関係のエラー
+
+- release/target/arch/kmodハッシュの不一致
+- フィードの混在
+- システム時刻/証明書
+- `--allow-untrusted` を日常的に使って回避しない
+
+### アップグレード後にLuCIのメニューがない
+
+- 本体だけをインストールし、`luci-app-*` を入れていない
+- 古いプラグインを再インストールしていない
+- ブラウザーのキャッシュ/再ログイン
+- 017を参照
+
+## E2ラボ検証（2026-10-20）
+
+- 環境: OpenWrt 25.12.6 x86 VM 200、`apk`、公式/TUNAフィード
+- 公式/TUNAの `apk update`: どちらも11220パッケージ。`apk add sqm-scripts` は成功した。
+- 25.12の `sysupgrade` 後: パッケージは239から182に減り、SQM/OpenClashが消えて再インストールが必要だった。
+- 未実行: 24.10の `opkg` のupdate/install/list、実際の24.10から25.12への移行、異なるアーキテクチャのパッケージ
+- レシピ: `tests/recipes/apk-vs-opkg.md`
+
+## 出典とレビュー
+
+- これはE2の部分的な検証です。25.12のapkは検証しましたが、24.10のopkgは公式のコマンド一覧であり、ここでは実行していません。
+- コマンドの比較を「移行を検証済み」にしないでください。バックアップを取り、先にVMで試してください。
+- 独立したレビュアーはおらず、結論はこの25.12 x86環境に限られます。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200、apkの公式/TUNAフィードは11220パッケージ、SQMをインストール。24.10のopkgは未実行"
+  recipe="tests/recipes/apk-vs-opkg.md"
+  result="E2部分検証: 25.12のapk update/search/installとミラー切り替えを検証。25.12のsysupgradeでパッケージが239から182に減少。24.10のopkgのコマンド/形式はドキュメントのみで未実行"
+  date="2026-10-20"
+/>
+
+<PageSources />

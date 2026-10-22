@@ -1,0 +1,210 @@
+---
+title: "パッケージをインストールできない: ダウンロード、アーキテクチャ、依存関係、LuCI、postinst"
+description: ファームウェアのせいにする前に、apkフィード、パッケージ形式、アーキテクチャ、依存関係、LuCIメニューファイル、postinstログを順に確認します。
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; apk; sqm-scripts 1.7.2 / luci-app-sqm'
+testRecipe: 'tests/recipes/plugin-install-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt パッケージ インストール できない', 'apk install 失敗', 'luci app 表示されない', 'luci メニュー 出ない', 'apk 依存関係 エラー', 'openwrt プラグイン インストール']
+symptoms: ['apk add が失敗する', 'LuCIにメニューがない', '依存関係が満たされない', 'postinstエラー']
+sources:
+  - label: OpenWrt apkパッケージマネージャー
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: OpenWrt opkgからapkへの早見表
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: OpenWrt LuCI
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt パッケージ形式
+    url: https://openwrt.org/docs/guide-user/additional-software/package-format
+sourceHash: '03807ef4db3c6db5'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## 目的
+
+- パッケージがフィードに存在しないのか、存在するがインストールに失敗するのかを切り分ける
+- アーキテクチャ、ABI、依存関係、LuCIフロントエンド、postinstのどれが原因かを特定する
+- 本体はインストールされたのにLuCIにメニューがない理由を理解する
+- ファームウェアを書き換えずに復旧する
+
+## レイヤー0: 環境を記録する
+
+<Step where="router-shell" title="ファームウェア、アーキテクチャ、パッケージマネージャー、フィードを記録する" expected="apkとopkgのどちらを使うか、およびリリース/ターゲット/アーキテクチャが分かります。">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+command -v apk
+command -v opkg
+cat /etc/apk/repositories.d/distfeeds.list 2>/dev/null
+```
+
+25.12は `apk`、24.10は `opkg` を使います。`.ipk` を `.apk` にリネームしたり、別のアーキテクチャを強制したりしないでください。
+
+</Step>
+
+## レイヤー1: ダウンロードとフィード
+
+<Step where="router-shell" title="パッケージがフィードに存在することを確認する" expected="apk search/updateで見つかるか、存在しないことが分かります。">
+
+```sh
+apk update
+apk search <package>
+apk info -e <package>
+```
+
+`apk update` が失敗する場合は、まず404、署名、時刻、証明書を確認してください。searchで見つからない場合は、フィードが古い、名前が間違っている、またはこのリリース/アーキテクチャにパッケージがない可能性があります。
+
+</Step>
+
+<Step where="router-shell" title="インストール前に形式とチェックサムを確認する" expected="入手元が信頼でき、形式とアーキテクチャが一致しています。">
+
+- 25.12は `.apk`、24.10は `.ipk`
+- クラウドストレージやフォーラムの「再パッケージ」より、フィードを優先する
+- ローカルファイルはSHA-256/署名を検証する
+- **`--allow-untrusted` を日常的に使わないでください**。信頼性チェックを回避するもので、互換性の証明にはなりません
+
+</Step>
+
+## レイヤー2: アーキテクチャとABI
+
+<Step where="router-shell" title="ファイル名ではなくパッケージのアーキテクチャを確認する" expected="パッケージのアーキテクチャが/etc/apk/archと一致し、kmodはカーネルとも一致します。">
+
+```sh
+cat /etc/apk/arch
+apk info -a <package> | grep -E "arch|depends|provides" | head
+```
+
+- `x86_64`、`aarch64_cortex-a53` などは互換ではありません
+- カーネルモジュール（kmod）はカーネルのバージョン/ABIと一致する必要があります
+- スクリプトのみのパッケージは `any`/`noarch` の場合があり、アーキテクチャによる拒否の証明にはなりません
+
+> このテストではaarch64の `sqm-scripts` をダウンロードしましたが、これは `sqm-scripts-any`（アーキテクチャ固有のバイナリなし）であり、ローカルの `--allow-untrusted` でも置き換えられました。これは**アーキテクチャチェックを通過した証明にはなりません**。本当の拒否テストにはELFを含むパッケージが必要です。このページでは検証済みとしていません。
+
+</Step>
+
+## レイヤー3: 依存関係
+
+<Step where="router-shell" title="依存関係ツリーとインストール出力を読む" expected="不足している依存関係の具体的なパッケージ名が分かります。">
+
+```sh
+apk add <package> 2>&1 | tail -20
+apk info -R <package> 2>/dev/null | head -20
+apk info -e <dependency>
+```
+
+よくあるケース:
+
+- 本体はインストールされたが `luci-app-*` がない
+- `kmod-*` がカーネルと一致しない
+- 依存関係が別のフィード/バージョンにある
+- 公式、ImmortalWrt、iStoreOSのフィードが混在している
+
+</Step>
+
+## レイヤー4: LuCIメニュー
+
+<Step where="router-shell" title="本体 ≠ LuCIフロントエンド" expected="luci-appをインストールすると、メニューと静的ファイルが現れます。">
+
+```sh
+apk info -L <luci-app-name> | head -20
+ls -l /usr/share/luci/menu.d/ 2>/dev/null | grep <name>
+```
+
+このテストの結果:
+
+- `sqm-scripts` のみ: インストールされたが、LuCIメニューはない
+- `luci-app-sqm` を追加: `/usr/share/luci/menu.d/luci-app-sqm.json` と `/www/luci-static/resources/view/network/sqm.js` が現れた
+- `luci-app-sqm` を削除: メニューファイルが消え、再インストールで復元された
+
+それでもメニューが表示されない場合は、ブラウザーのキャッシュを消去し、ログアウト/ログインし直して、`luci-base`/言語パック/rpcdを確認してください。先にファームウェアを書き換えないでください。
+
+</Step>
+
+## 動作デモの記録（017テスト）
+
+<TerminalCast
+  src="/casts/017-plugin-install.cast"
+  title="017テスト: sqm-scripts → luci-app-sqm"
+  caption="実際のOpenWrt 25.12.6 VMでのセッション: sqm-scriptsをインストール（LuCIメニューなし）、luci-app-sqmを追加（メニューファイルが現れる）、削除（メニューが消える）、再インストール（復元）。プレーヤーは補足です。このページのコードブロックが正式な内容です。"
+/>
+
+## レイヤー5: postinst/セットアップスクリプト
+
+<Step where="router-shell" title="パッケージはインストールされたがサービスや設定が反映されない" expected="postinstが失敗したかどうか、何を変更したかが分かります。">
+
+```sh
+logread | tail -50
+apk info -L <package> | head -20
+ls /etc/uci-defaults/ 2>/dev/null | tail
+```
+
+- postinstが失敗しても、パッケージが必ずロールバックされるとは限りません
+- `/etc/uci-defaults`、`/etc/init.d/<service>`、`/etc/config/<service>` を確認する
+- postinstを再実行するためだけに強制再インストールを繰り返さず、まずログとスクリプトを読む
+
+</Step>
+
+## レイヤー6: 復旧
+
+<Step where="router-shell" title="ファームウェアを書き換えず、アンインストール/フィードの復元/再起動で対処する" expected="以前の状態に戻るか、少なくともデバッグを続けられる状態になります。">
+
+```sh
+apk del <package>
+# フィードを変更した場合:
+cp /etc/apk/repositories.d/distfeeds.list.bak.YYYY-MM-DD /etc/apk/repositories.d/distfeeds.list
+apk update
+reboot
+```
+
+パッケージが管理機能を壊した場合は、まずサービスを停止し、設定のバックアップを復元してください。ファームウェアの書き換えは最後の手段です。
+
+</Step>
+
+## よくある失敗
+
+| 症状 | 考えられる原因 | 最初に確認すること |
+|---|---|---|
+| `apk update` が404 | リリース/ターゲット/アーキテクチャ/ミラーのパスが間違っている | フィードファイルと `curl -I` |
+| パッケージが見つからない | 名前/フィード/バージョンが間違っている | `apk search` |
+| ダウンロードできたがインストールできない | アーキテクチャ/依存関係/署名 | `apk info -a`、インストール出力 |
+| インストールされたがメニューがない | 本体のみで `luci-app-*` がない | `apk info -L` |
+| メニューはあるが開けない | LuCI/言語/rpcd/キャッシュ | ブラウザーコンソール、`logread` |
+| postinstエラー | スクリプト/権限/依存関係/設定 | `logread`、`/etc/uci-defaults` |
+| インストール後にインターネットに接続できない | サービスがDNS/ファイアウォール/インターフェースを変更した | サービスを停止し、バックアップを復元 |
+
+## E2テスト結果 (2026-10-20)
+
+- 環境: OpenWrt 25.12.6 x86 VM 200、x86_64、apk、速度のためTUNAミラーを使用（このページでは必須ではありません）
+- `sqm-scripts 1.7.2-r1`: インストール済み。LuCIメニュー/コントローラーなし
+- `luci-app-sqm`: インストール済み。`/usr/share/luci/menu.d/luci-app-sqm.json` が現れ、`/www/luci-static/resources/view/network/sqm.js` が存在
+- `apk del luci-app-sqm`: メニューファイルが消え、再インストールで復元
+- aarch64の `sqm-scripts`: パッケージは `sqm-scripts-any`（noarch）。ローカルの `--allow-untrusted` で受理された。**アーキテクチャ拒否のテストではありません**
+- 破壊的な再現は未実施: postinstの失敗、kmod ABIの不一致、アーキテクチャ固有の本当の拒否
+
+## E2の状況と出典
+
+- 本ページはE2の一部です。インストール/依存関係/LuCIメニュー/削除と再インストールをテストしました。アーキテクチャ拒否とpostinst失敗は完全には再現していません。
+- レシピ: `tests/recipes/plugin-install-25.12.md`
+- 「すべてのパッケージがインストールできる」という意味にはしないでください。パッケージごとにリリース/ターゲット/アーキテクチャを確認してください。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; apk; sqm-scripts 1.7.2 / luci-app-sqm"
+  recipe="tests/recipes/plugin-install-25.12.md"
+  result="E2 partial: sqm-scriptsはインストールされたがLuCIメニューはなし。luci-app-sqmの追加で/usr/share/luci/menu.d/luci-app-sqm.jsonが現れ、削除でメニューが消え、再インストールで復元。アーキテクチャ/postinstの失敗は破壊的な再現をしていません"
+  date="2026-10-20"
+/>
+
+<PageSources />

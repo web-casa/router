@@ -1,0 +1,176 @@
+---
+title: "これはどの OpenWrt か: 公式、ImmortalWrt、iStoreOS、ベンダー製ファームウェア"
+description: 読み取り専用のコマンドで、ディストリビューション、バージョン、ターゲット、パッケージマネージャー、ハードウェアのモデルを確認し、正しいイメージとフィードを選びます。
+pageType: troubleshoot
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'デバイスでの取得は未実施。コマンドは読み取り専用で、検証環境には依存しない'
+testRecipe: 'tests/recipes/which-openwrt.md'
+aliases: ['openwrt version', 'openwrt バージョン 確認', 'immortalwrt vs openwrt', 'immortalwrt 違い', 'istoreos openwrt', 'openwrt ファームウェア 確認', 'openwrt どのイメージ']
+symptoms: ['どのイメージを書き込めばよいか分からない', 'パッケージがインストールできない', 'ファームウェアの出どころが不明']
+sources:
+  - label: OpenWrt 25.12 リリースノート
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: OpenWrt Firmware Selector
+    url: https://firmware-selector.openwrt.org/
+  - label: OpenWrt パッケージマネージャー (apk)
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: ImmortalWrt
+    url: https://immortalwrt.org/
+  - label: iStoreOS
+    url: https://www.istoreos.com/
+sourceHash: 'c81d8dfe3c689c0e'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="unknown" version="—" packageManager="—" device="OpenWrt 系の任意のデバイス" tested={false} evidence="E1" />
+
+## 到達点
+
+- デバイスが**公式 OpenWrt、ImmortalWrt、iStoreOS、ベンダー製ファームウェア**のどれで動いているかを判別できます。
+- ディストリビューション、バージョン、リビジョン、ターゲット、アーキテクチャ、ハードウェアのモデルを確認できます。
+- パッケージマネージャーが `apk` か `opkg` か、どのフィードが対応するかが分かります。
+- 間違ったイメージを書き込まず、正しい sysupgrade/ベンダー製イメージを選べます。
+
+## まず読み取り専用のコマンドを 3 つ実行する
+
+<Step where="router-shell" title="システムのボードデータを確認する" expected="ディストリビューション、バージョン、ターゲット、モデルが分かる。">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+```
+
+重要なフィールドは、`release.distribution`、`release.version`、`release.target`、`model` の 4 つです。
+
+</Step>
+
+<Step where="router-shell" title="パッケージマネージャーとアーキテクチャを確認する" expected="apk か opkg か、CPU のアーキテクチャが分かる。">
+
+```sh
+command -v apk
+command -v opkg
+cat /etc/apk/arch 2>/dev/null
+opkg print-architecture 2>/dev/null
+uname -a
+```
+
+バージョン番号からパッケージマネージャーを推測しないでください。公式の 25.12 は通常 `apk`、24.10 は `opkg` ですが、派生版やベンダー製イメージでは異なる場合があります。実際に存在するコマンドを信頼してください。
+
+</Step>
+
+<Step where="router-shell" title="モデルとハードウェアのリビジョンを確認する" expected="モデルとボード名が、デバイスのラベルと一致する。">
+
+x86:
+
+```sh
+cat /sys/class/dmi/id/sys_vendor
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/board_version
+cat /sys/class/dmi/id/bios_version
+```
+
+ARM/ルーター:
+
+```sh
+cat /tmp/sysinfo/model
+cat /tmp/sysinfo/board_name
+```
+
+`model` はハードウェアのリビジョンではありません。1 つのモデルに複数のリビジョンがあることがあります。書き込む前に、ラベル、`board_name`、ベンダーのダウンロードページを確認してください。
+
+</Step>
+
+## 判別表
+
+| フィールド/特徴 | 公式 OpenWrt | ImmortalWrt | iStoreOS | ベンダー製ファームウェア |
+|---|---|---|---|---|
+| `release.distribution` | `OpenWrt` | 通常は `ImmortalWrt` | 通常は `iStoreOS`/ベンダー名 | ベンダー名 |
+| フィード | `downloads.openwrt.org` | ImmortalWrt のフィード | iStoreOS のフィード | ベンダーのストア |
+| パッケージマネージャー | `apk` (25.12) または `opkg` (24.10) | コマンドを確認 | 通常は `opkg` | 存在しない/制限されている場合がある |
+| Web UI | LuCI | LuCI + 独自機能 | iStoreOS の UI | ベンダーの UI |
+| アップグレード用イメージ | OpenWrt の sysupgrade | ImmortalWrt のイメージ | iStoreOS のイメージ | ベンダーのファームウェア |
+| サポート | OpenWrt コミュニティ | ImmortalWrt コミュニティ | iStoreOS コミュニティ | ベンダー |
+
+公式の OpenWrt のフィードを ImmortalWrt/iStoreOS に**混在させたり**、別のモデルの sysupgrade を書き込んだりしないでください。ABI、カーネル、パーティション構成が一致しない場合があります。
+
+## 「情報」ページだけでは足りない理由
+
+- 一部のベンダー製イメージは LuCI の見た目を変えていますが、中身は公式 OpenWrt ではありません。
+- `DISTRIB_DESCRIPTION` は書き換えられるため、それだけでは判断できません。
+- バージョン番号が同じでも、ターゲットやプロファイルが同じとは限りません。
+- プラグインをインストールするときに本当に重要なのは、パッケージマネージャーとフィードです。
+
+`ubus call system board`、`/etc/openwrt_release`、パッケージマネージャーを照らし合わせてください。
+
+## アップグレード用イメージを選ぶ
+
+<Step where="router-shell" title="ターゲットと board_name を控える" expected="Firmware Selector やベンダーのページで、完全に一致するものを見つけられる。">
+
+```sh
+ubus call system board
+```
+
+注目する項目:
+
+- `release.target` (例: `x86/64`、`mediatek/filogic`)
+- `board_name`
+- `model`
+- 現在のバージョン/リビジョン
+
+公式対応のデバイスでは、正確なターゲット/モデルを指定して [OpenWrt Firmware Selector](https://firmware-selector.openwrt.org/) を使います。ImmortalWrt/iStoreOS/ベンダー製のデバイスは、それぞれのダウンロードページを使います。**別のモデルやターゲットの sysupgrade を書き込まないでください。**
+
+</Step>
+
+<Step where="router-shell" title="イメージの種類を確認する" expected="sysupgrade か、factory/ベンダー製イメージかが分かる。">
+
+- すでに OpenWrt が動いている場合のアップグレードは、通常 `sysupgrade` を使います。
+- ベンダー製ファームウェアからの初回インストールは、通常 `factory`/ベンダー用の移行イメージを使います。
+- x86 では、combined/ext4 のイメージを別の方法で書き込む場合があります。
+- 不明な場合は、デバイスのページを読んでください。ファイル名から推測しないでください。
+
+</Step>
+
+## 失敗した場合の分岐と復旧
+
+### `ubus` がない、または失敗する
+
+ベンダー製ファームウェアか、OpenWrt ではないシステムの可能性があります。Web UI の「情報/システム」とデバイスのラベルを確認してください。むやみに OpenWrt を書き込まないでください。
+
+### Web UI のみで SSH が使えない
+
+ベンダー製ファームウェアでは SSH が無効になっていることがあります。まずベンダーのドキュメントと保証を確認してください。root 権限を得るためだけに書き込まないでください。ベンダーの機能が必要なら、ベンダーのアップグレード手順を使います。
+
+### パッケージがインストールできない
+
+- パッケージマネージャーがファームウェアと一致していない (`apk` と `opkg`)。
+- フィードのアーキテクチャ/バージョンが一致していない。
+- カーネルモジュールの ABI が一致していない。
+- 別の派生版のフィードが混在している。
+
+`ubus call system board` とパッケージマネージャーに戻って、出どころを確認してから調査してください。
+
+### 間違ったイメージ / 文鎮化
+
+書き込みをやめてください。デバイスの failsafe、TFTP、ベンダーの復旧手順を使います。復旧手段がない場合は、「もう 1 つだけ」と別のイメージを試さないでください。
+
+## E1 の状況と情報源
+
+- これは E1 です。フィールド、判別表、イメージの選び方は公開ドキュメントに基づいており、この環境ではデバイスの情報を取得していません。
+- 派生版やベンダー製の出力は異なる場合があります。実機で `tests/recipes/which-openwrt.md` を実行し、フィールドとスクリーンショットを記録してから E2 に引き上げます。
+- このページはファームウェアの判別のみを扱います。モデルをまたいだ書き込みや、ベンダーによる制限の回避方法は扱いません。
+
+<TestRecord
+  status="planned"
+  environment="デバイスでの取得は未実施。読み取り専用のコマンドで、検証環境には依存しない"
+  recipe="tests/recipes/which-openwrt.md"
+  result="E1: フィールド、判別表、イメージの選び方を記載。デバイスでの取得はまだ行っていない"
+/>
+
+<PageSources />

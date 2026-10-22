@@ -1,0 +1,216 @@
+---
+title: "IPv6 の基礎: ULA、RA/SLAAC、PD、DNS を確認する"
+description: リンクローカル、ULA、GUA、PD、RA、SLAAC、DHCPv6 の違いを整理し、まず LAN の ULA/RA を確認し、次に上流が GUA/PD を委任しているか、最後に DNS/ファイアウォールを確認します。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200。LAN ULA fd2f:385b:7d0a::/48。RA/SLAAC クライアントが /64 を取得。上流の GUA/PD なし'
+testRecipe: 'tests/recipes/ipv6-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt ipv6', 'openwrt ipv6 setup', 'openwrt slaac', 'openwrt pd', 'openwrt ipv6 設定', 'openwrt ipv6 使えない', 'openwrt ipv6 プレフィックス委任']
+symptoms: ['fe80 のアドレスしかない', 'パブリック IPv6 がない', 'RA が動作しない', 'IPv6 の DNS が失敗する']
+sources:
+  - label: OpenWrt IPv6 設定
+    url: https://openwrt.org/docs/guide-user/network/ipv6/configuration
+  - label: OpenWrt DHCP と DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt ファイアウォール
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: IPv6 RA/SLAAC の概要
+    url: https://www.rfc-editor.org/rfc/rfc4862
+sourceHash: 'a51aaeb75df7ffe7'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## アドレスと仕組みに関する5つの用語
+
+| 名前 | 例/役割 | よくある間違い |
+|---|---|---|
+| link-local | `fe80::/10` | すべての NIC にあり、パブリックではない |
+| ULA | `fd00::/8` の範囲内 | インターネットから直接ルーティングできない |
+| GUA | `2000::/3` のパブリックアドレス | 上流の PD/割り当てが必要 |
+| RA | ルーターがプレフィックス/ゲートウェイ/DNS を通知する | RA がなければ SLAAC は使えない |
+| SLAAC | クライアントが RA のプレフィックスからアドレスを生成する | DHCPv6 ではない |
+| DHCPv6 | サーバーがアドレス/プレフィックス/DNS を割り当てる | IPv4 の DHCP とは異なる |
+| PD | 上流がルーターにプレフィックスを委任する | PD がなければ LAN の GUA はない |
+
+## 現在の状態
+
+<Step where="router-shell" title="アドレス、ルート、UCI を確認する" expected="link-local のみか、ULA か、GUA があるかが分かる。">
+
+```sh
+ip -6 addr show
+ip -6 route
+uci show network.lan
+uci show dhcp.lan
+uci show network.globals
+logread -e odhcpd | tail -30
+```
+
+この検証では、`br-lan` に ULA `fd2f:385b:7d0a::1/60` と link-local があり、IPv6 のデフォルトルートと GUA はありませんでした。
+
+</Step>
+
+## LAN: ULA + RA/SLAAC
+
+<Step where="router-shell" title="LAN のプレフィックスと RA サービスを確認する" expected="LAN に ULA プレフィックスがあり、odhcpd が RA を送信している。">
+
+```sh
+uci show network.globals.ula_prefix
+uci show network.lan.ip6assign
+uci show dhcp.lan.ra
+uci show dhcp.lan.ra_slaac
+uci show dhcp.lan.dhcpv6
+ps | grep [o]dhcpd
+```
+
+この検証の結果:
+
+```text
+network.globals.ula_prefix='fd2f:385b:7d0a::/48'
+network.lan.ip6assign='60'
+dhcp.lan.ra='server'
+dhcp.lan.ra_slaac='1'
+dhcp.lan.dhcpv6='server'
+```
+
+`ip6assign='60'` は、ULA の `/48` から LAN 用に `/60` を割り当てます。クライアントには通常 `/64` が割り当てられます。
+
+</Step>
+
+<Step where="client" title="クライアントに RA からアドレスを取得させる" expected="クライアントが ULA を取得し、ルーターの IPv6 に ping できる。">
+
+Linux の例(`accept_ra=2` はこの netns でのみ設定したもので、通常のクライアントは既定値のままです):
+
+```sh
+sysctl -w net.ipv6.conf.eth0.accept_ra=2
+ip -6 addr show eth0
+ip -6 route
+ping -6 -c 2 <router-ULA>
+```
+
+この検証の netns クライアントが取得した内容:
+
+```text
+fd2f:385b:7d0a:0:5088:71ff:fed4:32d2/64  scope global dynamic
+fe80::5088:71ff:fed4:32d2/64             scope link
+```
+
+そして `fd2f:385b:7d0a::1` に ping が通りました。クライアントにあったのは `fd2f:385b:7d0a::/64` のみで、IPv6 のデフォルトルートはありませんでした(上流がないため)。
+
+</Step>
+
+## WAN: GUA と PD
+
+<Step where="router-shell" title="WAN6/上流がプレフィックスを提供しているか確認する" expected="GUA とデフォルトルートがある、または上流に IPv6 がないことが明確になる。">
+
+```sh
+uci show network.wan6 2>/dev/null
+ubus call network.interface.wan6 status 2>/dev/null
+ip -6 route
+ip -6 addr show eth1
+logread | grep -Ei 'odhcp6c|dhcpv6|pd' | tail -30
+```
+
+一般的なメインルーターの設定:
+
+```sh
+uci set network.wan6=interface
+uci set network.wan6.device='eth1'
+uci set network.wan6.proto='dhcpv6'
+uci commit network
+/etc/init.d/network reload
+```
+
+- 上流が IPv6/PD に対応している必要があります。ONT や ISP によっては `/64` しか提供しない、または何も提供しない場合があります。
+- PD がない場合、LAN に「パブリックプレフィックス」を作り出さないでください。
+- この検証には上流の IPv6 がなかったため、GUA/PD は確認しておらず、確認したのは ULA/RA/SLAAC のみです。
+
+</Step>
+
+## DNS とファイアウォール
+
+<Step where="router-shell" title="AAAA と IPv6 の DNS を別々にテストする" expected="「AAAA がない」のか「DNS が IPv6 を使っていない」のかが分かる。">
+
+```sh
+nslookup -type=AAAA openwrt.org 127.0.0.1
+nslookup -type=AAAA openwrt.org <router-ULA>
+cat /tmp/resolv.conf.d/resolv.conf.auto
+```
+
+- DNS が IPv4 を使っていても、AAAA は解決できます。
+- クライアントの DNS は RA/DHCPv6 から取得する場合と、手動設定の場合があります。
+- 「IPv6 が動く」ことを確認するために、すべての DNS を IPv6 に切り替えないでください。IPv4/IPv6 のフォールバックを残します。
+
+ファイアウォール:
+
+```sh
+uci show firewall
+nft list ruleset 2>/dev/null | head -80
+```
+
+- ICMPv6/ND/RA を許可する(そうしないと IPv6 が壊れます)。
+- LAN→WAN の IPv6 forward を許可する。
+- 「接続性のテスト」のために IPv6 ファイアウォールを無効にしないでください。LAN が外部に公開されます。
+
+</Step>
+
+## よくある失敗
+
+### fe80 のアドレスしかない
+
+- LAN に ULA プレフィックス/`ip6assign` がない
+- odhcpd が動作していない / RA がブロックされている
+- クライアントの `accept_ra=0`
+- スイッチ/AP がマルチキャスト/ICMPv6 をブロックしている
+
+### ULA はあるが GUA がない
+
+- 上流に IPv6/PD がない
+- `wan6` が未設定 / プレフィックスを受信していない
+- ISP が `/64` しか提供せず、LAN 用に分割できない
+- リレー/ND プロキシの構成は別の話です。無理に使わないでください
+
+### アドレスはあるがインターネットに接続できない
+
+- IPv6 のデフォルトルートがない
+- ファイアウォールの forward/ICMPv6
+- DNS が IPv4 のみ
+- 上流のルート/プレフィックスが無効
+
+### IPv6 を有効にしたら IPv4 が遅くなる/壊れる
+
+- DNS の優先順位/デュアルスタックのフォールバック
+- クライアントのプライバシーアドレス/RA パラメーター
+- IPv4 を動作させたまま、IPv6 を1ステップずつ追加する
+
+## E2 検証結果(2026-10-20)
+
+- 環境: OpenWrt 25.12.6 x86 VM 200。LAN は `192.168.1.2/24` + ULA `fd2f:385b:7d0a::1/60`。
+- ULA プレフィックスは `fd2f:385b:7d0a::/48`、`ip6assign=60`、`ra=server`、`ra_slaac=1`、`dhcpv6=server`。odhcpd は動作中。
+- クライアント: SLAAC で `fd2f:385b:7d0a:0:5088:71ff:fed4:32d2/64` を取得し、ルーターの ULA に ping が通った。
+- 上流の IPv6/GUA/PD はなし。WAN6、実際の ISP、DHCPv6 クライアント、IPv6 のファイアウォール/NAT は未検証。
+- レシピ: `tests/recipes/ipv6-25.12.md`。
+
+## 情報源とレビュー
+
+- これは E2 の部分的な検証です。LAN の ULA/RA/SLAAC は検証しましたが、WAN の GUA/PD と実際の ISP は検証していません。
+- 独立したレビュアーはいません。結論はこの VM/netns 環境に限られます。
+- 「LAN に ULA がある」を「IPv6 インターネットが使える」と同一視しないでください。ULA は内部専用です。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200。LAN ULA fd2f:385b:7d0a::/48。RA/SLAAC クライアントが /64 を取得。上流の GUA/PD なし"
+  recipe="tests/recipes/ipv6-25.12.md"
+  result="E2 部分的: LAN に ULA fd2f:385b:7d0a::1/60 があり、RA/SLAAC クライアントが fd2f:385b:7d0a:0:.../64 を取得してルーターに ping が通った。上流の GUA/PD はなく、WAN の IPv6 は未検証"
+  date="2026-10-20"
+/>
+
+<PageSources />

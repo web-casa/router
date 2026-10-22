@@ -1,0 +1,199 @@
+---
+title: "ファームウェアのアップグレード: 設定を維持し、パッケージを再構築し、DNS/管理アクセスを確認する"
+description: アップグレード前に設定とパッケージ一覧をバックアップし、アップグレード後にLAN/HTTP/SSH、DNS、パッケージの残存を確認します。sysupgrade、設定維持、設定復元の各方法の違いも説明します。
+pageType: recovery
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; 同一バージョンのsysupgrade; 設定は維持; パッケージ239→182; SQM/OpenClashは消失; DNS/HTTPは正常'
+testRecipe: 'tests/recipes/firmware-upgrade-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt アップグレード', 'openwrt ファームウェア 更新', 'sysupgrade 設定 維持', 'openwrt アップグレード パッケージ 消えた', 'openwrt ファームウェア アップグレード']
+symptoms: ['アップグレード後にインターネットに接続できない', 'アップグレード後にパッケージが消えた', 'アップグレード後にDNSが失敗する', 'sysupgradeが失敗する']
+sources:
+  - label: OpenWrt sysupgrade
+    url: https://openwrt.org/docs/guide-user/installation/generic.backup
+  - label: OpenWrt バックアップと復元
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+  - label: OpenWrt attended sysupgrade
+    url: https://openwrt.org/docs/guide-user/installation/attended.sysupgrade
+  - label: OpenWrt パッケージマネージャー
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+sourceHash: '012dc7ede32ddb47'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## アップグレードは「ファームウェアファイルを入れ替えるだけ」ではない
+
+次の4つを分けて考えます。
+
+1. **ファームウェア**が書き込まれ、起動したか
+2. **設定**が維持/復元されたか
+3. **パッケージ/プラグイン**が残っているか、再インストールが必要か
+4. **管理アクセス/DNS/WAN**が復旧したか
+
+設定を維持してもパッケージは維持されません。アプリの設定を維持しても、そのバイナリは維持されません。
+
+## アップグレードの前に
+
+<Step where="router-shell" title="リリース、ターゲット、パッケージ一覧を記録してバックアップする" expected="ロールバックでき、何が消えたかが分かります。">
+
+```sh
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+apk list --installed > /tmp/packages-$(date +%F).txt
+wc -l /tmp/packages-$(date +%F).txt
+sysupgrade -b /tmp/pre-upgrade-$(date +%F).tar.gz
+sha256sum /tmp/pre-upgrade-$(date +%F).tar.gz
+```
+
+設定アーカイブはデバイス外にコピーしてください。VMの場合はPVEのスナップショット/バックアップも取得します。`/tmp` にだけ置かないでください。
+
+</Step>
+
+<Step where="router-shell" title="イメージとチェックサムを検証する" expected="イメージがリリース/ターゲット/アーキテクチャと一致し、チェックサムが有効です。">
+
+```sh
+wget -O /tmp/openwrt.img.gz <official-image-url>
+sha256sum /tmp/openwrt.img.gz
+# 公式sha256sumsの該当行と比較する
+gzip -dkf /tmp/openwrt.img.gz
+ls -lh /tmp/openwrt.img
+```
+
+このテストでは25.12.6 x86/64のcombined ext4イメージを使いました。`.img.gz` のSHA-256が一致したことを確認し、展開して `sysupgrade` に渡しています。
+
+</Step>
+
+<Step where="router-shell" title="コンソールとロールバック手段を確保する" expected="アップグレードの中断や失敗から復旧できます。">
+
+- 物理デバイス: シリアル/HDMI、フェイルセーフ用のキー、旧ファームウェア
+- PVE: アップグレード前にスナップショットを取り、`qm rollback` を確認する
+- LAN IP、DHCP、WAN、DNS、管理ポートを記録する
+- アップグレード中に電源を切ったり、ディスクを取り外したりしない
+
+</Step>
+
+## アップグレードコマンド
+
+デフォルト（設定を維持）:
+
+```sh
+sysupgrade -v /tmp/openwrt.img
+```
+
+オプション:
+
+- `-n`: 設定を維持しない（クリーンインストール）
+- `-f <backup.tar.gz>`: アップグレード中に設定を復元する
+- `-c`/`-o`: 変更されたファイルをより多く保持する。境界が複雑になる
+- 内容を十分に理解している場合を除き、互換性チェックを無視する `-F` は使わない
+
+アップグレードによりSSH/Webセッションは切断されます。接続が切れたからといって電源を切らず、再起動を待ってください。
+
+## アップグレード後の確認
+
+<Step where="client" title="管理アクセス" expected="LAN IP、HTTP、SSHを少なくとも一度ずつ確認します。">
+
+```sh
+ping -c 2 192.168.1.2
+curl -sSI --max-time 5 http://192.168.1.2/ | head -3
+ssh root@192.168.1.2 'cat /etc/openwrt_release'
+```
+
+このテストではLAN `192.168.1.2/24` が維持され、HTTP 200とSSHが動作しました。
+
+</Step>
+
+<Step where="router-shell" title="設定とDNS/WAN" expected="設定が維持され、DNS/WANが実際に動作しています。">
+
+```sh
+uci show network.lan.ipaddr
+uci show dhcp.lan
+ip route
+nslookup openwrt.org 127.0.0.1
+logread | grep -Ei 'dnsmasq|netifd|dhcp' | tail -30
+```
+
+このテスト環境: アップグレード後もDNSとHTTPが動作し、WAN設定は維持されました。ただし、ルーター自身だけでなく、クライアントのDHCPリースと実際のインターネット接続も再確認してください。
+
+</Step>
+
+<Step where="router-shell" title="パッケージとプラグイン" expected="何が失われたかが分かり、一覧から再インストールできます。">
+
+```sh
+apk list --installed | wc -l
+for p in sqm-scripts luci-app-sqm luci-app-openclash; do
+  apk info -e "$p" && echo "$p installed" || echo "$p MISSING"
+done
+```
+
+このテスト環境: アップグレード前は239個、後は182個。`sqm-scripts`、`luci-app-sqm`、`luci-app-openclash` はすべて消えていました。設定は残っていても、バイナリは再インストールが必要です。
+
+1つずつ再インストールします。
+
+```sh
+apk update
+apk add sqm-scripts luci-app-sqm
+# 次のパッケージに進む前に、メニュー/サービスを確認する
+```
+
+すべてのプラグインを一度に復元しないでください。まず管理アクセス、DNS、基本的なネットワークを復旧させます。
+
+</Step>
+
+## 再構築の順序
+
+1. 基本ネットワーク: network/dhcp/firewall
+2. DNS: dnsmasq、必要ならその後にAGH
+3. 管理: luci/uhttpd
+4. プロキシ/シェーピング: OpenClash、SQM
+5. 最後に: ルール/サブスクリプション/性能チューニング
+
+各パッケージで確認すること:
+
+- インストールされているか
+- LuCIのメニュー/コントローラーがあるか
+- サービスが起動するか
+- DNS/デフォルトルートが変更されていないか
+- 無効化すると基本ネットワークが復旧するか
+
+## ロールバック
+
+- 物理デバイス: 旧ファームウェア/リカバリーモードを保管しておく
+- PVE: アップグレード前のスナップショット/`vzdump` を使い、失敗したらVM全体をロールバックする
+- 設定: アーカイブを `sysupgrade -r` で復元する
+- 失敗の原因を調べる代わりに「もう一度書き換える」ことはしない
+
+このテストではスナップショット `pre-019` を使い、結果を記録した後にアップグレード前の状態へロールバックしました。このページは実際のアップグレード実行を記録したものです。
+
+## E2テスト結果 (2026-10-20)
+
+- 環境: OpenWrt 25.12.6 x86 VM 200。前後で同一バージョン（再書き込みであり、バージョンをまたぐものではない）
+- 前: パッケージ239個。`sqm-scripts`、`luci-app-sqm`、`luci-app-openclash` がインストール済み。LAN `.2`、DHCPはignore
+- `sysupgrade -v /tmp/openwrt.img` の後: デバイスが再起動。LAN `.2` とDHCP ignoreは維持。HTTP 200、SSH、DNSが動作
+- パッケージ: 239 → 182。SQM/OpenClashは消失。設定は残っていても、バイナリは再インストールが必要
+- 未完了: バージョンをまたぐアップグレード、SQM/OpenClashの再インストール確認、実際のWi-Fi/PPPoE、電源断からの復旧
+- レシピ: `tests/recipes/firmware-upgrade-25.12.md`
+
+## 出典とレビュー
+
+- 本ページはE2の一部です。同一バージョンのsysupgradeによる設定の維持、管理アクセス/DNS、パッケージの消失をテストしました。バージョンをまたぐアップグレードとプラグインの再構築は完了していません。
+- 同一バージョンの結果から、リリースをまたぐ場合の動作を推測しないでください。リリースノートを読み、バックアップを取り、VMでテストしてください。
+- 独立したレビュアーはいません。結論はこのVM環境に限られます。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; 同一バージョンのsysupgrade; 設定は維持; パッケージ239→182; SQM/OpenClashは消失; DNS/HTTPは正常"
+  recipe="tests/recipes/firmware-upgrade-25.12.md"
+  result="E2 partial: 同一バージョンのsysupgrade後、LAN/DHCP設定は維持され、HTTP/SSH/DNSが動作。パッケージは239→182に減少し、SQM/OpenClashは消失。バージョンをまたぐアップグレードは未実施。SQMの再インストールは未完了。スナップショットをロールバック済み"
+  date="2026-10-20"
+/>
+
+<PageSources />

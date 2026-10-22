@@ -1,0 +1,54 @@
+---
+title: "OpenWrt の DSA: スイッチポートを Linux インターフェースとして扱い、br-lan 上に VLAN を設定する"
+description: "DSA 対応ターゲットでは、各スイッチポートが独立したインターフェース(lan1〜lan4)として br-lan ブリッジに属し、VLAN は bridge-vlan セクションで設定します。DSA と swconfig の見分け方も説明します。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt dsa", "openwrt swconfig vs dsa", "openwrt bridge-vlan", "openwrt dsa 設定", "openwrt dsa swconfig 違い", "openwrt vlan 設定 dsa"]
+sources:
+  - label: "OpenWrt DSA"
+    url: https://openwrt.org/docs/guide-user/network/dsa/start
+  - label: "DSA ミニチュートリアル"
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+  - label: "OpenWrt 21.02.0 リリース告知"
+    url: https://forum.openwrt.org/t/openwrt-21-02-0-first-stable-release/105395
+  - label: "OpenWrt 22.03.0 リリース告知"
+    url: https://forum.openwrt.org/t/openwrt-22-03-0-first-stable-release/136252
+sourceHash: '94301dc22a784645'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="dsa" />
+
+## 一言でいうと
+
+DSA(Distributed Switch Architecture)は、ネットワークスイッチ向けの Linux カーネルのサブシステムです。DSA 対応デバイスでは、前面の各ポートが `lan1`〜`lan4` のように独立したインターフェースとして現れ、それらが `br-lan` にブリッジされます。
+
+## 経緯
+
+- DSA は 21.02 で初めて登場し、一部のターゲットで従来の swconfig を置き換えました。
+- 22.03 では、bcm53xx や lantiq xrx200 のすべてなど、さらに多くのターゲットが DSA に移行しました。
+- sysupgrade では、swconfig の設定を DSA に移行できません。お使いのデバイスが DSA に切り替わった場合は、ネットワークを設定し直してください。
+
+## DSA での VLAN
+
+VLAN は `/etc/config/network` 内の `config bridge-vlan` セクションで設定します。インターフェースは `br-lan.1` のように、VLAN のサフィックスを付けてブリッジ上に置かれます。各ポートは VLAN ごとに tagged か untagged かを指定します。
+
+## ルーターで確認する
+
+```sh
+ip -br link
+uci show network | grep -E 'bridge-vlan|=device'
+```
+
+代わりに `config switch` と `switch_vlan` セクションが表示される場合、そのデバイスはまだ swconfig を使っており、DSA のガイドは当てはまりません。
+
+## 関連ガイド
+
+- [DSA VLAN](/ja/wireless-vlan/dsa-vlan/)
+- [ゲスト Wi-Fi](/ja/wireless-vlan/guest-wifi/)
+- [有線/無線 AP](/ja/network/ap-mode/)
+
+<PageSources />

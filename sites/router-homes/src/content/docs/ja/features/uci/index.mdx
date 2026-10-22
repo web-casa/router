@@ -1,0 +1,53 @@
+---
+title: "UCI: OpenWrt がすべての設定を /etc/config に保存する仕組み"
+description: "UCI は OpenWrt の設定システムです。設定ファイルの場所、変更のステージングとコミットの流れ、LuCI との関係を説明します。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt uci", "uci commit", "openwrt /etc/config", "openwrt uci 設定", "openwrt uci コマンド", "uci commit 反映されない"]
+sources:
+  - label: "OpenWrt UCI"
+    url: https://openwrt.org/docs/guide-user/base-system/uci
+  - label: "LuCI の基本"
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+sourceHash: 'af6a6bb6c4e60fdd'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="uci" />
+
+## 一言でいうと
+
+UCI(Unified Configuration Interface)は、OpenWrt のサービスの設定を `/etc/config/` 配下のプレーンテキストファイルに保存します。LuCI と `uci` コマンドは、どちらも同じファイルを編集します。
+
+## 仕組み
+
+- `network`、`wireless`、`dhcp`、`firewall`、`system` など、サブシステムごとに1つのファイルがあります。
+- `uci set`、`uci add`、`uci rename`、`uci delete` による変更は、まずステージングされます。`uci commit` で一括してフラッシュに書き込みます。
+- コミットした変更は、init スクリプトでサービスを再読み込みまたは再起動して初めて反映されます。公式の例では、uhttpd のポートを変更してコミットし、`/etc/init.d/uhttpd restart` を実行します。
+- LuCI はフロントエンドです。各ページは API を通じて同じ UCI ファイルを読み書きします。
+
+## ルーターで確認する
+
+次のコマンドは読み取り専用です。
+
+```sh
+uci show network.lan
+uci get network.lan.ipaddr
+uci export dhcp
+```
+
+## 注意点
+
+- コミットしたものの再読み込みしていない変更は、まだ反映されていません。次回のサービス再起動またはリブート時に反映されますが、それは設定したことを忘れた頃かもしれません。
+- 手作業で編集する前に、`/etc/config` を安全な場所にコピーしてください。完全なバックアップについては[バックアップと復元](/ja/recovery/backup-restore/)を参照してください。
+
+## 関連ガイド
+
+- [LAN アドレス](/ja/network/lan-address/)
+- [DNS](/ja/network/dns/)
+- [バックアップと復元](/ja/recovery/backup-restore/)
+
+<PageSources />

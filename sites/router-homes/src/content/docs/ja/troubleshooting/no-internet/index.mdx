@@ -1,0 +1,179 @@
+---
+title: "インターネットに繋がらない/断続的に切れる：全デバイス、1台のクライアント、1つのアプリ"
+description: 5つの層（WAN、DNS、LAN/DHCP、クライアントのルート、アプリのプロキシ）で、ネットワーク全体の障害と、1台のデバイスまたは1つのアプリだけの障害を切り分けます。
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; WAN 192.168.50.191/24; LAN 192.168.1.1; netnsクライアント 192.168.1.175'
+testRecipe: 'tests/recipes/no-internet-triage-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt no internet', 'openwrt intermittent drops', 'only one device has no internet', 'dns resolution fails', 'openwrt インターネット 繋がらない', 'openwrt ネット 切れる', 'openwrt dns 名前解決 できない', '1台だけ ネット 繋がらない', 'openwrt 接続 不安定']
+symptoms: ['全デバイスがオフライン', '1台だけオフライン', 'IPへのpingは通るがWebが開かない', 'ネットワークが断続的に切れる']
+sources:
+  - label: OpenWrt ネットワークのトラブルシューティング
+    url: https://openwrt.org/docs/guide-user/network/troubleshooting
+  - label: OpenWrt DHCPとDNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt ファイアウォール
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt failsafe
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+sourceHash: 'bd543737b04bca88'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## 「繋がらない」の種類を見極める
+
+| 症状 | 可能性が高い層 | 最初の一手 |
+|---|---|---|
+| すべてのデバイスでブラウジングできない | WAN/アップストリーム/DNS/NAT | ルーターからWAN/DNSをテストする |
+| 1台のデバイスだけオフライン | そのクライアントのIP/ゲートウェイ/DNS/Wi-Fi/VPN | 同じLAN上の別のクライアントと比較する |
+| 1つのアプリだけ失敗する | アプリのDNS/プロキシ/QUIC/IPv6 | 別のブラウザーを試し、プロキシを無効にし、DNSをテストする |
+| 断続的 | リンク、DHCPリース、Wi-Fi、アップストリーム | タイムラインを記録する。pingを1回打つだけでは不十分 |
+| IPへのpingは通るがWebは開かない | DNSまたはプロキシ | `nslookup` + 別のDNS |
+
+## 5つの層
+
+### 1. WAN / アップストリーム
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+ping -c 3 192.168.50.1
+ping -c 3 1.1.1.1
+```
+
+- WANアドレスがない：DHCP/PPPoEを確認します（007を参照）。
+- ゲートウェイに届かない：ケーブル/アップストリーム/ONUを確認します。
+- ゲートウェイには届くが公開IPに届かない：アップストリーム/NAT/ファイアウォールを確認します。
+- 一部でパケットロスがある：設定を変更する前に、時刻とリンク状態を記録します。
+
+### 2. DNS
+
+```sh
+nslookup openwrt.org 127.0.0.1
+nslookup openwrt.org 192.168.50.1
+cat /tmp/resolv.conf.d/resolv.conf.auto
+logread | grep -i dnsmasq | tail -20
+```
+
+このラボでdnsmasqを停止した場合：
+
+- ルーターからの `ping 1.1.1.1` は通った。
+- `nslookup openwrt.org 127.0.0.1` は失敗した。
+- クライアントからの `ping 1.1.1.1` は通り、DNSは失敗した。
+- dnsmasqを再起動すると復旧した。
+
+これは典型的な「IPは通るが、名前は引けない」パターンです。
+
+### 3. LAN / DHCP / クライアントのアドレス
+
+```sh
+ip -4 addr show br-lan
+cat /tmp/dhcp.leases
+ip neigh
+```
+
+クライアント側：
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.1.1
+```
+
+ゲートウェイの誤り、IPの競合、古いサブネットは、いずれも「このデバイスだけオフライン」に見えます。
+
+### 4. ファイアウォール / NAT / フォワーディング
+
+```sh
+uci show firewall
+nft list ruleset 2>/dev/null | head -80
+logread | grep -i firewall | tail -20
+```
+
+WANにアドレスがあり、DNSも正常なのに、LANクライアントがインターネットに到達できない場合は、次を確認します。
+
+- LAN/WANのゾーン
+- WANのマスカレード
+- LAN→WANのフォワード
+- DNSやフォワーディングを遮断するカスタムルール
+
+### 5. 1台のクライアント / 1つのアプリ
+
+1台のクライアントの場合：
+
+- デフォルトルートを削除します：`ip route del default`。ゲートウェイには届くのに公開IPに届かなければ、そのクライアントのルートの問題です。
+- 復元：`ip route add default via 192.168.1.1`
+- Wi-Fi、VPN、プロキシ、プライベートDNS、IPv6の優先設定を確認します。
+
+1つのアプリの場合：
+
+- 別のブラウザーを試す / プロキシを無効にする
+- `nslookup`/`curl -v` と比較する
+- アプリ側のDoH/QUIC/プロキシは、ルーターのDNSを迂回することがある
+- 層ごとの切り分けをせずに、「アプリを再インストール」しないでください。
+
+## 記録されたデモ（015ラボ）
+
+<TerminalCast
+  src="/casts/015-triage.cast"
+  title="015ラボ：DNS、WAN、1台のクライアントのルート"
+  caption="実際のOpenWrt 25.12.6 VM + netnsクライアント：DNSを停止（IPは通るがDNSは失敗）、WANをifdown（ゲートウェイには届くが公開IPには届かない）、クライアントのデフォルトルートを削除（そのクライアントだけ失敗）。正式な内容はコードブロックです。"
+/>
+
+## 断続的な切断を記録する
+
+「ときどき切れる」と書かないでください。次を記録します。
+
+- 時刻、継続時間、自然に復旧するか
+- 全デバイスか、1台だけか
+- 有線かWi-Fiか、2.4/5 GHz
+- WANアドレスやリースが変わったか
+- `logread` 内のリンク/DHCP/DNS/ファイアウォールのタイムスタンプ
+- ダウンロード/アップロード/ローミング/スリープ中に発生するか
+
+タイムラインがなければ、「断続的」な問題を修正したり検証したりするのは困難です。
+
+## 復旧の順序
+
+1. まずWAN/DNSサービスを復旧します。初期化はしないでください。
+2. 1台のクライアントの問題なら、ルーターではなくそのクライアントを変更します。
+3. 1つのアプリの問題なら、まずプロキシ/プライベートDNSを無効にします。
+4. 再起動する場合は、再起動前の状態を記録します。
+5. 初期化は最後の手段です。先にバックアップを取ってください。
+
+## E2ラボ実行（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200、WAN DHCP `192.168.50.191/24`、LAN `192.168.1.1/24`、netnsクライアント `192.168.1.175/24`。
+- DNSを停止：ルーターから公開IPへのpingは通り、ルーター/クライアントのDNSは失敗。dnsmasqの再起動で復旧しました。
+- WANを `ifdown`：WANアドレスが消え、クライアントはゲートウェイにはpingできたが `1.1.1.1` にはできませんでした。`ifup wan` で復旧しました。
+- クライアントのデフォルトルートを削除：ゲートウェイには届くが、公開IPには届かない。ルートを復元すると復旧しました。
+- 未テスト：実際のWi-Fi、物理的なリンクのフラップ、アップストリームのジッター、アプリのプロキシ/DoH/QUIC、IPv6の優先設定。
+- キャスト：`public/casts/015-triage.cast`、レシピ：`tests/recipes/no-internet-triage-25.12.md`。
+
+## 情報源とレビュー
+
+- このページはE2（一部）です。制御された3つの障害をテストしました。断続的な障害、物理層、アプリ層は未テストです。
+- 独立したレビュアーはいません。結論はこのVM/netns環境に限られます。
+- pingを1回、あるいはページの読み込み失敗を1回見ただけで、ISPのせいにしないでください。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; WAN 192.168.50.191/24; LAN 192.168.1.1; netnsクライアント 192.168.1.175"
+  recipe="tests/recipes/no-internet-triage-25.12.md"
+  result="E2（一部）：DNSを停止すると公開IPへのpingは通るがDNSは失敗し、再起動で復旧した。WANをifdownするとクライアントはゲートウェイには届くが公開IPには届かず、ifupで復旧した。クライアントのデフォルトルートを削除すると、その端末だけが繋がらなくなった。断続的な障害/物理Wi-Fi/アプリのプロキシは未テスト。"
+  date="2026-10-20"
+/>
+
+<PageSources />

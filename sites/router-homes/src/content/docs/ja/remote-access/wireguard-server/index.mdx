@@ -1,0 +1,230 @@
+---
+title: "WireGuard で自宅にアクセス: サーバー、ピア、ファイアウォール、トンネルの確認"
+description: OpenWrt 25.12 で WireGuard のサーバー、ピア、ファイアウォールを設定し、ハンドシェイク/トンネル IP/HTTP を確認します。WAN のポート転送、DDNS、実際のスマートフォンでのローミングは別の確認項目です。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200 + PVE netns クライアント。wg0 10.10.0.1/24、UDP 51820。ハンドシェイク/ping/HTTP 成功。WAN ポート転送/DDNS/スマートフォンのローミングは未検証'
+testRecipe: 'tests/recipes/wireguard-server-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt wireguard', 'openwrt wireguard server', 'wireguard home access', 'openwrt wg0', 'openwrt wireguard 設定', 'openwrt wireguard サーバー 構築', 'openwrt vpn 自宅 アクセス']
+symptoms: ['wireguard ハンドシェイクしない', 'wg0 が存在しない', 'wireguard に接続できない', 'トンネルの ping が通らない']
+sources:
+  - label: OpenWrt WireGuard サーバー
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/server
+  - label: WireGuard クイックスタート
+    url: https://www.wireguard.com/quickstart/
+  - label: OpenWrt ファイアウォール
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: WireGuard プロトコル
+    url: https://www.wireguard.com/protocol/
+sourceHash: '37c1b278e3300bba'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 + PVE netns" tested={true} evidence="E2" />
+
+## 対象範囲
+
+このページで確認する内容:
+
+- OpenWrt に WireGuard サーバーインターフェース `wg0` を作成する。
+- クライアントピアを1つ追加する。
+- `wg0` を LAN のファイアウォールゾーンに入れる。
+- ハンドシェイク、トンネル IP への ping、トンネル経由の LuCI へのアクセス。
+
+次の内容は確認**していません**。
+
+- 公開 WAN の UDP ポート転送/ファイアウォール
+- DDNS/ドメイン
+- スマートフォン/Windows クライアントのローミング
+- LAN 全体への転送/NAT
+
+これらは導入環境に依存します。この LAN 内のテストでは代用できません。
+
+## トポロジー
+
+```text
+Client 192.168.1.251
+   │  vmbr5 (lab LAN)
+   ▼
+OpenWrt VM 200 192.168.1.2
+   wg0 10.10.0.1/24, UDP 51820
+   │
+   └── tunnel 10.10.0.0/24
+       client wg0 10.10.0.2/24
+```
+
+実際の自宅アクセスでは、クライアントはインターネット側にいます。OpenWrt の WAN で UDP 51820 の転送/許可が必要です。この検証は LAN 側のみです。
+
+## 準備
+
+<Step where="router-shell" title="カーネルとツールを確認する" expected="wg コマンドがあり、wireguard モジュールがロードされている。">
+
+```sh
+apk add wireguard-tools kmod-wireguard
+wg --version
+cat /proc/modules | grep wireguard
+```
+
+この検証では `wireguard-tools v1.0.20260223` で、`wireguard` モジュールがロードされていました。
+
+</Step>
+
+<Step where="router-shell" title="サーバーの鍵を生成する(チャットやリポジトリには貼り付けない)" expected="秘密鍵はデバイス上に残り、公開鍵だけをクライアントに渡す。">
+
+```sh
+umask 077
+wg genkey > /tmp/wg-server.key
+wg pubkey < /tmp/wg-server.key > /tmp/wg-server.pub
+cat /tmp/wg-server.pub   # only the public key goes to the client
+```
+
+クライアントも自身の鍵ペアを生成します。**クライアントの秘密鍵をサーバーに送らないでください。** サーバーに必要なのはクライアントの公開鍵だけです。
+
+</Step>
+
+## サーバーを設定する
+
+<Step where="router-shell" title="wg0 とピアを作成する" expected="netifd が proto=wireguard を認識し、wg0 にアドレスが設定される。">
+
+```sh
+uci set network.wg0=interface
+uci set network.wg0.proto='wireguard'
+uci set network.wg0.private_key='<server-private-key>'
+uci set network.wg0.listen_port='51820'
+uci set network.wg0.addresses='10.10.0.1/24'
+uci set network.wg0.auto='1'
+
+uci set network.wg0_client=wireguard_wg0
+uci set network.wg0_client.public_key='<client-public-key>'
+uci set network.wg0_client.allowed_ips='10.10.0.2/32'
+uci set network.wg0_client.persistent_keepalive='25'
+
+uci commit network
+/etc/init.d/network restart
+```
+
+名前の付け方が重要です。
+
+- インターフェースのセクション名は `wg0`、ピアのタイプは `wireguard_wg0` です。サフィックスは一致させる必要があります。
+- この検証では、インターフェース名を `wg` にすると netifd が `proto: none` と報告し、デバイス `wg0` が存在しませんでした。`wg0` に変更すると解決しました。**`wg0` を使ってください。**
+
+確認:
+
+```sh
+wg show
+ip -4 addr show wg0
+ubus call network.interface.wg0 status
+```
+
+</Step>
+
+<Step where="router-shell" title="ファイアウォール: wg0 を LAN ゾーンに入れる" expected="UDP 51820 に到達でき、トンネル IP 同士が通信できる。">
+
+```sh
+uci show firewall | grep -E "zone.*name|zone.*network"
+uci add_list firewall.@zone[0].network='wg0'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+この検証では `@zone[0]` が LAN ゾーンでしたが、環境によってインデックスは異なる場合があります。`name='lan'` のセクションを探してください。
+
+`wg0` を LAN に追加した後、クライアントから `10.10.0.1` に ping でき、LuCI にも到達できました。
+
+</Step>
+
+## クライアントの最小限の確認
+
+クライアントの設定は 022 にあります。サーバー側で次を実行します。
+
+```sh
+wg show
+```
+
+クライアントがハンドシェイクした後、サーバーには次のように表示されます。
+
+```text
+peer: <client-public-key>
+  endpoint: 192.168.1.251:44421
+  allowed ips: 10.10.0.2/32
+  latest handshake: ...
+  transfer: ...
+```
+
+この検証のクライアント:
+
+- 3秒前にハンドシェイク
+- `transfer 124 B received, 180 B sent`
+- `10.10.0.1` への ping は 4/4 成功
+- HTTP `http://10.10.0.1/` で LuCI が返された
+
+## 実際の WAN で必要になること
+
+- 公開 IP/ポート転送: WAN の UDP 51820 → OpenWrt
+- WAN の入力ファイアウォールでその UDP を許可する
+- DDNS/固定ホスト名
+- クライアントの `Endpoint` には 192.168.1.2 ではなく公開アドレスを使う
+- LAN 全体にアクセスするには、サーバー側ピアの `allowed_ips` とクライアント側の `AllowedIPs` に LAN のプレフィックスを含め、戻りのルーティングと NAT も必要
+- 「トンネル IP に ping が通る」を「自宅の LAN 全体に到達できる」と同一視しないでください
+
+## よくある失敗
+
+### wg0 が存在しない / proto が none
+
+- インターフェースのセクション名とピアのタイプのサフィックスが一致していない
+- `wireguard-tools`/`kmod-wireguard` がない
+- ネットワークを再起動していない
+- `wg show`、`ubus status`、`logread` を確認する
+
+### ハンドシェイクしない
+
+- クライアントとサーバーの公開鍵を取り違えている
+- エンドポイント/ポートが間違っている
+- ファイアウォールが UDP を許可していない
+- 秘密鍵のパーミッション/内容が間違っている
+- WireGuard のハンドシェイクは時刻同期に依存しませんが、鍵が間違っていれば失敗します
+
+### トンネルの ping が通らない
+
+- `allowed_ips` にピアのトンネル IP が含まれていない
+- インターフェースにアドレスがない / down になっている
+- ファイアウォールゾーン
+- クライアントのルートがエンドポイント自体をトンネルに送っている(ループ)
+
+### トンネル IP には ping が通るが LAN に到達できない
+
+- クライアントの AllowedIPs に LAN のプレフィックスがない
+- サーバー側に転送/NAT/戻りのルートがない
+- ファイアウォールの forward が許可されていない
+- トンネルが動作していることと、LAN が動作していることを同一視しないでください
+
+## E2 検証結果(2026-10-20)
+
+- 環境: OpenWrt 25.12.6 x86 VM 200、`wg0` は `10.10.0.1/24`、UDP 51820。PVE netns クライアントは `10.10.0.2/24`。
+- サーバー: `wg show` にピアが表示され、ハンドシェイクが成功。転送量は 1.47 KiB/1.90 KiB。`wg0` は up。
+- クライアント: ハンドシェイク成功、トンネル ping 4/4、HTTP 200(LuCI)。
+- 未検証: WAN のポート転送/ファイアウォール、DDNS、スマートフォン/Windows、LAN への転送、NAT/戻りのルート。
+- レシピ: `tests/recipes/wireguard-server-25.12.md`。
+
+## 情報源とレビュー
+
+- これは E2 の部分的な検証です。LAN 側のサーバーとトンネルは検証しましたが、実際の WAN、モバイルクライアント、LAN への転送は検証していません。
+- 秘密鍵はデバイス上に保管し、リポジトリ、スクリーンショット、チャットには絶対に載せないでください。
+- 独立したレビュアーはいません。結論はこの VM/netns 環境に限られます。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200 + PVE netns クライアント。wg0 10.10.0.1/24、UDP 51820。ハンドシェイク/ping/HTTP 成功。WAN ポート転送/DDNS/スマートフォンのローミングは未検証"
+  recipe="tests/recipes/wireguard-server-25.12.md"
+  result="E2 部分的: サーバー wg0 10.10.0.1/24(UDP 51820)。クライアント 10.10.0.2/24 がハンドシェイクし、トンネル ping 4/4、HTTP 200。WAN ポート転送、DDNS、実際のスマートフォン/ローミング、LAN への転送は未検証"
+  date="2026-10-20"
+/>
+
+<PageSources />

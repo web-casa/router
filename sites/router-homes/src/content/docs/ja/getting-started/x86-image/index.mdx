@@ -1,0 +1,199 @@
+---
+title: "x86イメージの選び方：combined、ext4、squashfs、EFI/BIOS"
+description: x86/64のcombined/rootfs、ext4/squashfs、EFI/BIOS、tar.gzイメージを区別し、PVEや物理マシンでの起動に合わせて選び、誤ったディスクへの書き込みや起動しないイメージを避けます。
+pageType: install
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86/64 generic-ext4-combined (BIOS/SeaBIOS) をPVE VM 200にインポート; 13.0MB gz/120.5MB img; UEFI/squashfs/USBは未テスト'
+testRecipe: 'tests/recipes/x86-image-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt x86 image', 'openwrt combined', 'openwrt ext4 squashfs', 'openwrt efi bios', 'openwrt x86 イメージ 選び方', 'openwrt combined ext4 squashfs 違い', 'openwrt uefi 起動しない', 'openwrt pve インポート']
+symptoms: ['x86イメージを選べない', 'PVEにインポートしても起動しない', 'UEFIで起動に失敗する', '間違ったディスクに書き込んだ']
+sources:
+  - label: OpenWrt x86インストール
+    url: https://openwrt.org/docs/guide-user/installation/openwrt_x86
+  - label: OpenWrt イメージの種類
+    url: https://openwrt.org/docs/guide-user/installation/generic.backup
+  - label: Proxmox VE importdisk
+    url: https://pve.proxmox.com/pve-docs/qm.1.html
+  - label: OpenWrt ダウンロード x86/64
+    url: https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/
+sourceHash: '129e616812c48fb6'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 / x86" tested={true} evidence="E2" />
+
+## 一言での選び方
+
+- **PVEのデフォルトであるSeaBIOS**：`generic-ext4-combined.img.gz` を推奨します（ここでテスト済み）。
+- **UEFI/OVMF**：`-efi` 付きのcombinedイメージを選びます。
+- **初期化可能/読み取り専用のroot + overlay**：squashfsのcombinedを選びます。
+- **既存のブートローダー/パーティションを使い、rootfsだけ置き換える**：rootfsイメージを使います。
+- **コンテナ/chroot**：ディスクイメージではなく `rootfs.tar.gz` を使います。
+
+## ファイル名の読み方
+
+25.12.6 x86/64の主なファイル：
+
+```text
+openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+openwrt-25.12.6-x86-64-generic-ext4-combined-efi.img.gz
+openwrt-25.12.6-x86-64-generic-squashfs-combined.img.gz
+openwrt-25.12.6-x86-64-generic-squashfs-combined-efi.img.gz
+openwrt-25.12.6-x86-64-generic-ext4-rootfs.img.gz
+openwrt-25.12.6-x86-64-generic-squashfs-rootfs.img.gz
+openwrt-25.12.6-x86-64-generic-kernel.bin
+openwrt-25.12.6-x86-64-generic-targz-rootfs.tar.gz
+openwrt-25.12.6-x86-64-rootfs.tar.gz
+```
+
+重要な語句：
+
+| 語句 | 意味 | 間違えた場合 |
+|---|---|---|
+| `combined` | パーティションテーブルとブートを含むディスク全体のイメージ | rootfsとして使うとパーティションを上書きする恐れがある |
+| `rootfs` | ファイルシステムのみ | ブートローダーがなく、直接起動できない |
+| `ext4` / `squashfs` | 書き込み可能なroot / 読み取り専用のroot + overlay | 復旧や書き込みの挙動に影響する |
+| `-efi` | UEFIで起動 | レガシーBIOSでは起動しない場合がある |
+| `tar.gz` | rootfsのアーカイブ | 起動可能なディスクイメージではない |
+
+## ext4とsquashfsの違い
+
+- **ext4 combined**：書き込み可能なroot。VMやソフトルーターで一般的で、通常のLinuxインストールと同じように動作します。
+- **squashfs combined**：読み取り専用のroot、設定はoverlayに保存。初期化しやすく誤操作に強い一方、容量とメンテナンスの面で違いがあります。
+- PVEではどちらも起動できますが、このラボではext4のみテストしました。「squashfsのほうが安全」という理由でバックアップを省かないでください。
+
+## BIOSとUEFIの違い
+
+- PVEのデフォルト `SeaBIOS`：`-efi` なしのcombinedイメージを使います。
+- PVEの `OVMF (UEFI)`：`-efi` のcombinedイメージを使い、EFIディスクを用意します。
+- 物理マシン：ファームウェア設定の `UEFI/Legacy` を確認し、一致させます。
+- 選択を誤ると、ブートエントリがない、GRUBが起動しない、PXE/BIOSにフォールバックする、といった状態になります。
+
+このラボ：PVE VM 200、SeaBIOS + `generic-ext4-combined`。正常に起動しました。
+
+## ダウンロードと検証
+
+<Step where="client" title="イメージとsha256sumsをダウンロードする" expected="公式/TUNAの入手元とチェックサムが検証を通ります。">
+
+```sh
+curl -LO https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+curl -LO https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/sha256sums
+grep 'generic-ext4-combined.img.gz' sha256sums | sha256sum -c -
+```
+
+このラボ：`.img.gz` は13.0MB、展開後の `.img` は120.5MBで、SHA-256が一致しました。
+
+</Step>
+
+<Step where="client" title="展開する" expected="インポート/書き込み用の.imgができます。">
+
+```sh
+gzip -dk openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+ls -lh openwrt-25.12.6-x86-64-generic-ext4-combined.img
+```
+
+`sysupgrade` とPVEの `qm importdisk` は `.img` を使います。`.gz` を直接ディスクに書き込まないでください。
+
+</Step>
+
+## PVEにインポートする
+
+<Step where="pve" title="ディスクをインポートし、起動順序を設定する" expected="VMがISO/PXEではなく、インポートしたディスクから起動します。">
+
+```sh
+qm create 200 --name openwrt --memory 512 --cores 2 --cpu host \
+  --scsihw virtio-scsi-pci --ostype l26 --vga std --serial0 socket \
+  --net0 virtio,bridge=vmbr0
+
+qm importdisk 200 openwrt-25.12.6-x86-64-generic-ext4-combined.img local-lvm
+qm set 200 --scsi0 local-lvm:vm-200-disk-0
+qm set 200 --boot order=scsi0
+qm start 200
+```
+
+PVEがUEFI/OVMFを使う場合は、`-efi` イメージとEFIディスクを使ってください。UEFIにBIOS用イメージを無理に使わないでください。
+
+</Step>
+
+<Step where="pve" title="起動を確認する" expected="コンソールにOpenWrtと正しいバージョン/ターゲットが表示されます。">
+
+```sh
+qm terminal 200
+# or inside the VM
+ubus call system board
+cat /etc/openwrt_release
+```
+
+このラボでは25.12.6 x86/64が起動し、デフォルトのLANは `192.168.1.1` でした。
+
+</Step>
+
+## 物理ディスクへの書き込み
+
+```sh
+# verify the target first; do not copy the wrong device name
+lsblk
+sudo dd if=openwrt-...-combined.img of=/dev/sdX bs=4M status=progress conv=fsync
+sync
+```
+
+- `dd` は対象全体を上書きします。無関係なディスクを取り外し、デバイスを確認してください。
+- UEFIでは `-efi` を選びます。
+- そのディスクから起動してください。ISOの起動優先度を残さないでください。
+- 物理NICの名前は、PVEの `eth0/eth1` と一致しないことがあります。MAC/PCIで識別してください。
+
+## よくある失敗
+
+### PVEにインポートしても起動しない
+
+- 起動順序が `scsi0` になっていない。
+- combinedではなくrootfsを選んだ。
+- BIOS/UEFIのイメージが一致していない。
+- ディスクバス/コントローラーが一致していない。
+- シリアルコンソールが未設定で、起動ログがない。
+
+### 物理マシンのUEFIで起動に失敗する
+
+- `-efi` ではないイメージを使った。
+- BIOSがまだLegacy/CSMになっている。
+- USBへの書き込みが不完全。
+- セキュアブート/署名の制限。
+
+### 書き込み後に元のシステムが消えた
+
+`dd` で間違ったディスクに書き込みました。バックアップを取り、`lsblk` のサイズ/モデルを確認してから書き込んでください。本番のマシンでテストしないでください。
+
+### rootfsイメージが直接起動しない
+
+rootfsにはブートローダーやパーティションテーブルがありません。既存のブートローダーか、適切なコンテナ/仮想化の経路を使ってください。
+
+## E2ラボ実行（2026-10-20）
+
+- 環境：PVE 9.2.2、OpenWrt 25.12.6 x86/64、`generic-ext4-combined.img.gz`、SeaBIOS。
+- ダウンロード：`.img.gz` は13.0MB、`.img` は120.5MB。SHA-256は公式の `sha256sums` と一致しました。
+- PVE：`qm importdisk` → `scsi0` → `boot order=scsi0`。VMは25.12.6で起動しました。
+- 未テスト：`-efi`/OVMF、squashfs、物理USB、セキュアブート、24.10のイメージとの違い。
+- レシピ：`tests/recipes/x86-image-25.12.md`。
+
+## 情報源とレビュー
+
+- このページはE2（一部）です。BIOS/ext4 combinedとPVEへのインポートをテストしました。UEFI/squashfs/物理ディスクへの書き込みは未テストです。
+- イメージ名や提供状況はリリースごとに変わります。ダウンロードページを使ってください。
+- 独立したレビュアーはいません。結論はこのPVE/VM環境に限られます。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86/64 generic-ext4-combined (BIOS/SeaBIOS) をPVE VM 200にインポート; 13.0MB gz/120.5MB img; UEFI/squashfs/USBは未テスト"
+  recipe="tests/recipes/x86-image-25.12.md"
+  result="E2（一部）：generic-ext4-combined (BIOS) のSHA-256が一致し、qm importdisk + scsi0で25.12.6が起動。EFI/squashfs/物理USBは未テスト"
+  date="2026-10-20"
+/>
+
+<PageSources />

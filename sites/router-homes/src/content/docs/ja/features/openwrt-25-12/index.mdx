@@ -1,0 +1,65 @@
+---
+title: "OpenWrt 25.12: 24.10 からの変更点とアップグレードの目安"
+description: "OpenWrt 25.12「Dave’s Guitar」は apk に切り替わり、全ターゲットが Linux 6.12 に移行し、2200 以上のデバイスに対応します。変更点とアップグレード前の確認事項をまとめます。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt 25.12", "openwrt 25.12 リリース", "openwrt 25.12 新機能", "openwrt 25.12 変更点", "openwrt アップグレード 24.10 25.12"]
+sources:
+  - label: "OpenWrt 25.12.0 リリース告知"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: "OpenWrt 25.12.6 サービスリリース"
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: "OpenWrt 25.12.0 リリースノート"
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: "OpenWrt 24.10.0 リリース告知"
+    url: https://forum.openwrt.org/t/openwrt-24-10-0-first-stable-release/223845
+sourceHash: 'bf464024aeedffe3'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="openwrt-25-12" />
+
+## 一言でいうと
+
+OpenWrt 25.12 は現在の安定版シリーズです。25.12.0 のイメージの日付は 2026-03-03 で、執筆時点の最新のサービスリリースは 25.12.6 (2026-10-18) です。
+
+## 24.10 からの変更点
+
+- **パッケージマネージャー。** opkg に代わって apk になります。パッケージ名の変更は少ないものの、コマンドライン引数が異なります。[apk が opkg に置き換わる](/ja/features/apk/)を参照してください。
+- **カーネル。** すべてのターゲットが Linux 6.12 で動作します。25.12.0 は 6.12.71、25.12.6 は 6.12.112 です。24.10 は 6.6 でした。[カーネルとツールチェーン](/ja/features/kernel-toolchain/)を参照してください。
+- **ツールチェーン。** GCC 14.3.0、binutils 2.44、musl 1.2.5、glibc 2.41。
+- **アップグレード。** attended sysupgrade の LuCI アプリが標準でインストールされます。フラッシュ容量の大きいデバイスには `owut` も含まれます。
+- **内部の変更。** Wi-Fi スクリプトが ucode で書き直され、シェルの履歴は RAM 上のファイルシステムに保存されるようになりました。
+- **ハードウェア。** 対応デバイスは 2200 以上で、そのうち 180 以上が新規です。新しいターゲットには siflower、sunxi/arm926ejs、microchipsw/lan969x があります。
+
+このリリースの名前「Dave’s Guitar」は Dave Täht にちなむもので、24.10 以降のコミットは 4700 を超えます。
+
+## アップグレードすべきか
+
+- **24.10 の場合:** 25.12.0 の告知によると、24.10 には 2026 年 9 月以降セキュリティ更新がありません。移行を計画してください。
+- **23.05 の場合:** 23.05 から 25.12 へ sysupgrade で直接アップグレードする方法は、公式にはサポートされていません。方法を選ぶ前にリリースノートを読んでください。
+- **ベンダー製またはサードパーティ製ファームウェアの場合:** まず、[このルーターはどの OpenWrt?](/ja/getting-started/which-openwrt/)で実際に何が動いているかを確認してください。
+
+アップグレードの前には必ずバックアップを取り、ルーターへの有線接続を確保してください。手順は[ファームウェアのアップグレード](/ja/recovery/firmware-upgrade/)にあります。
+
+## ルーターで確認する
+
+次のコマンドは読み取りのみを行います。
+
+```sh
+cat /etc/openwrt_release
+uname -r
+```
+
+`DISTRIB_RELEASE` でリリースを、`uname -r` でカーネルのバージョンを確認できます。
+
+## 関連ガイド
+
+- [ファームウェアのアップグレード](/ja/recovery/firmware-upgrade/)
+- [バックアップと復元](/ja/recovery/backup-restore/)
+- [apk と opkg の違い](/ja/software/apk-vs-opkg/)
+
+<PageSources />

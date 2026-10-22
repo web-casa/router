@@ -1,0 +1,275 @@
+---
+title: "メインルーターの接続確認: WAN DHCPとPPPoEを分けて検証する"
+description: WAN DHCPクライアント、ゲートウェイ/DNS、LANクライアント、NATを順に検証し、PPPoEに実際に必要なものを確認します。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'WAN DHCP E2: OpenWrt 25.12.6 x86 VM 200、WAN 192.168.50.166/24、LAN 192.168.10.1。PPPoEは未検証'
+testRecipe: 'tests/recipes/wan-dhcp-pppoe-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt wan dhcp', 'openwrt pppoe', 'openwrt pppoe 設定', 'openwrt wan 設定', 'openwrt メインルーター インターネット', 'openwrt wan つながらない', 'openwrt インターネット 接続できない']
+symptoms: ['WANにアドレスがない', 'PPPoE認証に失敗する', 'LANにアドレスはあるがインターネットにつながらない']
+sources:
+  - label: OpenWrt ネットワーク設定
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt WANインターフェースのプロトコル
+    url: https://openwrt.org/docs/guide-user/network/wan/wan_interface_protocols
+  - label: OpenWrt PPPoE / ISP設定
+    url: https://openwrt.org/docs/guide-user/network/wan/isp-configurations
+  - label: OpenWrt ファイアウォール
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: '92abdcdd7cb6f92a'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 + 実ISP回線（PPPoEは未検証）" tested={true} evidence="E2" />
+
+## 目的
+
+- WANがDHCPかPPPoEかを判別し、どの状態を確認するかを把握する
+- 「接続済み」を信用せず、WANのアドレス、ゲートウェイ、DNSを確認する
+- LANクライアントのアドレス、ゲートウェイ、DNSを確認する
+- 「WANは上がっているがLANがつながらない」原因が、転送/NATかDNSかを切り分ける
+- PPPoEに必要なものと、実回線なしでは検証済みと言えない理由を理解する
+
+## トポロジーと前提
+
+```text
+上流ルーター/ONU 192.168.50.1
+        │
+   WAN eth1 (DHCP 192.168.50.166/24)
+        │
+   OpenWrt VM 200
+        │
+   LAN br-lan 192.168.10.1/24
+        │
+   LANクライアント 192.168.10.191/24
+```
+
+- WANとLANは別のサブネットにします。上流と重複させないでください。
+- メインルーターはNAT/転送を行う必要があります。ブリッジ/APの検証とは異なります。
+- コンソールで操作できる状態を保ち、WANの変更中は1つのWebセッションだけに頼らないでください。
+
+## WANのプロトコルを判別する
+
+<Step where="router-shell" title="現在のWAN/LAN設定を読み取る" expected="WANがdhcp、pppoe、staticのどれかわかる。">
+
+```sh
+uci show network.wan
+uci show network.wan6 2>/dev/null
+uci show network.lan
+ip -4 addr show
+ip route
+```
+
+WANの `proto` によって確認先が変わります。`dhcp` なら udhcpc、`pppoe` なら pppd/pppoe-wan です。
+
+</Step>
+
+## WAN DHCP
+
+<Step where="luci" title="WANをDHCPクライアントにする" expected="WANがアドレス、ゲートウェイ、DNSを受け取る。">
+
+**ネットワーク → インターフェース → WAN → 編集** を開きます。
+
+1. プロトコル: `DHCPクライアント`
+2. 保存して適用します。
+3. インターフェースの画面で、「接続済み」だけでなくWANにIPv4アドレスがあることを確認します。
+
+CLIでの同等の手順:
+
+```sh
+uci set network.wan.proto='dhcp'
+uci commit network
+/etc/init.d/network reload
+```
+
+</Step>
+
+<Step where="router-shell" title="WANのアドレス/ゲートウェイ/DNSを確認する" expected="WANにアドレスがあり、デフォルトルートが上流を向き、DNSが機能する。">
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+cat /tmp/resolv.conf.d/resolv.conf.auto
+nslookup openwrt.org 192.168.50.1
+```
+
+このラボでの結果:
+
+- WAN `192.168.50.166/24`
+- ゲートウェイ/DNS `192.168.50.1`
+- WANデバイス `eth1`
+
+`ubus` が `up: false` を返す、または `ipv4-address` がない場合は、LANに手を付ける前に `logread -e udhcpc` を確認してください。
+
+</Step>
+
+<Step where="client" title="LANクライアントを確認する" expected="クライアントがLANのアドレス、ゲートウェイ、DNSを受け取る。">
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.10.1
+```
+
+このラボでは、LANのDHCPクライアントが `192.168.10.191/24`、ゲートウェイ `192.168.10.1` を取得しました。
+
+ルーターの先も確認します。
+
+```sh
+ping -c 3 1.1.1.1
+nslookup openwrt.org
+```
+
+> このE2検証ではWAN DHCPとLAN DHCPを再確認しましたが、LANクライアントから公開インターネットへのNAT/DNS経路は完全には再実行していないため、「クライアントで閲覧できる」は検証済みとしていません。
+
+</Step>
+
+<Step where="router-shell" title="WANは上がっているがLANがつながらない" expected="転送/NATとDNSを切り分ける。">
+
+```sh
+uci show firewall
+nft list ruleset 2>/dev/null | head -80
+logread | grep -i firewall | tail -20
+```
+
+確認項目:
+
+- LAN/WANが正しいファイアウォールゾーンに属しているか
+- WANゾーンでマスカレードが有効か
+- LAN→WANの転送が許可されているか
+- クライアントのゲートウェイ/DNSがOpenWrtを向いているか
+- 2台目のDHCPやサブネットの競合がないか
+
+</Step>
+
+## PPPoE（E1、実回線が必要）
+
+<Step where="client" title="手元にある情報を確認する" expected="アカウント、パスワード、VLAN/サービス名があり、正当に入手したものである。">
+
+PPPoEには通常、次の情報が必要です。
+
+- ISPのアカウント/パスワード（チャット、リポジトリ、スクリーンショットに絶対に載せないでください）
+- 地域によってはVLAN ID
+- 地域によってはサービス名/AC名
+- ONUがすでにダイヤルしているか（ブリッジモードかルーターモードか）
+- MTU/MSSとIPv6の要件
+
+これらがなければPPPoEを検証済みとは言えません。他人のアカウントで試験しないでください。
+
+</Step>
+
+<Step where="luci" title="LuCIでPPPoEを設定する（例、実際のパスワードは使わない）" expected="WANプロトコルがPPPoEになり、認証情報はデバイス内にだけ残る。">
+
+**ネットワーク → インターフェース → WAN → 編集 → プロトコル: PPPoE**:
+
+- ユーザー名/パスワード: ISPの認証情報
+- VLANが必要な場合は、デバイス/インターフェース層で設定します。
+- Keepaliveは `5 3` から始められます。
+- 保存して適用します。
+
+CLIでの書き方（実際のパスワードをシェル履歴やリポジトリに残さないでください）:
+
+```sh
+uci set network.wan.proto='pppoe'
+uci set network.wan.username='<your-account>'
+uci set network.wan.password='<your-password>'
+uci set network.wan.keepalive='5 3'
+uci commit network
+/etc/init.d/network reload
+```
+
+</Step>
+
+<Step where="router-shell" title="PPPoEの状態を確認する" expected="pppoe-wanにアドレス、デフォルトルート、DNSがある。">
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show pppoe-wan
+ip route
+logread | grep -Ei 'pppd|pppoe' | tail -30
+```
+
+確認項目:
+
+- `pppoe-wan` にIPv4アドレスがあるか
+- デフォルトルートが `pppoe-wan` 経由か
+- DNSが機能するか
+- MTUが1492前後か（PPPoEでは一般的）
+- ログに認証失敗/タイムアウト/サービス名のエラーがないか
+
+このページには実際のISPアカウントがないため、**PPPoEはE1のまま**とし、「ダイヤルに成功した」とは記述しません。
+
+</Step>
+
+## よくある障害
+
+### WAN DHCPでアドレスが取得できない
+
+- ポートの間違い（WANとLAN）
+- 上流のDHCPが無効
+- 上流でのMACバインドや認証
+- VLANが必要
+- `logread -e udhcpc` でdiscover/offerを確認する
+- 上流のサブネットを推測して静的IPを設定しない
+
+### PPPoE認証に失敗する
+
+- アカウント/パスワードの誤り（大文字小文字、サフィックス）
+- VLAN/サービス名が必要
+- ONUがまだダイヤルしている（二重ダイヤル）
+- アカウントがMACやポートに紐付いている
+- 繰り返し再試行するとISPの制限に掛かる場合がある。連打せずログを読む
+
+### WANにアドレスはあるが、LANからインターネットに出られない
+
+- ファイアウォールのゾーン/転送/マスカレード
+- クライアントのゲートウェイ/DNS
+- 上流が1台/1つのMACしか許可しない
+- サブネットの競合/二重NAT
+- IPv6とIPv4の違い
+
+### DNSが失敗する
+
+- WAN側のDNSを確認する（`nslookup ... 192.168.50.1`）
+- 次にルーター自身を確認する（`nslookup ... 127.0.0.1`）
+- 最後にLANクライアントを確認する（`cat /etc/resolv.conf`）
+- DNSの失敗をすべてWANのせいにしない
+
+## E2/E1の記録
+
+### WAN DHCP（E2）
+
+- 環境: OpenWrt 25.12.6 x86 VM 200、WAN `eth1`、上流 `192.168.50.1`
+- 結果: WAN `192.168.50.166/24`、ゲートウェイ/DNS `192.168.50.1`、LAN `192.168.10.1/24`
+- LAN DHCP: netnsクライアントが `192.168.10.191/24`、ゲートウェイ `192.168.10.1` を取得
+- 再実行していない項目: LANクライアントから公開インターネットまでのNAT/DNSのエンドツーエンド、IPv6、物理WAN
+
+### PPPoE（E1）
+
+- 実際のISPアカウント/回線がなく、ダイヤル、認証、MTU、DNSは検証していません。
+- 読者は自分の正当なアカウントと、デバイス/ISPのドキュメントで検証してください。認証情報を公開しないでください。
+
+## 出典とレビュー
+
+- WAN DHCPはE2、PPPoEはE1です。「メインルーターを完全に検証した」とまとめないでください。
+- レシピ: `tests/recipes/wan-dhcp-pppoe-25.12.md`
+- 独立したレビュアーはおらず、結論はこのVM/上流環境に限られます。
+
+<TestRecord
+  status="partial"
+  environment="WAN DHCP E2: OpenWrt 25.12.6 x86 VM 200、WAN 192.168.50.166/24、LAN 192.168.10.1。PPPoEは未検証"
+  recipe="tests/recipes/wan-dhcp-pppoe-25.12.md"
+  result="WAN DHCPで192.168.50.166/24を取得し、ゲートウェイ/DNSは192.168.50.1。LAN DHCPクライアントは192.168.10.191/24を取得。LANクライアントのNAT/DNSエンドツーエンドは再実行していない。PPPoEは実アカウント/回線がないため未検証"
+  date="2026-10-20"
+/>
+
+<PageSources />

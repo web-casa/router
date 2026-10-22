@@ -1,0 +1,66 @@
+---
+title: "OpenWrt 25.12のapk：opkgに代わったパッケージマネージャー"
+description: "25.12以降、OpenWrtはopkgではなくapkでソフトウェアをインストールします。コマンド対応表、ファイルの場所、実行してはいけない1つのコマンドを解説します。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt apk", "apk vs opkg", "openwrt opkg replaced", "openwrt apk 使い方", "openwrt opkg 使えない", "openwrt パッケージ インストール 25.12", "opkg apk 違い"]
+sources:
+  - label: "OpenWrt apk"
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: "opkgからapkへの早見表"
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: "OpenWrt 25.12.0 リリース告知"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+sourceHash: 'b79c99d190d594fd'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="apk" />
+
+## 一言で言うと
+
+25.12以降、OpenWrtはapk（Alpine Package Keeper、バージョン3）でソフトウェアをインストール・削除します。24.10以前は引き続きopkgを使います。
+
+## 変更された理由
+
+25.12.0の告知によると、OpenWrtのopkgフォークはメンテナンスされなくなりました。パッケージ名の変更は少ないものの、コマンドはすべて変わっています。
+
+## コマンド対応表
+
+| 作業 | apk (25.12) | opkg (24.10) |
+|---|---|---|
+| パッケージインデックスの更新 | `apk update` | `opkg update` |
+| インストール | `apk add <pkg>` | `opkg install <pkg>` |
+| 削除 | `apk del <pkg>` | `opkg remove <pkg>` |
+| インストール済み一覧 | `apk list --installed` | `opkg list-installed` |
+| 更新可能な一覧 | `apk list --upgradeable` | `opkg list-upgradable` |
+| ファイルを所有するパッケージ | `apk info --who-owns <file>` | `opkg search <file>` |
+
+## ほかの違い
+
+- パッケージファイルの拡張子は `.apk`、パッケージインデックスは `packages.adb` です。
+- リポジトリは `/etc/apk/repositories.d/` 以下に記載されます。
+- 自分でビルドしたパッケージは署名がないため、インストールには `--allow-untrusted` が必要です。
+
+## 注意点
+
+- **システムのアップグレードに `apk upgrade` を使わないでください。** OpenWrt wikiでも警告されています。ファームウェアはattended sysupgradeクライアントでアップグレードします。25.12ではLuCIアプリが標準でインストールされています。
+- 25.12にopkgのコマンドを、24.10にapkのコマンドを貼り付けないでください。先にどちらを使っているか確認します。
+
+## ルーターで確認する
+
+```sh
+apk list --installed | head
+ls /etc/apk/repositories.d/
+```
+
+## 関連ガイド
+
+- [apk vs opkg](/ja/software/apk-vs-opkg/)
+- [パッケージソース](/ja/software/package-sources/)
+- [パッケージがインストールできない](/ja/troubleshooting/plugin-install/)
+
+<PageSources />

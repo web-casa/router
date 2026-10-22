@@ -1,0 +1,234 @@
+---
+title: "バイパスゲートウェイ: DHCP の無効化、クライアントのゲートウェイ/DNS の設定、元に戻す方法"
+description: ワンアーム構成のバイパスと WAN 付きの2台目ゲートウェイを区別し、LAN の変更、DHCP の無効化、クライアントのバイパス向け設定、ロールバック手段の確保までを説明します。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'WAN 付きバイパスの E2: LAN 192.168.1.2/24、DHCP オフ、WAN 192.168.50.5/24。静的クライアント 192.168.1.100。純粋なワンアームバイパスは未検証'
+testRecipe: 'tests/recipes/bypass-gateway-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt bypass gateway', 'openwrt bypass router', 'bypass router dhcp', 'openwrt gateway change', 'openwrt バイパスルーター', 'openwrt サブルーター 設定', 'openwrt dhcp 無効 ゲートウェイ']
+symptoms: ['バイパスルーターでインターネットに接続できなくなる', 'クライアントのゲートウェイの設定方法', 'バイパスで DHCP が競合する']
+sources:
+  - label: OpenWrt ネットワーク設定
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP と DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt ファイアウォール
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt ブリッジ/リレー
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+sourceHash: '111105920d4777d6'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## モードを選ぶ: ワンアームバイパスと WAN 付きゲートウェイ
+
+| モード | OpenWrt のインターフェース | DHCP を提供するもの | クライアントのゲートウェイ/DNS | ここでの検証 |
+|---|---|---|---|---|
+| ワンアームバイパス | LAN のみ、WAN なし | 上流のメインルーター | バイパスの LAN IP | なし(E1 の手順) |
+| WAN 付きゲートウェイ | LAN + WAN | 上流またはバイパス | バイパスの LAN IP | **E2** |
+
+どちらも「クライアントを OpenWrt 経由にする」ことはできますが、障害点が異なります。
+
+- ワンアームバイパス: DHCP/NAT がない場合、メインルーターが戻りの経路を知っている必要があります。そうでなければバイパスで NAT を行います。
+- WAN 付き: OpenWrt が自身の WAN アドレスを持ち、LAN クライアントを NAT します。これが検証に使ったモードです。
+
+WAN の有無と DHCP を誰が提供するかを示さずに、「バイパスが動作する」と言わないでください。
+
+## 検証環境のトポロジー
+
+```text
+Upstream 192.168.50.1
+      │
+  WAN eth1 (DHCP 192.168.50.5/24)
+      │
+  OpenWrt VM 200
+      │
+  LAN br-lan 192.168.1.2/24
+      │  DHCP disabled
+  Client 192.168.1.100/24
+  gateway/DNS = 192.168.1.2
+```
+
+- この LAN には `.1` がないため、上流/メインルーターとの競合を避けられます。
+- クライアントは静的設定にする必要があります。
+- DHCP がオフのため、DHCP 要求に応答がないのは仕様どおりです。
+
+## 設定
+
+<Step where="router-shell" title="LAN/WAN の状態をバックアップして記録する" expected="LAN の IP、WAN のプロトコル、DHCP の状態が分かる。">
+
+```sh
+uci show network.lan
+uci show network.wan
+uci show dhcp.lan
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+コンソールアクセスを確保してください。以前の LAN IP は直ちに使えなくなります。
+
+</Step>
+
+<Step where="luci" title="LAN の IP を変更し、DHCP を無効にする" expected="LAN が 192.168.1.2/24 になり、DHCP がアドレスを配布しなくなる。">
+
+**ネットワーク → インターフェース → LAN → 編集**:
+
+1. IPv4 アドレス: `192.168.1.2/24`
+2. **DHCPサーバー → 一般設定 → インターフェースを無視**
+3. 保存して適用
+
+CLI での同等の操作:
+
+```sh
+uci set network.lan.ipaddr='192.168.1.2/24'
+uci set dhcp.lan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+その後、`192.168.1.2` で LuCI/SSH に再接続します。
+
+</Step>
+
+<Step where="router-shell" title="WAN と NAT を維持する(WAN 付きモード)" expected="WAN にアドレスがあり、LAN→WAN の転送/NAT が動作する。">
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+uci show firewall | grep -E 'zone|masquerade|forward'
+```
+
+この検証では WAN は `192.168.50.5/24`、ゲートウェイは `192.168.50.1` で、LAN クライアントは OpenWrt 経由で NAT されます。
+
+</Step>
+
+<Step where="client" title="クライアントをバイパスに向ける" expected="クライアントのゲートウェイ/DNS が 192.168.1.2 になり、パブリック IP と DNS が動作する。">
+
+```sh
+# Linux example
+ip addr add 192.168.1.100/24 dev eth0
+ip route add default via 192.168.1.2
+echo 'nameserver 192.168.1.2' > /etc/resolv.conf
+ping -c 2 192.168.1.2
+ping -c 2 1.1.1.1
+nslookup openwrt.org 192.168.1.2
+```
+
+Windows では、IP、ゲートウェイ、DNS を手動で設定します。以前の DHCP アドレスを残さないでください。
+
+</Step>
+
+<Step where="client" title="DHCP が本当にオフであることを確認する" expected="DHCP のオファーがなく、静的設定は引き続き動作する。">
+
+```sh
+# Linux example
+udhcpc -i eth0 -f -q -n -t 3
+```
+
+この検証では `no lease, failing` と出力され、静的アドレスでの ping と名前解決は引き続き成功しました。リースを取得できてしまう場合は、別の DHCP サーバーが存在するか、`ignore` が適用されていません。
+
+</Step>
+
+<Step where="client" title="DNS/ゲートウェイを切り替えて対照実験する" expected="DNS の障害とゲートウェイの障害を切り分けられる。">
+
+```sh
+# public DNS
+nslookup openwrt.org 1.1.1.1
+# dead gateway
+ip route replace default via 192.168.1.250
+ping -c 2 1.1.1.1
+# restore
+ip route replace default via 192.168.1.2
+```
+
+この検証の結果: パブリック DNS は動作し、`.250` では 100% パケットロスとなり、`.2` に戻すと復旧しました。
+
+</Step>
+
+## ワンアームバイパス(E1、ここでは未検証)
+
+LAN のみで WAN なしの構成:
+
+- バイパスの LAN は `192.168.1.2/24`、メインルーターへのゲートウェイは `192.168.1.1`
+- バイパスの DHCP を無効にする
+- クライアントのゲートウェイ/DNS は `.2`
+- 転送を有効にする。メインルーターに戻りの経路が必要、またはバイパスが LAN のトラフィックを NAT する
+- メインルーターのファイアウォールで、クライアントからインターネットへの転送を許可する必要がある
+
+メインルーターの検証環境がなかったため、この部分は E2 ではなく **E1** です。お使いのルーター/ファイアウォールで確認してください。
+
+## よくある失敗
+
+### LAN を変更した後にバイパスへ接続できない
+
+- 以前の IP を使い続けている
+- クライアントが `192.168.1.0/24` にいない
+- ARP が古い: `ip neigh flush dev <iface>`
+- コンソールを使う: `ip -4 addr show br-lan`
+
+### クライアントにアドレスが割り当てられない
+
+- バイパスの DHCP がオフなのは想定どおりです。静的に設定してください
+- DHCP を使いたい場合は、サーバーをバイパスかメインルーターのどちらか1台だけにする
+- `dhcp.lan.ignore` と、別の DHCP サーバーの有無を確認する
+
+### クライアントにアドレスはあるがインターネットに接続できない
+
+- ゲートウェイ/DNS がバイパスを向いていない
+- バイパスにデフォルトルート/上流がない
+- ファイアウォールの転送/NAT
+- メインルーターに戻りの経路がない(ワンアーム)
+- サブネットの競合/二重 NAT
+
+### DNS が失敗する
+
+- クライアントが DNS に以前のゲートウェイを使い続けている
+- バイパスの dnsmasq が LAN で待ち受けていない
+- 上流の DNS がブロックされている
+- アプリ側の DoH/プライベート DNS
+
+## 録画デモ(009 検証環境)
+
+<TerminalCast
+  src="/casts/009-bypass.cast"
+  title="009 検証環境: バイパスゲートウェイ、DHCP オフ、静的ゲートウェイ/DNS"
+  caption="実際の OpenWrt 25.12.6 VM: LAN .2 + WAN DHCP、DHCP 無効。静的クライアント .100 で、パブリック IP/DNS、DNS の切り替え、ゲートウェイ障害と復旧を確認。純粋なワンアームバイパスはこの録画に含まれません。"
+/>
+
+## E2 検証結果(2026-10-20)
+
+- 環境: OpenWrt 25.12.6 x86 VM 200、LAN `192.168.1.2/24`、`DHCP ignore=1`、WAN DHCP `192.168.50.5/24`、netns クライアント `192.168.1.100/24`。
+- DHCP オフ: `udhcpc` はオファーを受け取れず(`no lease, failing`)、静的アドレスは動作した。
+- 静的ゲートウェイ/DNS `.2`: ゲートウェイへの ping、`1.1.1.1`、`nslookup` が動作した。
+- DNS `1.1.1.1` は動作し、ゲートウェイ `.250`(存在しない)ではパブリックアクセスが不通になり、`.2` に戻すと復旧した。
+- 未検証: 純粋なワンアームバイパス、メインルーターの戻り経路、実際の Wi-Fi/Windows クライアント、IPv6/RA。
+- 録画: `public/casts/009-bypass.cast`、レシピ: `tests/recipes/bypass-gateway-25.12.md`。
+
+## 情報源とレビュー
+
+- これは E2 の部分的な検証です。WAN 付きバイパスは検証済みですが、ワンアームの経路は E1 の手順のみです。
+- 独立したレビュアーはいません。結論はこの VM/netns 環境に限られます。
+- 「バイパスゲートウェイ」は単一の固定構成ではありません。DHCP を誰が提供し、誰が NAT し、戻りの経路があるかを確認してください。
+
+<TestRecord
+  status="partial"
+  environment="WAN 付きバイパスの E2: LAN 192.168.1.2/24、DHCP オフ、WAN 192.168.50.5/24。静的クライアント 192.168.1.100。純粋なワンアームバイパスは未検証"
+  recipe="tests/recipes/bypass-gateway-25.12.md"
+  result="E2 部分的: DHCP オフでクライアントはリースを取得できず、静的ゲートウェイ/DNS .2 でパブリック ping と DNS が動作。DNS 1.1.1.1 は動作し、存在しないゲートウェイ .250 ではパブリックアクセスが不通になり、.2 に戻すと復旧した。"
+  date="2026-10-20"
+/>
+
+<PageSources />

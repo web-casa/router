@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "topK": 5,
+  "queries": [
+    {
+      "id": "ja-dns-01",
+      "locale": "ja",
+      "query": "DNS ブラウザー",
+      "expectedUrls": [
+        "/ja/network/dns/"
+      ],
+      "category": "dns",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-proxmox-01",
+      "locale": "ja",
+      "query": "proxmox NIC openwrt",
+      "expectedUrls": [
+        "/ja/installation/proxmox/"
+      ],
+      "category": "proxmox",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-agh-01",
+      "locale": "ja",
+      "query": "adguard home クライアント",
+      "expectedUrls": [
+        "/ja/software/adguard-home/"
+      ],
+      "category": "agh",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-sqm-01",
+      "locale": "ja",
+      "query": "sqm cake ラグ",
+      "expectedUrls": [
+        "/ja/software/sqm/"
+      ],
+      "category": "sqm",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-luci-01",
+      "locale": "ja",
+      "query": "LuCI 初回ログイン",
+      "expectedUrls": [
+        "/ja/getting-started/luci-first-login/"
+      ],
+      "category": "luci",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-fw-01",
+      "locale": "ja",
+      "query": "immortalwrt istoreos ベンダー",
+      "expectedUrls": [
+        "/ja/getting-started/which-openwrt/"
+      ],
+      "category": "fw",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-oc-01",
+      "locale": "ja",
+      "query": "openclash 無効化",
+      "expectedUrls": [
+        "/ja/software/openclash/"
+      ],
+      "category": "oc",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-pkg-01",
+      "locale": "ja",
+      "query": "apk opkg ミラー",
+      "expectedUrls": [
+        "/ja/software/package-sources/"
+      ],
+      "category": "pkg",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-rec-01",
+      "locale": "ja",
+      "query": "LuCI 接続 コンソール",
+      "expectedUrls": [
+        "/ja/troubleshooting/no-web-ui/"
+      ],
+      "category": "rec",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-lan-01",
+      "locale": "ja",
+      "query": "lan サブネット 変更",
+      "expectedUrls": [
+        "/ja/network/lan-address/"
+      ],
+      "category": "lan",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-bak-01",
+      "locale": "ja",
+      "query": "バックアップ 復元",
+      "expectedUrls": [
+        "/ja/recovery/backup-restore/"
+      ],
+      "category": "bak",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-upg-01",
+      "locale": "ja",
+      "query": "ファームウェア アップグレード",
+      "expectedUrls": [
+        "/ja/recovery/firmware-upgrade/"
+      ],
+      "category": "upg",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-wg-01",
+      "locale": "ja",
+      "query": "wireguard サーバー ピア",
+      "expectedUrls": [
+        "/ja/remote-access/wireguard-server/"
+      ],
+      "category": "wg",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-vlan-01",
+      "locale": "ja",
+      "query": "dsa vlan pvid",
+      "expectedUrls": [
+        "/ja/wireless-vlan/dsa-vlan/"
+      ],
+      "category": "vlan",
+      "aliasCase": false
+    },
+    {
+      "id": "ja-guest-01",
+      "locale": "ja",
+      "query": "ゲスト wifi ssid",
+      "expectedUrls": [
+        "/ja/wireless-vlan/guest-wifi/"
+      ],
+      "category": "guest",
+      "aliasCase": false
+    }
+  ]
+}

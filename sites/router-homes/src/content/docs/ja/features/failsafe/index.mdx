@@ -1,0 +1,58 @@
+---
+title: "フェイルセーフモードとsysupgrade: OpenWrt標準の復旧手段"
+description: "フェイルセーフは最小構成で192.168.1.1に起動し、修復できるようにします。sysupgradeは指定しない限り設定を保持します。それぞれの仕組みを説明します。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt failsafe", "openwrt フェイルセーフ", "openwrt リカバリーモード", "openwrt 復旧", "openwrt 初期化", "sysupgrade 設定 保持"]
+sources:
+  - label: "OpenWrt フェイルセーフとファクトリーリセット"
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+  - label: "sysupgradeのソース (OpenWrt 25.12)"
+    url: https://github.com/openwrt/openwrt/blob/openwrt-25.12/package/base-files/files/sbin/sysupgrade
+  - label: "OpenWrt バックアップと復元"
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+sourceHash: '9ab880000b82bb47'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="failsafe" />
+
+## ひとことで言うと
+
+フェイルセーフモードは、既知の最小構成でOpenWrtを `192.168.1.1` に起動し、壊れた設定を修復できるようにします。sysupgradeはファームウェアを置き換え、指定しない限り設定を保持します。
+
+## フェイルセーフモード
+
+- **入り方:** 起動中に2〜4秒の入力受付があります。そのタイミングでデバイスのほぼ任意のボタンを押すか、シリアルコンソールで `f` を入力してEnterを押します。
+- **得られる状態:** ルーターは `192.168.1.1/24` で起動し、DHCPと無線はオフ、必須のサービスだけが動きます。コンピューターにそのサブネットの静的アドレスを設定して、SSHで接続します。
+- **できること:** `mount_root` でオーバーレイをマウントしてファイルを修復するか、`firstboot && reboot` ですべての設定をリセットします。
+- フェイルセーフにはSquashFSイメージが必要です。
+
+## sysupgrade
+
+- 既定では設定を保持します。`-n` を付けると設定を保持せずに書き込みます。
+- `sysupgrade -b <file>` は、`sysupgrade.conf` に記載されたファイルの `.tar.gz` バックアップを作成します。`-r <file>` で復元し、`-l` で保存対象を一覧表示します。
+
+## ルーターで確認する
+
+このコマンドは読み取りのみです。
+
+```sh
+sysupgrade -l | head
+```
+
+## 注意
+
+- ファクトリーリセットはすべての設定を消去します。先にバックアップを取ってください。
+- フェイルセーフではDHCPが動きません。コンピューターに静的IPを設定しないと、ルーターが壊れたように見えます。
+
+## 関連ガイド
+
+- [LuCIにつながらない](/ja/troubleshooting/no-web-ui/)
+- [バックアップと復元](/ja/recovery/backup-restore/)
+- [ファームウェアのアップグレード](/ja/recovery/firmware-upgrade/)
+
+<PageSources />

@@ -1,0 +1,243 @@
+---
+title: "LuCI に接続できない: IP、ポート、DHCP、コンソールでの復旧"
+description: LAN ポートとクライアントのアドレスから、実際の管理 IP、uhttpd/SSH/ファイアウォールへと順に調べます。むやみに初期化せず、コンソールや failsafe による復旧手段を残します。
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200、uhttpd の停止と復旧、HTTP 80 の確認、SSH は維持'
+testRecipe: 'tests/recipes/troubleshooting-no-web-ui.md'
+aliases: ['openwrt cannot open luci', 'luci not loading', '192.168.1.1 not working', 'openwrt unreachable', 'openwrt 管理画面 開けない', 'luci 開けない', '192.168.1.1 つながらない', 'openwrt ログインできない', 'openwrt ルーター 繋がらない']
+symptoms: ['192.168.1.1 を開けない', 'ログイン画面がタイムアウトする', 'LAN 変更後に接続できなくなった', 'DHCP でアドレスを取得できない']
+sources:
+  - label: OpenWrt failsafe と初期化
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+  - label: OpenWrt LuCI の基本
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt ネットワーク設定
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP と DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+sourceHash: 'bfd0c331078d3002'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
+
+## 到達点
+
+- 問題が、物理的なリンク、クライアントのアドレス、管理 IP、HTTP サービス、SSH/ファイアウォールのどれにあるかを切り分けられます。
+- 設定を変更せずに、LuCI が実際に待ち受けているかを判断できます。
+- むやみに初期化せず、静的なクライアントアドレス、コンソール、failsafe で復旧できます。
+- 作業を止めるべきとき、バックアップを取るべきとき、デバイスのドキュメントを読むべきときが分かります。
+
+## 切り分け表
+
+| 症状 | 最初に確認すること | 最初にやってはいけないこと |
+|---|---|---|
+| リンク LED が点灯しない | ケーブル、LAN ポート、電源 | ファームウェアの書き直し |
+| クライアントが 169.254.x.x になる | DHCP/ケーブル/LAN ポート | ルーターの LAN の変更 |
+| ping は通るが Web は開けない | 80/443、uhttpd、ファイアウォール、HTTPS | 初期化 |
+| ping が通らない | クライアントのサブネット、管理 IP、VLAN/ポート | IP を次々に変える |
+| SSH は通るが LuCI が開けない | uhttpd/LuCI パッケージ/ポート | ネットワーク設定の変更 |
+| コンソールに出力がない | シリアルの設定、映像出力、電源 | ピンをショートする、やみくもに書き込む |
+
+## レイヤー 1: 物理ポートとリンク
+
+<Step where="client" title="WAN ではなく LAN ポートを使う" expected="LAN の LED が点灯し、クライアントがリンクを認識している。">
+
+**LAN** と表示されたポートに接続します。WAN ポートでは通常、管理にアクセスできません。別のケーブルと別の LAN ポートも試し、LED とクライアントの NIC の状態を確認します。
+
+LED がまったく点灯しない場合は、ファームウェアに手を付ける前に、電源、ケーブル、ポートを確認してください。
+
+</Step>
+
+## レイヤー 2: クライアントのアドレスとゲートウェイ
+
+<Step where="client" title="クライアントが LAN のサブネットにいることを確認する" expected="クライアントが 192.168.1.x または既知の別の LAN アドレスを持っている。">
+
+Linux:
+
+```sh
+ip addr show
+ip route
+```
+
+Windows:
+
+```powershell
+ipconfig /all
+```
+
+macOS:
+
+```sh
+ifconfig
+netstat -rn
+```
+
+`169.254.x.x` のアドレスは、DHCP が失敗したことを意味します。まずケーブルと LAN を確認し、そのうえで一時的な静的アドレスを設定します。
+
+- IP: `192.168.1.2`
+- マスク: `255.255.255.0`
+- ゲートウェイ: `192.168.1.1`
+
+ログインするためだけに使い、ルーターの LAN アドレスと重複させないでください。
+
+</Step>
+
+<Step where="client" title="ゲートウェイに ping を送る" expected="応答がある、または管理 IP が 192.168.1.1 ではないと分かる。">
+
+```sh
+ping 192.168.1.1
+```
+
+- 応答がある: レイヤー 3 に進みます。
+- 応答がない: クライアントのサブネット、LAN ポート、初期アドレスを変更していないかを確認します。
+- ping が失敗しただけで、デバイスが故障したと判断しないでください。
+
+</Step>
+
+## レイヤー 3: 管理 IP を変更していないか
+
+<Step where="client" title="実際の LAN アドレスを調べる" expected="少なくとも 2 つの候補アドレスを持ち、それぞれを試した。">
+
+主な手がかり:
+
+- デバイスのラベルやマニュアル
+- 保存しておいた設定やスクリーンショット
+- 上位ルーターの DHCP リース表 (アクセスできる場合)
+- コンソールでの `uci show network`
+- 自分で変更した LAN アドレス
+
+**自分のサブネット**では、ARP キャッシュを確認できます。
+
+```sh
+ip neigh
+```
+
+知らないネットワークを広範囲にスキャンしないでください。スキャン結果から機器を推測しないでください。
+
+</Step>
+
+## レイヤー 4: HTTP/HTTPS と SSH
+
+<Step where="client" title="「ping は通るが Web は開けない」場合と、リンクの障害を切り分ける" expected="ポート、サービス、プロトコルのどれの問題か分かる。">
+
+```sh
+curl -v http://192.168.1.1/
+curl -k -v https://192.168.1.1/
+ssh root@192.168.1.1
+```
+
+- HTTP も HTTPS もタイムアウトする: uhttpd/LuCI が待ち受けていないか、ファイアウォールが遮断しています。
+- HTTP 404/リダイレクト: ポート、パス、HTTPS の設定を確認します。
+- SSH が通る: SSH 経由でサービスを調査します。LAN は変更しないでください。
+
+</Step>
+
+<Step where="router-shell" title="SSH が通る場合は uhttpd とポートを調べる" expected="LuCI が動作しているか、80/443 が待ち受けているかが分かる。">
+
+```sh
+netstat -lnp | grep -E ':80|:443|:22'
+ps w | grep -E 'uhttpd|rpcd' | grep -v grep
+logread -e uhttpd | tail -30
+uci show uhttpd
+```
+
+uhttpd が動作していない場合は、次を試します。
+
+```sh
+/etc/init.d/uhttpd restart
+```
+
+それでも失敗する場合は、ログとファイアウォールを確認します。ネットワーク全体を何度も再起動しないでください。
+
+</Step>
+
+<Step where="router-shell" title="ファイアウォールが管理を遮断していないか確認する" expected="LAN からルーターの 80/443/22 が誤って遮断されていない。">
+
+```sh
+uci show firewall
+logread | grep -i firewall | tail -20
+```
+
+ファイアウォールのゾーンを変更した直後であれば、バックアップを復元するか、コンソールから修正してください。コンソールなしで変更を重ねないでください。
+
+</Step>
+
+## レイヤー 5: ローカルコンソール / failsafe
+
+<Step where="console" title="コンソールからシステムが動作していることを確認する" expected="ログインプロンプトまたはカーネルログが表示される。">
+
+シリアル、HDMI/キーボード、IPMI、クラウドのコンソールを使います。シリアルは `115200 8N1` であることが多いですが、デバイスで確認してください。出力がない場合は、まずケーブル、ボーレート、電源を確認します。
+
+ログインできたら、次を実行します。
+
+```sh
+ip addr show
+ip route
+uci show network
+uci show dhcp
+logread | tail -50
+```
+
+</Step>
+
+<Step where="console" title="必要なときだけ failsafe を使う" expected="初期化せずに LAN/DHCP を復旧できる。">
+
+failsafe のボタン操作のタイミングはデバイスによって異なります。OpenWrt のデバイスページやベンダーのマニュアルに従ってください。入れたら、まず状態を確認します。
+
+```sh
+uci show network
+uci show dhcp
+```
+
+LAN アドレスだけが間違っている場合は、元に戻し、確認してから再起動します。不明な点がある場合は、先に設定を記録/バックアップしてください。`firstboot` は実行しないでください。初期化すると設定が消去されます。
+
+</Step>
+
+## 復旧の順序
+
+1. **何も変更しない**: ケーブル/LAN ポート/静的なクライアントアドレスを確認します。
+2. **ping は通るが Web は開けない**: uhttpd/ファイアウォール/HTTPS を確認します。
+3. **SSH が通る**: SSH 経由でサービスを調査します。LAN は変更しません。
+4. **SSH が通らない**: コンソール/failsafe を使います。
+5. **初期化は最後**: 重要な設定やバックアップがないことを確認し、WAN/LAN/Wi-Fi の再設定が必要になることを理解しておきます。
+
+## よくある誤診
+
+- WAN ポートを管理用に使っている。
+- クライアントが古いサブネットや静的 IP のままになっている。
+- LuCI は HTTP なのに、ブラウザーが HTTPS を強制している。
+- ping が通るので LuCI は正常だと思い込む。
+- DHCP やゲートウェイを更新せずに LAN アドレスを変更した。
+- ファイアウォールのルールが LAN からの管理を遮断している。
+- uhttpd がない/削除されているのに、ネットワークを何度も再起動している。
+
+## E2 検証の記録 (2026-10-20)
+
+- 環境: OpenWrt 25.12.6 x86 VM 200。LAN は `192.168.1.2`。HTTP は PVE ホストから確認。
+- `/etc/init.d/uhttpd stop`: `http://192.168.1.2/` への curl は `http=000` (接続失敗) を返し、SSH は引き続き利用できました。
+- `/etc/init.d/uhttpd start`: HTTP は `200` を返しました。
+- 未検証: ファイアウォールによる drop、uhttpd のポート変更、LuCI パッケージの欠落、実際のシリアル/failsafe のキー操作。
+- レシピ: `tests/recipes/troubleshooting-no-web-ui.md`。
+
+## E2 の状況と情報源
+
+- これは E2 の一部です。uhttpd の停止と復旧、SSH の維持は検証済みで、ファイアウォール、ポート、failsafe はドキュメントのみです。
+- 初期化で済ませず、リンク、アドレス、uhttpd、ファイアウォールのどれかを順に切り分けてください。
+- コンソール/failsafe の手順はデバイスやファームウェアによって異なります。先にデバイスのドキュメントを読んでください。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200、uhttpd の停止と復旧、HTTP 80 の確認、SSH は維持"
+  recipe="tests/recipes/troubleshooting-no-web-ui.md"
+  result="E2 の一部: uhttpd を停止すると HTTP 80 は拒否され SSH は利用可能のまま。start で HTTP 200 に復帰。ファイアウォール/ポート変更/failsafe は未検証"
+/>
+
+<PageSources />

@@ -1,0 +1,178 @@
+---
+title: "WireGuardクライアント: 設定、AllowedIPs、DNS、再接続"
+description: クライアントが持つのは自分の秘密鍵とサーバーの公開鍵だけです。AllowedIPsでトンネルのみ、LAN、全トラフィックのいずれかを選び、ハンドシェイク/ping/DNSを確認し、エンドポイントのルーティングループを避けます。
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'PVE netnsクライアント; wg0 10.10.0.2/24 → 192.168.1.2:51820; allowed-ips 10.10.0.0/24; ハンドシェイク/ping/HTTPは成功; Windows/スマートフォン/DNS/全トラフィックのトンネルは未テスト'
+testRecipe: 'tests/recipes/wireguard-client-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['wireguard クライアント', 'openwrt wireguard クライアント 設定', 'wireguard allowedips 設定', 'wireguard 接続できない', 'wireguard ハンドシェイク 失敗']
+symptoms: ['wireguardクライアントでハンドシェイクが成立しない', 'トンネル経由のpingが失敗する', 'AllowedIPsの設定方法', 'wireguardでDNSが動作しない']
+sources:
+  - label: WireGuard クイックスタート
+    url: https://www.wireguard.com/quickstart/
+  - label: WireGuard クライアント設定
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/client
+  - label: WireGuard のルーティングとAllowedIPs
+    url: https://www.wireguard.com/quickstart/#configure-the-peer
+  - label: OpenWrt ファイアウォール
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: 'd749ad7be74e1585'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE netnsクライアント" tested={true} evidence="E2" />
+
+## クライアントに必要なもの
+
+- 自分の秘密鍵（クライアントのみが持つ）
+- サーバーの公開鍵
+- サーバーのエンドポイント（IP/ドメイン名とUDPポート）
+- クライアントのトンネルアドレス
+- `AllowedIPs`: どの宛先をトンネル経由にするか
+- 任意でDNS、PersistentKeepalive
+
+サーバーの設定は021にあります。クライアントがサーバーの秘密鍵を必要とすることはありません。
+
+## Linux `wg-quick` の例
+
+```ini
+[Interface]
+PrivateKey = <client-private-key>
+Address = 10.10.0.2/24
+# DNS = 10.10.0.1
+
+[Peer]
+PublicKey = <server-public-key>
+Endpoint = 203.0.113.10:51820
+AllowedIPs = 10.10.0.0/24
+PersistentKeepalive = 25
+```
+
+実際の使い方:
+
+```sh
+sudo install -m 600 client.conf /etc/wireguard/wg0.conf
+sudo wg-quick up wg0
+sudo wg show
+```
+
+`Endpoint` にはパブリックアドレス/ドメイン名を使います。このテストではLANアドレスの `192.168.1.2:51820` を使いました。
+
+## ここで使った最小限の手動設定
+
+PVEのnetns内で、`ip` と `wg` でインターフェースを作成します。
+
+```sh
+ip link add wg0 type wireguard
+wg set wg0 private-key /tmp/wg-client.key \
+  peer <server-public-key> \
+  endpoint 192.168.1.2:51820 \
+  allowed-ips 10.10.0.0/24 \
+  persistent-keepalive 5
+ip addr add 10.10.0.2/24 dev wg0
+ip link set wg0 up
+```
+
+クライアント `192.168.1.251/24` はvethを介してテスト用LANに到達し、`wg0` は `10.10.0.0/24` のみを運びました。
+
+## AllowedIPsの選び方
+
+| 目的 | AllowedIPs | 併せて必要なもの |
+|---|---|---|
+| トンネルIPのみ | `10.10.0.0/24` | サーバーのピアがクライアントのトンネルIPを許可している |
+| サーバー側LAN | `10.10.0.0/24, 192.168.1.0/24` | サーバーでのフォワード/戻りルートまたはNAT、ファイアウォールのフォワード |
+| 全トラフィックのトンネル/自宅経由 | `0.0.0.0/0, ::/0` | サーバーのNAT/フォワード、DNS、キルスイッチとの競合の可能性 |
+| LAN内の1台のホスト | `10.10.0.0/24, 192.168.1.10/32` | 公開範囲を最小限にする。サーバー側のルートは必要 |
+
+`AllowedIPs` にEndpointのIPが含まれる場合（例: `0.0.0.0/0`）、`wg-quick` はEndpoint用の例外ルートを追加します。手動設定ではEndpointをトンネルの外に保つ必要があります。そうしないと、ハンドシェイクが `wg0` の中でループします。
+
+## 確認
+
+```sh
+wg show
+ip addr show wg0
+ip route
+ping -c 3 10.10.0.1
+curl -sSI --max-time 5 http://10.10.0.1/ | head -3
+```
+
+このテストの結果:
+
+- ハンドシェイクは3秒前
+- `transfer 124 B received, 180 B sent`
+- トンネル経由のpingは4/4
+- HTTP 200（サーバーのLuCI）
+
+## DNS
+
+- `DNS = 10.10.0.1` はクライアントの参照先をトンネルアドレスに向けるだけです。サーバー側で実際にDNSを待ち受け/転送している必要があります
+- `AllowedIPs=0.0.0.0/0` の場合、DNSリークやキルスイッチは別のレイヤーの問題です
+- このテストではDNSをトンネルに移していません。`nslookup` の結果は、DNSがトンネル経由であることの証明にはなりません
+
+## Windows / スマートフォン
+
+- インポート時に、`AllowedIPs`、Endpoint、DNSを確認する
+- スマートフォンではデフォルトで「常時接続/オンデマンドVPN」になっている場合があります。先に切断と再接続をテストしてください
+- チャットやスクリーンショットから秘密鍵をコピーしない
+- このテストではWindows/Android/iOSをテストしていません。「すべてのプラットフォームで検証済み」とは言えません
+
+## よくある失敗
+
+### ハンドシェイクが成立しない
+
+- サーバーの公開鍵とクライアントの秘密鍵が一致しない
+- エンドポイント/ポート/ファイアウォール
+- サーバー側ピアの `allowed_ips` にクライアントのトンネルIPが含まれていない
+- WireGuardでは時刻は関係しませんが、鍵は関係します
+
+### トンネルIPへのpingが失敗する
+
+- インターフェースにアドレスがない、またはdownしている
+- `allowed_ips` に `10.10.0.0/24` が含まれていない
+- サーバーのファイアウォールゾーン
+- エンドポイントへの経路が誤ってトンネルに送られている
+
+### トンネルにはpingが通るが、LANに到達できない
+
+- `AllowedIPs` にLANのプレフィックスが含まれていない
+- サーバーにフォワード/戻りルート/NATがない
+- サーバーのファイアウォールのフォワード
+- トンネルの疎通とLANの疎通を同一視しない
+
+### DNSが動作しない
+
+- クライアントにDNSが設定されていない
+- サーバーのDNSがトンネルアドレスで待ち受けていない
+- 全トラフィックのトンネルのルート/DNSリーク
+- 設定を変更する前に、IP、名前、DNSサーバーを別々にテストする
+
+## E2テスト結果 (2026-10-20)
+
+- 環境: PVE netnsクライアント `192.168.1.251/24`、`wg0 10.10.0.2/24`、エンドポイント `192.168.1.2:51820`、AllowedIPs `10.10.0.0/24`
+- サーバー `wg0 10.10.0.1/24`。クライアントのハンドシェイクは成功。転送量は1.47 KiB/1.90 KiB（サーバー側の表示）
+- クライアントから `10.10.0.1` へのpingは4/4。HTTP 200
+- 未テスト: Windows/スマートフォン、トンネル経由のDNS、`0.0.0.0/0` の全トラフィック、実際のパブリックエンドポイント、ローミング/再接続
+- レシピ: `tests/recipes/wireguard-client-25.12.md`
+
+## 出典とレビュー
+
+- 本ページはE2の一部です。Linux netnsクライアントとLAN側のトンネルをテストしました。モバイル/DNS/全トラフィックのトンネル/パブリックWANはテストしていません。
+- 秘密鍵はクライアントに置き、サーバーには公開鍵だけを渡します。
+- 独立したレビュアーはいません。結論はこのVM/netns環境に限られます。
+
+<TestRecord
+  status="partial"
+  environment="PVE netnsクライアント; wg0 10.10.0.2/24 → 192.168.1.2:51820; allowed-ips 10.10.0.0/24; ハンドシェイク/ping/HTTPは成功; Windows/スマートフォン/DNS/全トラフィックのトンネルは未テスト"
+  recipe="tests/recipes/wireguard-client-25.12.md"
+  result="E2 partial: クライアント10.10.0.2/24がサーバー10.10.0.1/24とハンドシェイクに成功。トンネル経由のpingは4/4、HTTP 200。Windows/スマートフォン、トンネル経由のDNS、全トラフィックのルーティング、実際のローミングは未テスト"
+  date="2026-10-20"
+/>
+
+<PageSources />

@@ -1,0 +1,192 @@
+---
+title: "LuCI への初回ログイン: アドレス、パスワード、中国語 UI"
+description: OpenWrt の管理アドレスを確認し、root パスワードを設定し、中国語の言語パックをインストールします。復旧手段も確保しておきます。
+pageType: overview
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86_64 VM 200、LuCI 26.288。公式イメージ。ベンダー製ファームウェアは未検証'
+lastVerifiedAt: '2026-10-20'
+testRecipe: 'tests/recipes/luci-first-login.md'
+aliases: ['openwrt login', 'openwrt ログイン', 'luci 初期パスワード', 'openwrt 初期パスワード', '192.168.1.1', 'openwrt 管理画面 入れない', 'openwrt 日本語化', 'openwrt chinese ui']
+symptoms: ['LuCI を開けない', '初期パスワードでログインできない', 'LuCI が英語表示']
+sources:
+  - label: OpenWrt LuCI ドキュメント
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt 初回ログイン
+    url: https://openwrt.org/docs/guide-quick-start/start
+  - label: LuCI 中国語言語パック
+    url: https://openwrt.org/packages/pkgdata/luci-i18n-base-zh-cn
+  - label: OpenWrt apk パッケージマネージャー
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+sourceHash: '43b9a180741d42b5'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import luciPassword from '@assets/screenshots/luci/first-login-password.webp';
+import luciLanguage from '@assets/screenshots/luci/language-zh.webp';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="初期状態の公式イメージ" tested={true} evidence="E2" />
+
+## 到達点
+
+- WAN ポートではなく、OpenWrt の LAN 側の管理アドレスを確認できます。
+- 初めて LuCI に入り、自分で管理する root パスワードを設定できます。
+- 簡体字中国語の UI をインストールして切り替えられます。
+- LuCI に接続できないときは、むやみに初期化せず、LAN やコンソールから復旧できます。
+
+## 対象の環境と初期値
+
+- `apk` を使う OpenWrt 25.12.6 の公式イメージ。LAN の初期値は通常 `192.168.1.1/24` です。
+- 初期状態の公式イメージには、**通常 root パスワードが設定されていません**。LuCI が設定を求めます。SSH と LuCI は同じ root パスワードを使います。
+- ベンダー製/コミュニティ製のファームウェア (ImmortalWrt、iStoreOS、ベンダーのビルド) は、アドレスもパスワードもまったく異なる場合があります。先にラベルやマニュアルを確認してください。
+- このページは E1 です。初期値、パッケージ名、復旧手順は公式ドキュメントに基づいています。お使いのデバイスで確認してください。
+
+## 接続して管理アドレスを確認する
+
+<Step where="client" title="WAN ではなく LAN ポートを使う" expected="クライアントが 192.168.1.x のアドレスを取得し、ゲートウェイが OpenWrt になっている。">
+
+パソコンを **LAN** と表示されたポートに接続します。WAN ポートでは通常、管理 UI は提供されません。DHCP を使い、デフォルトゲートウェイを確認します。
+
+Linux:
+
+```sh
+ip route
+```
+
+Windows:
+
+```powershell
+ipconfig
+```
+
+macOS:
+
+```sh
+netstat -rn
+```
+
+DHCP でアドレスを取得できない場合は、ログインするためだけに、一時的に静的アドレス `192.168.1.2/24`、ゲートウェイ `192.168.1.1` を設定します。
+
+</Step>
+
+<Step where="client" title="LuCI を開く" expected="LuCI のログイン画面または初回設定画面が表示される。">
+
+次のアドレスを開きます。
+
+```text
+http://192.168.1.1/
+```
+
+LuCI の初期設定は HTTPS ではなく HTTP のポート 80 です。ブラウザーが HTTPS を強制して接続できない場合は、`http://` を明示して入力してください。実際のゲートウェイのアドレスを使ってください。常に `192.168.1.1` とは限りません。
+
+</Step>
+
+## 最初のパスワードを設定する
+
+<Figure src={luciPassword} alt="パスワード未設定の警告と、パスワード/確認の入力欄がある LuCI のルーター パスワード画面" caption="初回ログイン時の LuCI のパスワード画面。すでにパスワードが設定されている場合はログインしてください。ここに例のパスワードを入力しないでください。" />
+
+<Step where="luci" title="root パスワードを設定する" expected="同じパスワードで LuCI と SSH にログインできる。">
+
+初期状態の公式イメージでは、通常、初回ログイン時にパスワードの設定を求められます。求められない場合は、**システム → 管理** を開きます。先に SSH で設定することもできます。
+
+```sh
+ssh root@192.168.1.1
+passwd
+```
+
+他と重複しない長いパスワードを使ってください。`admin`、`password`、モデル名、誕生日は使わないでください。LuCI と SSH は root パスワードを共有します。
+
+</Step>
+
+<Step where="client" title="ログインを確認する" expected="LuCI からログアウトし、新しいパスワードで再ログインできる。">
+
+LuCI からログアウトして、もう一度ログインします。続いて、SSH でも同じパスワードが通ることを確認します。アドレスとパスワードは、記事やリポジトリではなく、パスワードマネージャーに保管してください。
+
+</Step>
+
+## 中国語に切り替える
+
+<Figure src={luciLanguage} alt="言語とスタイルのタブで簡体字中国語を選択した LuCI のシステム設定" caption="言語パックをインストールしたら、言語とスタイルで簡体字中国語を選択します。一時的な OpenWrt 25.12.6 の検証用 VM で取得しました。" />
+
+<Step where="luci" title="インストール済みの言語を確認する" expected="簡体字中国語が一覧にある、またはインストールが必要だと分かる。">
+
+**システム → システム → 言語とスタイル** を開き、言語の一覧を確認します。LuCI には、インストール済みの言語パックだけが表示されます。
+
+</Step>
+
+<Step where="router-shell" title="簡体字中国語パックをインストールする" expected="更新後、簡体字中国語を選択できる。">
+
+OpenWrt 25.12 (apk):
+
+```sh
+apk update
+apk add luci-i18n-base-zh-cn
+```
+
+OpenWrt 24.10 (opkg):
+
+```sh
+opkg update
+opkg install luci-i18n-base-zh-cn
+```
+
+パッケージ名は `luci-i18n-base-zh-cn` です。ブラウザーを再読み込みして **システム → システム → 言語とスタイル** に戻り、简体中文を選択して、保存して適用します。
+
+</Step>
+
+<Step where="client" title="設定が維持されることを確認する" expected="新しくログインしても UI が中国語のまま。">
+
+ログアウトして、もう一度ログインします。英語に戻る場合は、言語の設定が保存されたか、別のタブが古い UI をキャッシュしていないかを確認してください。
+
+</Step>
+
+## LuCI に接続できない場合
+
+### 192.168.1.1 を開けない
+
+- WAN ではなく LAN ポートに接続していることを確認します。
+- クライアントの IP とゲートウェイが同じサブネットにあることを確認します。
+- `ping 192.168.1.1` を実行します。
+- デバイスが別の LAN アドレスを使っている可能性があります。ベンダー製ファームウェアや、LAN を変更した場合は特に注意してください。
+- ブラウザーが HTTPS を強制している可能性があります。`http://` を使うか、プライベートウィンドウを使ってください。
+
+### パスワードが通らない
+
+- 初期状態の公式イメージには通常、初期パスワードがなく、設定を求められます。
+- ベンダー製ファームウェアではラベルにパスワードが記載されている場合があります。何度も推測で入力しないでください。
+- 忘れた場合は、LAN とコンソール/SSH から復旧します。コンソールがない場合は、デバイスの failsafe の手順を使ってください。先に初期化しないでください。
+- 初期化すると設定が消えます。重要な設定やバックアップがないか確認してください。
+
+### 中国語が一覧にない
+
+- パッケージを確認します: `apk info -e luci-i18n-base-zh-cn` (24.10 では `opkg list-installed`)。
+- 言語パックは LuCI のバージョンと合っている必要があります。
+- ページを再読み込みするか、関連する Web サービスを再起動します。ネットワーク全体は再起動しないでください。
+
+### パスワードを設定しても SSH に接続できない
+
+- SSH はポート 22 で、root でログインします。
+- LAN のアドレスを変更していないか確認します。
+- **システム → 管理** で SSH アクセスを確認します。
+- `logread` で dropbear のエラーを確認します。ログインを連打しないでください。
+
+## E2 の状況と情報源
+
+- 基本的な流れは、公式の OpenWrt 25.12.6 x86_64 イメージで E2 です。初回ログイン、パスワード設定、`luci-i18n-base-zh-cn` のインストール、中国語 UI、SSH ログインを確認しました。
+- ベンダー製/コミュニティ製のファームウェアでは異なる場合があります。failsafe、初期化、ベンダーによる制限は E1 のままです。公式の初期値を一般化しないでください。
+- スクリーンショットは一時的な VM 200 のものです。所要時間やネットワークの値は環境によって異なります。レシピ: `tests/recipes/luci-first-login.md`。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86_64 VM 200、LuCI 26.288。公式イメージ。ベンダー製ファームウェアは未検証"
+  recipe="tests/recipes/luci-first-login.md"
+  result="E2: 公式イメージで確認。初回のパスワード設定画面を確認。中国語パックをインストールして選択。SSH は同じパスワードで接続できた。ベンダー製ファームウェアと failsafe は未検証"
+  date="2026-10-20"
+/>
+
+<PageSources />

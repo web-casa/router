@@ -1,0 +1,199 @@
+---
+title: "OpenClashの基本：互換性、DNSの競合、きれいな無効化"
+description: 適法な環境でOpenClashのファームウェア/アーキテクチャ/パッケージの互換性を確認し、DNSの競合を解消して、無効化後も基本的な接続を復旧できる状態を保ちます。
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; luci-app-openclash 0.48.002 apkのインストール/起動/停止; プロキシのエンドポイント/サブスクリプションなし'
+testRecipe: 'tests/recipes/openclash-25.12.md'
+aliases: ['openclash install', 'openclash compatibility', 'openclash dns', 'openclash インストール', 'openclash dns 競合', 'openclash 繋がらない', 'openwrt openclash 設定', 'openclash 無効化']
+symptoms: ['OpenClashがインストールできない', 'OpenClashを有効にしたらインターネットに繋がらない', 'DNSの競合']
+sources:
+  - label: OpenClashプロジェクト
+    url: https://github.com/vernesong/OpenClash
+  - label: OpenWrtのパッケージ形式
+    url: https://openwrt.org/docs/guide-user/additional-software/package-format
+  - label: OpenWrt DHCPとDNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: Mihomoコア
+    url: https://github.com/MetaCubeX/mihomo
+sourceHash: '1fba7eb75b5f204d'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
+
+> **対象範囲**：このページでは、適法な環境での互換性、DNSの競合、起動/停止、復旧を扱います。プロキシサーバー、サブスクリプションのリンク、ルールセット、ネットワーク制限やサービス/地域の制限を回避する手順は提供しません。利用前に、現地の法律、ISPの規約、アクセス先サービスの規約を確認してください。
+
+## 達成できること
+
+- お使いのファームウェア/アーキテクチャ/パッケージ形式が、OpenClashのリリースと合うか判断します。
+- ポート53で、dnsmasqやAdGuard Homeと競合しないか確認します。
+- LuCIの画面だけを信用せず、プロセス/ログ/ポートの状態を確認します。
+- 無効化した後に、DNSと基本的な接続を復旧します。
+- このページが意図的に扱わない内容を把握します。
+
+## 対象環境と前提
+
+- OpenWrt 25.12.6（`apk`）または24.10（`opkg`）。x86/ARMはリリースのパッケージと一致している必要があります。
+- OpenClashはサードパーティのLuCIアプリで、通常は対応するMihomo/Metaコアが必要です。フロントエンド、コア、ファームウェアに互換性が必要です。
+- 25.12の `apk` と24.10の `ipk` は別の形式です。`.ipk` を `.apk` にリネームしたり、別のアーキテクチャのパッケージを強制インストールしたりしないでください。
+- ベンダーのファームウェア/ImmortalWrt/iStoreOSでは、先に入手元とパッケージマネージャーを特定してください（ファームウェアの識別ページを参照）。
+
+## インストール前の確認
+
+<Step where="router-shell" title="ファームウェア、アーキテクチャ、空き容量を確認する" expected="パッケージ形式、CPUアーキテクチャ、利用可能な容量が分かります。">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+uname -m
+command -v apk
+command -v opkg
+df -h /
+free -h
+```
+
+`release.target`、`DISTRIB_ARCH`、パッケージマネージャー、空き容量を記録します。OpenClashにコアとルールデータを加えると数十MBになることがあります。rootfsがいっぱいの状態で無理に入れないでください。
+
+</Step>
+
+<Step where="router-shell" title="一致するリリースパッケージを探す" expected="お使いのファームウェアとアーキテクチャに合ったapk/ipkが見つかります。">
+
+OpenClashの公式リリースページのみを使い、次を確認します。
+
+- ファームウェアのメジャーバージョン（25.12 / 24.10）
+- パッケージ形式（apk / ipk）
+- CPUアーキテクチャ（x86_64、aarch64など）
+- 依存関係（カーネルモジュール、bash/curlなど。リリースノートに従う）
+- リリースページのSHA-256/チェックサム
+
+一致するパッケージがない場合は、そこで止めてください。「汎用」パッケージや他人のビルドを無理に使わないでください。
+
+</Step>
+
+<Step where="router-shell" title="DNS/ポートのベースラインを記録する" expected="誰が53番を使っているか、復元が何を指すかが分かります。">
+
+```sh
+netstat -lnp | grep -E ':53|:5353|:7874|:9090'
+cat /tmp/resolv.conf.d/resolv.conf.auto
+nslookup openwrt.org 127.0.0.1
+```
+
+AdGuard Homeが53番を使い、dnsmasqが5353番にある場合、OpenClashが同時に53番を使ってはいけません。起動する前に、誰がDNSを担当するか決めてください。
+
+</Step>
+
+## 最小限のセットアップ（プロキシのエンドポイントなし）
+
+<Step where="luci" title="DNSを乗っ取らせず、まずフロントエンドとコアを起動する" expected="サービスが起動し、LuCIに状態が表示されます。">
+
+**サービス → OpenClash** で次を行います。
+
+1. アーキテクチャに合ったコアを選択します。
+2. DNSの乗っ取り/ハイジャックは、今は無効のままにします。
+3. 保存して起動します。
+4. ログページを開き、「コアの不一致 / ポートが使用中 / 依存関係の不足」がないことを確認します。
+
+このページでは、プロキシサーバー、サブスクリプション、ルールは提供しません。適法な設定がない場合は、ここで止めてください。「とりあえず動かす」ために、出所不明のサブスクリプションを貼り付けないでください。
+
+</Step>
+
+<Step where="router-shell" title="プロセス、ポート、ログを確認する" expected="OpenClash/コアが、ポート53の競合なしで動作しています。">
+
+```sh
+ps w | grep -Ei 'openclash|mihomo|clash' | grep -v grep
+netstat -lnp | grep -E ':7874|:9090|:53'
+logread | grep -i openclash | tail -30
+```
+
+ポートは設定によって異なりますが、重要なルールは**2つのプロセスに53番をバインドさせない**ことです。ログにDNSのバインド失敗が出た場合は、再起動を繰り返さず、OpenClashを無効にしてください。
+
+</Step>
+
+## 無効化と復旧
+
+<Step where="router-shell" title="無効化して基本的な接続を確認する" expected="OpenClashなしで名前解決とインターネット接続が機能します。">
+
+```sh
+/etc/init.d/openclash stop
+/etc/init.d/openclash disable
+uci show openclash
+/etc/init.d/dnsmasq restart
+nslookup openwrt.org 127.0.0.1
+```
+
+以前にdnsmasqのポートやDHCPオプション6を変更した場合は、DNS/AGHのページに従って元に戻してください。クライアントが、停止したOpenClashのDNSを参照していないことを確認します。
+
+</Step>
+
+## 失敗時の分岐と復旧
+
+### OpenClashを有効にしたらインターネットに繋がらない
+
+1. LAN/コンソール経由でデバイスにアクセスします。
+2. OpenClashを停止します。
+3. dnsmasqのポート53とDHCPのDNSを元に戻します。
+4. ファイアウォール/DNSハイジャックのルールが残っていないか確認します。
+5. 必要なら再起動します。それ以上デバッグする前に、基本的な接続を復旧してください。
+
+### LuCIにアクセスできない
+
+「再起動」を何度もクリックしないでください。SSH/コンソールでサービスを停止します。
+
+```sh
+/etc/init.d/openclash stop
+/etc/init.d/openclash disable
+logread | tail -50
+```
+
+ファイアウォールのルールが管理アクセスを遮断している場合は、コンソールから復旧してください。やみくもに初期化しないでください。
+
+### パッケージ形式/アーキテクチャの不一致
+
+- 25.12はapk、24.10はipkを使い、互換性はありません。
+- x86_64とaarch64のパッケージも互換性がありません。
+- フロントエンドとコアのバージョンが合わない場合は、リリースページに記載された組み合わせに戻します。
+- インストールのためだけに、署名/検証のチェックをすべて無効にしないでください。
+
+### DNSの競合/ループ
+
+- メインのDNS入口で53番を使うのは、1つだけにします。
+- AdGuard Home、dnsmasq、OpenClashのDNSが、互いを参照してループしてはいけません。
+- OpenClashを停止し、dnsmasq/AGHを元に戻してから、コンポーネントを1つずつ戻します。
+- `127.0.0.1`、LANアドレス、アップストリームを、それぞれ `nslookup` でテストします。
+
+## コンプライアンスとバージョンの境界
+
+- 許可されたネットワークとサービス規約の下でのみ使用してください。このページは、回避手段、地域/アクセス制御の回避、アカウント/サブスクリプションの共有に関する内容を提供しません。
+- OpenClash/Mihomoはサードパーティのプロジェクトで、バージョンや依存関係の変化が速いです。リリースノートを読み、ロールバック用のパッケージを保管してください。
+- これは法的助言ではありません。導入前にコンプライアンスの問題を解決してください。
+
+## E2ラボ実行（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200、公式の `luci-app-openclash 0.48.002` `.apk`。
+- `apk add --allow-untrusted` で43パッケージ（`luci-compat`、Ruby、unzipを含む）がインストールされ、`/etc/init.d/openclash` とLuCIコントローラーが存在しました。
+- プロキシの設定/エンドポイントがない状態で、`start` は `inactive` と報告しました。このページは「プロキシが動作する」とは主張しません。
+- `stop` + `disable` の後、`nslookup openwrt.org 127.0.0.1` は接続拒否を返しました。`/etc/init.d/dnsmasq restart` でDNSが復旧し、公開IPへのpingも通りました。
+- 未テスト：実際のプロキシのエンドポイント/サブスクリプション、ルーティング/DNSのヒット、Mihomoコア、TUN/ファイアウォールルール、性能/安定性。
+- レシピ：`tests/recipes/openclash-25.12.md`。
+
+## E2の状況と情報源
+
+- このページはE2（一部）です。25.12の `.apk` のインストール、設定なしでの起動、無効化、DNSの復旧をテストしました。実際のプロキシ/ルーティングはE1/E3です。
+- 適法なエンドポイント/設定がない状態で、「インストールできた」を「プロキシが動作する」にすり替えないでください。
+- このページを、プロキシのサブスクリプション/回避のチュートリアルに拡張しないでください。対象外です。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; luci-app-openclash 0.48.002 apkのインストール/起動/停止; プロキシのエンドポイント/サブスクリプションなし"
+  recipe="tests/recipes/openclash-25.12.md"
+  result="E2（一部）：0.48.002のapkをインストール（luci-compat/rubyを含む43パッケージ）。設定なしの起動はinactive。stop/disable後、dnsmasqを再起動するまでDNSは拒否された。プロキシのエンドポイントやルーティングのテストなし"
+/>
+
+<PageSources />

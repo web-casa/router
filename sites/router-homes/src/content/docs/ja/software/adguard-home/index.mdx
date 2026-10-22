@@ -1,0 +1,306 @@
+---
+title: "AdGuard Home: Web UI からクライアントのフィルタリングまで"
+description: dnsmasq を 5353 に移し、AdGuard Home にポート 53 を任せます。そのうえで、OpenWrt 上の DHCP クライアント、フィルタリング、再起動後の復旧を確認します。
+pageType: app
+tested: true
+testedVersions: ['25.12.6', '0.107.79']
+evidenceLevel: E2
+testEnvironment: 'PVE 9.2.2 シングル NIC、OpenWrt 25.12.6 VM 201、AGH 0.107.79、vmbr2 192.168.2.0/24'
+testRecipe: 'tests/recipes/agh-25.12-vm201.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['adguard home openwrt', 'openwrt adguardhome', 'install adguardhome', 'openwrt adguard home 設定', 'openwrt adguard home インストール', 'openwrt 広告ブロック', 'openwrt dns フィルタリング', 'openwrt dnsmasq 5353']
+symptoms: ['フィルタリングが効かない', 'DNS のポートが競合する', 'クライアントが新しい DNS を使わない']
+sources:
+  - label: OpenWrt adguardhome パッケージ
+    url: https://openwrt.org/packages/pkgdata/adguardhome
+  - label: AdGuard Home ドキュメント
+    url: https://adguard.com/kb/adguard-home/overview/
+  - label: OpenWrt dnsmasq と DHCP
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt fstab / block-mount
+    url: https://openwrt.org/docs/guide-user/storage/fstab
+sourceHash: 'e15c635d6e7fe3ec'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import aghSetup from '@assets/screenshots/agh/setup-welcome.webp';
+import aghDashboard from '@assets/screenshots/agh/dashboard.webp';
+import aghFilters from '@assets/screenshots/agh/filters.webp';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import TopologyTable from '@components/TopologyTable.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 201 / 1GB" tested={true} evidence="E2" />
+
+## 到達点
+
+- AdGuard Home が OpenWrt のポート `53` を使い、Web UI は `3000` で動作します。
+- `dnsmasq` は `5353` に移り、引き続き DHCP を提供します。
+- DHCP クライアントは DNS として `192.168.2.1` を受け取ります。
+- カスタムフィルタールールでテスト用ドメインがブロックされ、通常の名前は引き続き解決できます。
+- データディスク、AGH の設定、フィルターは再起動後も維持されます。
+
+## 対象の環境とトポロジー
+
+- PVE 9.2.2 シングル NIC、OpenWrt 25.12.6 x86_64 VM 201 (RAM 1GB、データディスク 2GB)。
+- WAN の `net0` は `vmbr0` (DHCP)、LAN の `net1` は分離された `vmbr2` (`192.168.2.0/24`)。
+- AGH 0.107.79 は OpenWrt の `apk` フィードから取得。
+- **2 台の OpenWrt VM が、どちらも DHCP を動かしたまま 1 つのブリッジを共有しないでください**。この検証環境では VM 200 が `vmbr1` (192.168.1.0/24) にあるため、VM 201 は `vmbr2` (192.168.2.0/24) を使う必要があります。そうしないと、クライアントが誤ったサブネットのリースを受け取ることがあります。
+
+<TopologyTable rows={[
+  { physical: 'nic0', bridge: 'vmbr0', vnic: 'net0', iface: 'wan DHCP', role: 'upstream 192.168.50.1' },
+  { physical: '—', bridge: 'vmbr2', vnic: 'net1', iface: 'lan 192.168.2.1', role: 'AGH + DHCP clients' },
+]} />
+
+## ポートと役割
+
+| ポート | コンポーネント | 役割 |
+|---|---|---|
+| 53 | AdGuard Home | クライアントの DNS、フィルタリング、上流への転送 |
+| 3000 | AdGuard Home | Web UI |
+| 5353 | dnsmasq | DHCP とローカル DNS。53 では待ち受けない |
+
+AGH と dnsmasq を同時に 53 にバインドしないでください。DHCP のオプション 6 を、53 で待ち受けていないアドレスに向けないでください。
+
+## 変更する前に
+
+<Step where="router-shell" title="設定をバックアップし、データディスクを準備する" expected="dnsmasq/AGH の設定を復元できる。">
+
+```sh
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+cp /etc/config/adguardhome /etc/config/adguardhome.bak.$(date +%F) 2>/dev/null || true
+cat /etc/config/dhcp
+```
+
+OpenWrt へのコンソールまたは LAN からのアクセスを確保しておいてください。唯一の管理経路を、変更中の DNS に依存させないでください。
+
+</Step>
+
+## 最小限の手順
+
+<Figure src={aghSetup} alt="Get Started と Step 1/5 が表示された AdGuard Home の初回起動ウェルカムページ" caption="AGH 0.107.79 の初回起動時のウェルカムページ。Get Started をクリックするとセットアップウィザードが開きます。一時的な検証環境で取得したため、言語は中国語が選択されています。" />
+
+<Step where="router-shell" title="AGH、データディスク用ツール、fstab のサポートをインストールする" expected="adguardhome、block-mount、e2fsprogs がインストールされる。">
+
+```sh
+apk update
+apk add adguardhome block-mount e2fsprogs
+```
+
+`e2fsprogs` は `mkfs.ext4` を、`block-mount` は `fstab` サービスを提供します。OpenWrt のローカルミラーを使っても構いませんが、パッケージは署名の検証を通る必要があります。
+
+</Step>
+
+<Step where="router-shell" title="データディスクをフォーマットして永続化する" expected="/opt/agh が別のディスク上にあり、再起動後も維持される。">
+
+空であることを確認した検証用のデータディスクでのみ実行してください。
+
+```sh
+mkfs.ext4 -F /dev/sdb
+mkdir -p /opt/agh
+mount /dev/sdb /opt/agh
+block info /dev/sdb
+```
+
+`block info` が表示した UUID を使います。LuCI の Mount Points で、そのディスクのターゲットを `/opt/agh` に設定して有効にします。または CLI から、該当する `@mount[n]` を探します。
+
+```sh
+uci show fstab
+# find the @mount[n] whose uuid is <your-UUID>
+uci set fstab.@mount[n].target='/opt/agh'
+uci set fstab.@mount[n].enabled='1'
+uci commit fstab
+/etc/init.d/fstab enable
+block mount
+mount | grep /opt/agh
+```
+
+この検証環境では、2GB のデータディスクに対して自動検出された `fstab.@mount[2]` を使い、ターゲットを `/opt/agh` に変更して有効にしたところ動作しました。`[2]` をそのままコピーせず、自分の UUID に対応するものを選んでください。
+
+</Step>
+
+<Step where="router-shell" title="dnsmasq を 5353 に移す" expected="ポート 53 が空き、DHCP は引き続き動作する。">
+
+```sh
+uci set dhcp.@dnsmasq[0].port='5353'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+netstat -lnp | grep -E ':53|:5353'
+```
+
+AGH が起動するまで、クライアントは 53 で名前解決できません。
+
+</Step>
+
+<Step where="router-shell" title="AGH を起動して初回セットアップを完了する" expected="Web UI に 3000 で接続できる。">
+
+```sh
+uci set adguardhome.config.work_dir='/opt/agh/work'
+uci commit adguardhome
+mkdir -p /opt/agh/work
+chown -R adguardhome:adguardhome /opt/agh /etc/adguardhome
+/etc/init.d/adguardhome enable
+/etc/init.d/adguardhome start
+sleep 3
+netstat -lnp | grep -E ':3000|:53'
+```
+
+`http://192.168.2.1:3000/` を開き、次を設定します。
+
+- Web ポートは `3000`
+- DNS ポートは `53`
+- 管理者のユーザー名とパスワード
+- この検証環境では、上流 DNS に `192.168.50.1`
+- 上流が DNSSEC を検証しない場合は、DNSSEC を無効にする
+
+ブラウザーが使えない場合は AGH のセットアップ API を使えますが、管理者パスワードは絶対にコミットしないでください。
+
+</Step>
+
+<Step where="router-shell" title="DHCP で AGH を通知する" expected="クライアントが DNS として 192.168.2.1 を受け取る。">
+
+```sh
+uci add_list dhcp.lan.dhcp_option='6,192.168.2.1'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+uci show dhcp.lan | grep dhcp_option
+```
+
+dnsmasq のポートを変更しただけだと、一部のクライアントが DNS を受け取れなくなることがあります。オプション 6 を明示的に設定してください。
+
+</Step>
+
+<Step where="luci" title="確実に動作するフィルタールールを追加する" expected="blocked.example が 0.0.0.0 を返し、通常の名前は引き続き解決できる。">
+
+**Filters → Custom filtering rules** に次を追加します。
+
+```text
+||blocked.example^
+```
+
+これは予約済みのテスト用ドメインです。実際に使うときは、メンテナンスされているフィルターリストをあとから追加してください。確認には、「ページが壊れて見えるか」ではなく `nslookup` を使います。
+
+</Step>
+
+## 動作確認
+
+<Figure src={aghDashboard} alt="DNS クエリとフィルタリングの統計が表示された AdGuard Home のダッシュボード" caption="セットアップ後のダッシュボード。設定直後にクエリが 0 件なのは正常です。まず DNS ポートと上流を確認してください。" />
+
+<Step where="router-shell" title="ポートとローカルでの名前解決を確認する" expected="AGH が 53/3000、dnsmasq が 5353 で待ち受けている。">
+
+```sh
+netstat -lnp | grep -E ':53|:3000|:5353'
+nslookup blocked.example 192.168.2.1
+nslookup openwrt.org 192.168.2.1
+```
+
+期待される結果: `blocked.example` は `0.0.0.0` を返します (IPv6 では `::` も表示される場合があります)。`openwrt.org` は実際のアドレスを返します。
+
+</Step>
+
+<Step where="client" title="DHCP クライアントから確認する" expected="クライアントが 192.168.2.x のアドレスと、DNS 192.168.2.1 を取得している。">
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+nslookup blocked.example
+nslookup openwrt.org
+```
+
+クライアントの DNS が `192.168.2.1` でない場合は、DHCP のオプション 6 と dnsmasq のポートに戻って確認してください。
+
+</Step>
+
+<Step where="router-shell" title="再起動後にもう一度確認する" expected="データディスクがマウントされ、AGH が起動し、ルールが維持されている。">
+
+```sh
+reboot
+```
+
+再起動後:
+
+```sh
+mount | grep /opt/agh
+netstat -lnp | grep -E ':53|:3000'
+nslookup blocked.example 192.168.2.1
+nslookup openwrt.org 192.168.2.1
+```
+
+</Step>
+
+## 失敗した場合の分岐と復旧
+
+### AGH が起動しない / ポート 53 が使用中
+
+```sh
+logread | grep -i adguard | tail -50
+netstat -lnp | grep ':53'
+/usr/bin/AdGuardHome --check-config -c /etc/adguardhome/adguardhome.yaml
+```
+
+dnsmasq がまだ 53 を使っている場合は、`dhcp.@dnsmasq[0].port='5353'` になっているか確認します。設定が壊れている場合は、バックアップを復元します。
+
+```sh
+cp /etc/adguardhome/adguardhome.bak.YYYY-MM-DD /etc/adguardhome/adguardhome.yaml
+/etc/init.d/adguardhome restart
+```
+
+### クライアントがまったく名前解決できない
+
+DNS を一時的に dnsmasq に戻します。
+
+```sh
+uci set dhcp.@dnsmasq[0].port='53'
+uci -q delete dhcp.lan.dhcp_option
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+/etc/init.d/adguardhome stop
+```
+
+まず基本的な名前解決を復旧させ、そのあとで AGH を 1 層ずつ調べます。
+
+### データディスクがマウントされていない
+
+```sh
+mount | grep /opt/agh
+block info /dev/sdb
+logread | grep -i fstab
+```
+
+fstab の UUID、ターゲット、有効フラグを確認します。手動でマウントしてから AGH を再起動してください。
+
+### フィルタリングが効かない
+
+<Figure src={aghFilters} alt="既定のブロックリストが表示された AdGuard Home のフィルターページ" caption="フィルターページには有効なブロックリストが表示されます。この画面は、サードパーティの購読がない既定の状態のみです。テストルールは別に追加してください。" />
+
+- クライアントが実際に AGH を DNS として使っていることを確認します。
+- ルールが購読ではなく **Custom filtering rules** にあることを確認します。
+- AGH に直接問い合わせます: `nslookup blocked.example 192.168.2.1`。
+- ブラウザーや OS の DoH は AGH を迂回することがあります。
+
+## E2 の検証記録 (2026-10-20)
+
+- 環境: PVE 9.2.2 シングル NIC、OpenWrt 25.12.6 VM 201 (1GB/データディスク 2GB)、AGH 0.107.79。
+- ポート: AGH は `53` + Web `3000`、dnsmasq は `5353`、DHCP のオプション 6 は `192.168.2.1`。
+- クライアント: DHCP で `192.168.2.166/24`、DNS は `192.168.2.1`。`blocked.example` → `0.0.0.0`、`openwrt.org` → `64.226.122.113`。
+- 再起動: `/opt/agh` が fstab でマウントされ、AGH、dnsmasq、フィルタールールが復旧。Web は 302 を返しました。
+- 未検証: ブラウザーの UI の実操作、外部の購読リスト、物理 LAN のクライアント、IPv6、長期の安定性。
+
+## 情報源とレビュー
+
+- これは E2 の検証記録です。独立したレビューや、物理 LAN でのテストは行っていません。
+- レシピ: `tests/recipes/agh-25.12-vm201.md`、環境メモ: `docs/agh-e2-run.md`。
+- パッケージやバージョンが変わったら `testedVersions` を更新してください。init スクリプトをファームウェアのバージョン間でコピーしないでください。
+
+<TestRecord
+  status="partial"
+  environment="PVE 9.2.2 シングル NIC、OpenWrt 25.12.6 VM 201、AGH 0.107.79、vmbr2 192.168.2.0/24"
+  recipe="tests/recipes/agh-25.12-vm201.md"
+  result="AGH 53 + Web 3000、dnsmasq 5353、DHCP オプション 6 → 192.168.2.1。クライアントで blocked.example=0.0.0.0、openwrt.org は解決可能。fstab/ルール/サービスは再起動後も維持"
+  date="2026-10-20"
+/>
+
+<PageSources />

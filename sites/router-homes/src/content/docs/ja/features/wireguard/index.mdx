@@ -1,0 +1,53 @@
+---
+title: "OpenWrtのWireGuard: ネットワークインターフェースとして設定するカーネルVPN"
+description: "WireGuardはLinux 5.6からメインラインに含まれ、OpenWrtでは通常のインターフェースと同じように設定するネットワークプロトコルです。パッケージ、設定の場所、確認方法を説明します。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt wireguard", "openwrt vpn", "wireguard ルーター", "openwrt wireguard 設定", "openwrt vpn 設定"]
+sources:
+  - label: "Linux 5.6 (kernelnewbies)"
+    url: https://kernelnewbies.org/Linux_5.6
+  - label: "OpenWrt WireGuardの基本"
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/basics
+  - label: "wireguard-toolsパッケージ (OpenWrt 25.12)"
+    url: https://github.com/openwrt/openwrt/tree/openwrt-25.12/package/network/utils/wireguard-tools
+sourceHash: '485bb9713a3b4791'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="wireguard" />
+
+## 一言で言うと
+
+WireGuardは、2020-03-29にリリースされたLinux 5.6からメインラインに含まれています。OpenWrtでは `wireguard` というネットワークプロトコルとして提供され、他のインターフェースと同じように設定します。
+
+## 構成要素
+
+- `kmod-wireguard`: カーネルモジュール。
+- `wireguard-tools`: `wg` コマンド。カーネルモジュールに依存し、`wireguard` プロトコルをnetifdに登録します。
+- `luci-proto-wireguard`: LuCIでインターフェースを作成するときに、プロトコルとして「WireGuard VPN」を追加します。
+
+## 家庭での用途
+
+- **サーバー:** 外出先から自宅のネットワークにアクセスする。
+- **クライアント:** ルーターのトラフィックの全部または一部を、リモートのピア経由で送る。
+
+どちらの場合も、トンネルは `/etc/config/network` のインターフェースです。ファイアウォールゾーンが必要で、サーバーの場合はWANでUDPポートを開ける必要もあります。
+
+## ルーターで確認する
+
+```sh
+wg show
+uci show network | grep wireguard
+```
+
+## 関連ガイド
+
+- [WireGuardサーバー](/ja/remote-access/wireguard-server/)
+- [WireGuardクライアント](/ja/remote-access/wireguard-client/)
+- [firewall4とゾーン](/ja/features/firewall4/)
+
+<PageSources />

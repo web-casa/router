@@ -1,0 +1,281 @@
+---
+title: NIC が1つの Proxmox VE ホストに OpenWrt をインストールする
+description: 物理 NIC が1つしかない PVE ホストで、バイパスリゾルバーまたは内部ブリッジを使って OpenWrt を動かし、ホストへのアクセスも維持します。
+pageType: install
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'Proxmox VE 9.2.2、Realtek RTL8111 1枚。OpenWrt 25.12.6 VM 200、netns DHCP クライアント'
+lastVerifiedAt: '2026-10-20'
+testRecipe: 'tests/recipes/pve-single-nic-25.12.md'
+aliases: ['openwrt proxmox', 'pve openwrt', 'proxmox single nic openwrt', 'openwrt proxmox インストール', 'proxmox NIC 1つ openwrt', 'pve openwrt 構築']
+symptoms: ['インストール後にインターネットに接続できない', 'ホストにアクセスできない', 'PVE の NIC が1つしかない']
+sources:
+  - label: Proxmox VE ネットワーク設定
+    url: https://pve.proxmox.com/wiki/Network_Configuration
+  - label: Proxmox VE qm コマンド
+    url: https://pve.proxmox.com/pve-docs/qm.1.html
+  - label: OpenWrt x86 インストール
+    url: https://openwrt.org/docs/guide-user/installation/openwrt_x86
+  - label: OpenWrt 25.12 リリースノート
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+sourceHash: 'b8b086f75bf2a67f'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import pveConsole from '@assets/screenshots/pve/openwrt-console-login.webp';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import TopologyTable from '@components/TopologyTable.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="Proxmox VE" version="9.2.2" packageManager="—" device="NIC 1つの x86 ホスト" tested={true} evidence="E2" />
+
+## 目的
+
+**物理 NIC が1つ**の PVE ホストで、適切なトポロジーを選べるようになります。
+
+- PVE の管理アドレスを変更しない。
+- `vmbr0` で誤って DHCP を配布しない。
+- バイパスリゾルバー、または内部 LAN の検証環境として使える。
+- ルーター VM を停止してもホストにアクセスできる。
+
+## 対象環境
+
+- 物理 NIC が1つの Proxmox VE 8.x/9.x。`vmbr0` が PVE の管理アドレスと上流ゲートウェイの両方を担います。
+- このページは PVE 9.2.2、Realtek RTL8111 1枚、`vmbr0 192.168.50.2/24`、ゲートウェイ `192.168.50.1` を前提に書かれています。
+- **NIC が1つでは WAN と LAN を物理的に分離できません。** NIC が2つあるガイドの `enp1s0/enp2s0` 構成をそのまま使わないでください。バイパスサービスか PVE 内部ブリッジを使います。
+- 2枚目の NIC や VLAN 対応スイッチがあれば構成は簡単になりますが、そのトポロジーはこのページの対象外です。
+
+## 2つのトポロジー
+
+### A. バイパス DNS/ゲートウェイ(変更が最小)
+
+OpenWrt は `vmbr0` 上に vNIC を1つ持ち、LAN アドレスは `192.168.50.3/24` で、**DHCP は無効**です。クライアントは手動でこれを DNS(またはゲートウェイ)に指定し、OpenWrt は `192.168.50.1` 経由でインターネットに出ます。
+
+<TopologyTable rows={[
+  { physical: 'nic0', bridge: 'vmbr0', vnic: 'net0', iface: 'lan 192.168.50.3', role: 'バイパス DNS/ゲートウェイ' },
+]} />
+
+メインルーターの DHCP に触れずに、DNS、AdGuard Home、OpenClash の DNS/ルールを検証するのに向いています。
+
+### B. PVE 内部 LAN の検証環境(ルーティング検証に推奨)
+
+OpenWrt は vNIC を2つ持ちます。`net0` は `vmbr0` 上の WAN(DHCP)、`net1` は `vmbr1` 上の LAN(`192.168.1.1/24`)です。`vmbr1` には**物理ポートがなく**、テスト用クライアント VM だけが使います。
+
+<TopologyTable rows={[
+  { physical: 'nic0', bridge: 'vmbr0', vnic: 'net0', iface: 'wan DHCP', role: '上流 192.168.50.1' },
+  { physical: '—', bridge: 'vmbr1', vnic: 'net1', iface: 'lan 192.168.1.1', role: '内部テストクライアント' },
+]} />
+
+物理 LAN に影響を与えずに、ルーティング、NAT、DHCP、DNS、そして「ルーター VM 停止後もホストに到達できること」を検証できます。
+
+## 変更を始める前に
+
+<Step where="router-shell" title="ホストのネットワークと VM の状態を記録する" expected="問題が起きても、メモから vmbr0 を復元できる。">
+
+```sh
+ip -br link
+ip -br addr
+cat /etc/network/interfaces
+bridge link
+qm list
+pvesm status
+```
+
+`vmbr0` のアドレス、ゲートウェイ、物理ポート、VM の一覧を控えておきます。NIC が1つのホストでは `vmbr0` が唯一の管理経路であり、設定を誤るとロックアウトされる可能性があります。
+
+</Step>
+
+<Step where="router-shell" title="コンソールアクセスとイメージを用意する" expected="SSH が切れても PVE に到達できる。">
+
+モニター/キーボード、IPMI、またはクラウドの VNC を使い、SSH だけに頼らないでください。そのうえで、PVE ホストに OpenWrt x86_64 イメージをダウンロードします。
+
+```sh
+cd /var/lib/vz/template/iso
+wget https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+wget https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/sha256sums
+sha256sum -c sha256sums --ignore-missing
+gzip -d openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+```
+
+チェックサムが一致しない場合は先に進まないでください。ファイル名とバージョンは downloads.openwrt.org の最新のものを使います。
+
+</Step>
+
+## 最小手順
+
+<Step where="router-shell" title="内部ブリッジ vmbr1 を作成する(検証環境 B のみ)" expected="vmbr1 が存在して up になっている。vmbr0 のアドレスは変わっていない。">
+
+まず一時的なブリッジを作成し、動作を確認してから永続化します。
+
+```sh
+ip link add name vmbr1 type bridge
+ip link set vmbr1 up
+ip -br link show vmbr1
+ip -br addr show vmbr0
+```
+
+`vmbr1` には物理ポートがないため、家庭内 LAN に DHCP が漏れることはありません。`vmbr0` では DHCP サーバーを動かさないでください。
+
+</Step>
+
+<Step where="router-shell" title="OpenWrt VM 200 を作成する" expected="VM 200 に scsi0 の起動ディスクと net0/net1 がある。">
+
+```sh
+qm create 200 --name openwrt-lab --memory 512 --cores 2 --ostype l26 \
+  --scsihw virtio-scsi-pci \
+  --net0 virtio,bridge=vmbr0 \
+  --net1 virtio,bridge=vmbr1 \
+  --serial0 socket
+qm importdisk 200 /var/lib/vz/template/iso/openwrt-25.12.6-x86-64-generic-ext4-combined.img local-lvm
+qm set 200 --scsi0 local-lvm:vm-200-disk-0
+qm set 200 --boot order=scsi0
+qm start 200
+```
+
+実際のストレージ ID は `pvesm status` で確認します。`qm importdisk` の後は、コマンドの出力でディスク名を確認してください。`vm-200-disk-0` になるとは限りません。
+
+</Step>
+
+<Step where="router-shell" title="OpenWrt コンソールを開き、NIC の順序を確認する" expected="どのインターフェースが WAN で、どれが LAN かが分かる。">
+
+```sh
+qm terminal 200
+```
+
+シリアルに出力がない場合は、PVE の VNC コンソールを使います。OpenWrt 内で次を実行します。
+
+```sh
+ip link show
+ip addr show
+uci show network
+```
+
+`eth0/eth1` の順序が `net0/net1` と一致するとは限りません。MAC アドレス、リンク状態、`uci show network` で確認してください。`eth0` が WAN だと決めつけないでください。この検証環境では `net0=eth0=WAN`、`net1=eth1=LAN` でしたが、別のホストでは再確認が必要です。
+
+</Step>
+
+<Step where="router-shell" title="WAN/LAN を設定し、WAN 側の DHCP を無効にする" expected="WAN が 192.168.50.1 からアドレスを取得し、LAN は 192.168.1.1 になる。vmbr0 では DHCP を配布しない。">
+
+OpenWrt コンソールで、`eth0/eth1` を確認済みのインターフェース名に置き換えて実行します。
+
+```sh
+uci set network.wan=interface
+uci set network.wan.proto='dhcp'
+uci set network.wan.device='eth0'
+uci set network.lan=interface
+uci set network.lan.proto='static'
+uci set network.lan.device='eth1'
+uci set network.lan.ipaddr='192.168.1.1'
+uci set network.lan.netmask='255.255.255.0'
+uci set dhcp.wan=dhcp
+uci set dhcp.wan.interface='wan'
+uci set dhcp.wan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+```
+
+`dhcp.wan.ignore='1'` を必ず確認してください。そうしないと、OpenWrt が上流の `vmbr0` で DHCP を配布し、家庭内ネットワークを混乱させる可能性があります。
+
+</Step>
+
+<Step where="client" title="テストクライアントからルーティングを確認する" expected="クライアントが 192.168.1.1、上流ゲートウェイ、DNS に到達できる。">
+
+`vmbr1` 上にテスト VM を作成する(または NIC をそこに接続する)と、OpenWrt の LAN からリースを取得します。その後、次を実行します。
+
+```sh
+ip route
+ping 192.168.1.1
+ping 192.168.50.1
+nslookup openwrt.org
+```
+
+クライアントがリースを取得できない場合は、`vmbr0` を変更する前に、OpenWrt の `dhcp.lan` と `dnsmasq` を確認してください。
+
+</Step>
+
+## 確認
+
+<Figure src={pveConsole} alt="Proxmox VE の VM コンソールに表示された OpenWrt 25.12.6 の root シェルと apk の通知" caption="Proxmox VE の VM コンソールで、起動後に表示される OpenWrt 25.12.6 の root シェル。一時的なスクリーンショット用 VM で取得したもので、NIC 名、サブネット、ディスクは構成によって異なります。" />
+
+- `qm status 200` が running であり、`qm config 200` で `net0` が `vmbr0`、`net1` が `vmbr1` にあること。
+- OpenWrt 内の `ip addr show` で、WAN が `192.168.50.x`、LAN が `192.168.1.1/24` であること。
+- テストクライアントのデフォルトゲートウェイが `192.168.1.1` で、`192.168.50.1` に ping でき、`openwrt.org` を名前解決できること。
+- ホスト: `ssh root@192.168.50.2` と PVE の Web UI が引き続き使えること。
+- ルーター VM を停止(`qm stop 200`)してもホストの管理が使え、`qm start 200` で元に戻ること。
+
+## 失敗時の分岐と復旧
+
+### ホストに SSH で接続できない
+
+ネットワークの変更を中止します。モニター/キーボード、IPMI、またはクラウドコンソールを使って確認します。
+
+```sh
+ip -br addr show vmbr0
+cat /etc/network/interfaces
+bridge link
+```
+
+`/etc/network/interfaces` を編集した直後であれば、バックアップを復元して再読み込みします。
+
+```sh
+cp /etc/network/interfaces.bak.YYYY-MM-DD /etc/network/interfaces
+ifreload -a
+```
+
+一時的な `vmbr1` だけが原因の場合は、まず他の VM が使っていないことを確認します。
+
+```sh
+grep -R "vmbr1" /etc/pve/qemu-server
+```
+
+このコマンドが何も出力しない場合にのみ削除します。
+
+```sh
+ip link set vmbr1 down
+ip link del vmbr1
+```
+
+### OpenWrt に WAN アドレスがない
+
+```sh
+qm config 200
+qm terminal 200
+```
+
+OpenWrt 内で `ip link show`、`uci show network`、`logread` を確認します。`net0` が `vmbr0` にあり、`nic0` が up であることを確認してください。`vmbr0` に2つ目の DHCP サーバーを追加しないでください。
+
+### テストクライアントが 192.168.1.x のリースを取得できない
+
+OpenWrt の `dhcp.lan` と `dnsmasq` が動作しているかを確認し、テスト VM が実際に `vmbr1` に接続されていることを確認します。検証環境を「直す」ために `vmbr0` のアドレスやゲートウェイを変更しないでください。
+
+### ルーター VM を停止してもホストに到達できるか
+
+これが復旧の判定基準です。`qm stop 200` の後、別のマシンから `https://192.168.50.2:8006` を開き、SSH で接続します。到達できない場合は、管理経路が OpenWrt に依存しています。先に進む前に修正してください。
+
+## E2 検証結果(2026-10-20)
+
+- 環境: PVE 9.2.2、Realtek RTL8111 1枚、`vmbr0 192.168.50.2/24`。OpenWrt 25.12.6 x86_64 VM 200、512MB/2 vCPU。
+- OpenWrt の WAN `eth0` は `192.168.50.1` から DHCP で `192.168.50.77` を取得。LAN `eth1` は `192.168.1.1/24`。
+- 内部 `vmbr1` 上の netns クライアントは DHCP で `192.168.1.191` を取得し、`192.168.1.1` をデフォルトルートとして使い、`openwrt.org` を名前解決して HTTP 200 を得た。
+- `qm stop 200` の後も、新しい SSH 接続で PVE ホストに接続でき、`vmbr0` は `192.168.50.2/24` のままだった。
+- 未検証: 物理 LAN のクライアント、NIC 2枚構成、長時間の安定性、PPPoE/IPv6 の上流。これらはこの E2 の結果の対象外です。
+
+## 情報源とレビュー
+
+- このページは E2 の検証結果であり、E1 だけの草稿ではありません。ただし、独立したレビューや物理 LAN での検証は行っていません。
+- レシピ: `tests/recipes/pve-single-nic-25.12.md`。イメージの SHA-256、`qm config 200`、クライアントの結果を記録しています。
+- NIC 1つは NIC 2つとは異なります。2枚目の NIC や VLAN スイッチなしに、これを「WAN/LAN を物理的に分離する」ガイドへ書き換えないでください。
+
+<TestRecord
+  status="partial"
+  environment="Proxmox VE 9.2.2、Realtek RTL8111 1枚。OpenWrt 25.12.6 VM 200、netns DHCP クライアント"
+  recipe="tests/recipes/pve-single-nic-25.12.md"
+  result="WAN DHCP 192.168.50.77、LAN 192.168.1.1、クライアント DHCP 192.168.1.191、DNS/HTTP 成功、qm stop 200 の後もホストの SSH は利用可能"
+  date="2026-10-20"
+/>
+
+<PageSources />

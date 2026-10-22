@@ -1,0 +1,206 @@
+---
+title: "バックアップと復元: 設定、パッケージ、管理アクセスを個別に確認する"
+description: sysupgrade -b/-rでOpenWrtの設定をバックアップ・復元し、設定アーカイブ、パッケージ、完全イメージの違いを理解して、復元後にLAN/HTTP/SSH/DHCPを確認します。
+pageType: recovery
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; sysupgrade -b 4.2MB/59エントリ; sysupgrade -r で復元; LAN/HTTP/SSHを確認'
+testRecipe: 'tests/recipes/backup-restore-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt バックアップ', 'openwrt 設定 復元', 'openwrt 設定 バックアップ 復元', 'sysupgrade バックアップ', 'openwrt 再インストール 後 復元']
+symptoms: ['書き換え後に設定が消えた', 'バックアップの復元方法', 'sysupgrade -b が失敗する', '復元後に接続できない']
+sources:
+  - label: OpenWrt バックアップと復元
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+  - label: OpenWrt sysupgrade
+    url: https://openwrt.org/docs/guide-user/installation/sysupgrade.owut
+  - label: OpenWrt パッケージマネージャー
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: Proxmox VE バックアップ
+    url: https://pve.proxmox.com/pve-docs/chapter-vzdump.html
+sourceHash: 'eb78c790dd7db4e1'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## 3種類の「バックアップ」
+
+| 種類 | 含まれるもの | 含まれないもの | 主な用途 |
+|---|---|---|---|
+| 設定アーカイブ `sysupgrade -b` | `/etc/config` と `sysupgrade.conf` に記載されたファイル | ファームウェア、インストール済みパッケージ、ディスク全体 | 書き換え/アップグレード後に設定を復元する |
+| パッケージ一覧 | 名前、バージョン、フィード | パッケージのバイナリ | 再インストールのチェックリスト |
+| 完全イメージ/VMバックアップ | ディスク/VM全体 | なし（サイズは大きい） | マシン全体のロールバック/ディスク交換 |
+
+**設定のバックアップはファームウェアのバックアップではありません。** 設定を復元しても、削除したパッケージは再インストールされません。
+
+## バックアップの前に
+
+<Step where="router-shell" title="リリース、ターゲット、パッケージ一覧を記録する" expected="バックアップ元のリリース/ターゲット/アーキテクチャが分かります。">
+
+```sh
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+apk list --installed > /tmp/packages-$(date +%F).txt
+wc -l /tmp/packages-$(date +%F).txt
+sysupgrade -l
+```
+
+このテスト環境: `25.12.6`、`x86/64`、インストール済みパッケージ239個。`sysupgrade -b` は59エントリをアーカイブしました。
+
+</Step>
+
+<Step where="router-shell" title="設定アーカイブを作成する" expected="検証可能な.tar.gzを作成し、デバイス外にコピーできます。">
+
+```sh
+sysupgrade -b /tmp/backup-$(date +%F).tar.gz
+ls -lh /tmp/backup-*.tar.gz
+tar -tzf /tmp/backup-$(date +%F).tar.gz | head
+sha256sum /tmp/backup-$(date +%F).tar.gz
+```
+
+このテスト環境: 4.2MB、59エントリ。`etc/config/network`、`dhcp`、`firewall`、`openclash`、`sqm` を含みます。
+
+> アーカイブにはWi-Fiパスワード、PPPoE認証情報、DDNS/プロキシ設定が含まれる場合があります。公開クラウドストレージやリポジトリにアップロードせず、機密情報として扱ってください。
+
+</Step>
+
+<Step where="client" title="アーカイブをデバイスの外にコピーする" expected="デバイスが起動しなくなったり書き換えられたりしても、バックアップが残ります。">
+
+```sh
+# ルーターから管理用マシンへ取得する
+scp root@192.168.1.2:/tmp/backup-2026-10-20.tar.gz ./
+sha256sum backup-2026-10-20.tar.gz
+```
+
+`/tmp` にだけ置かないでください。再起動で消え、書き換えでは確実に消えます。
+
+</Step>
+
+## 3つの復元方法
+
+### 1. 稼働中の同一バージョンでの復元（このテストで実施）
+
+```sh
+sysupgrade -r /tmp/backup-2026-10-20.tar.gz
+```
+
+`-r` は設定を復元して終了します。ファームウェアは書き換えません。その後、関連サービスを再起動するか、再起動してネットワーク/DHCP/DNSを再読み込みしてください。
+
+このテストでは `network.lan.e2_marker='before-restore'` を書き込みました。`sysupgrade -r` の後、マーカーは消え、LANは `192.168.1.2/24` のままで、HTTP 200とSSHが動作しました。
+
+### 2. 書き換え/アップグレード中の復元
+
+```sh
+sysupgrade -f /tmp/backup-2026-10-20.tar.gz <firmware.img>
+```
+
+`-f` はアップグレード中に設定を復元します。バックアップをファームウェアと見なさないでください。また、異なるリリース/ターゲット間で無闇に復元しないでください。
+
+### 3. VM/イメージ全体のロールバック
+
+PVEでは `vzdump`/スナップショットでVMのディスクと設定全体を復元します。ファームウェア、パッケージ、設定がすべて元に戻りますが、規模が大きく、新しいデータを上書きすることがあります。設定アーカイブとマシン全体のバックアップは代替になりません。
+
+## 復元後の確認
+
+<Step where="client" title="管理アクセス" expected="LAN IP、HTTP、SSH、DHCPを少なくとも一度ずつ確認します。">
+
+```sh
+ping -c 2 192.168.1.2
+curl -sSI --max-time 5 http://192.168.1.2/ | head -3
+ssh root@192.168.1.2 'uci show network.lan | grep ipaddr'
+```
+
+- HTTP 200はDHCPが動作する証明にはなりません
+- SSHで接続できても、LuCIの設定が正しい証明にはなりません
+- クライアントは更新して、復元したプールからアドレスを取得する必要があります
+
+</Step>
+
+<Step where="router-shell" title="ネットワーク/DHCP/DNS" expected="ファイルが展開されただけでなく、復元した設定が実際に反映されています。">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+ubus call network.interface.lan status
+logread | grep -Ei 'dnsmasq|dhcp|netifd' | tail -30
+```
+
+必要に応じて再起動します。
+
+```sh
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+</Step>
+
+<Step where="router-shell" title="パッケージ" expected="再インストールが必要なパッケージが分かります。設定の復元はパッケージの復元ではありません。">
+
+```sh
+apk list --installed | wc -l
+apk list --installed | grep -E 'openclash|sqm|adguard|luci-app' || true
+```
+
+設定アーカイブにはバイナリは含まれません。書き換えの後は、パッケージ一覧とフィードから再インストールしてください。OpenClash/SQM/AGHの設定は残っていても、プログラムとカーネルモジュールは再インストールして確認する必要があります。
+
+</Step>
+
+## よくある失敗
+
+### 復元後も古い設定のまま
+
+- `sysupgrade -r` の後にサービス/デバイスを再起動していない
+- 別のアーカイブを復元してしまった
+- 後から実行したUCIコマンドで上書きされた
+- アーカイブにそのファイルが含まれていない（`sysupgrade -l` / `tar -tzf` で確認）
+
+### 復元後に接続できない
+
+- バックアップが別のLANサブネットのものだった
+- DHCP/ファイアウォールが再読み込みされていない
+- アーカイブに古いパスワード/SSH設定が含まれている
+- コンソールを使い、`ip -4 addr show br-lan` を確認する。すぐに工場出荷状態へリセットしない
+
+### パッケージが戻らない
+
+- 設定のバックアップにパッケージファイルは含まれない
+- フィード/バージョンの不一致
+- `luci-app-*` とカーネルモジュールを再インストールする
+- 「設定がある」ことは「プログラムがインストールされている」ことを意味しない
+
+### バージョンをまたぐ復元
+
+- リリース/ターゲット/アーキテクチャの不一致
+- 新しいリリースでオプションの名前が変わった、または削除された
+- まずVMでテストする
+- ロールバック用に、旧ファームウェアとマシン全体のバックアップを保管する
+
+## E2テスト結果 (2026-10-20)
+
+- 環境: OpenWrt 25.12.6 x86 VM 200、LAN `192.168.1.2/24`、`apk`、インストール済みパッケージ239個
+- `sysupgrade -b /tmp/backup-e2.tar.gz`: 4.2MB、59エントリ。`tar -tzf` で `etc/config/network`、`dhcp`、`firewall`、`openclash`、`sqm` を確認
+- `network.lan.e2_marker='before-restore'` を書き込み。`sysupgrade -r` の後にマーカーは消え、LANは `.2` のまま、HTTP 200、SSHが動作
+- 未テスト: PVE全体のバックアップ復元、バージョンをまたぐ復元、パッケージの再インストール、実機での電源断/文鎮化
+- レシピ: `tests/recipes/backup-restore-25.12.md`
+
+## 出典とレビュー
+
+- 本ページはE2の一部です。同一バージョンでの設定のバックアップ/復元と管理アクセスをテストしました。マシン全体、バージョンをまたぐ復元、パッケージの再構築はテストしていません。
+- 設定アーカイブには機密データが含まれます。コミットや共有をしないでください。
+- 独立したレビュアーはいません。結論はこのVM環境に限られます。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; sysupgrade -b 4.2MB/59エントリ; sysupgrade -r で復元; LAN/HTTP/SSHを確認"
+  recipe="tests/recipes/backup-restore-25.12.md"
+  result="E2 partial: sysupgrade -bで4.2MB/59エントリの設定アーカイブを作成。テスト用マーカーを追加後、sysupgrade -rでマーカーが消え、LAN 192.168.1.2、HTTP 200、SSHは引き続き動作。完全イメージ/バージョンをまたぐ復元/パッケージ再インストールは未テスト"
+  date="2026-10-20"
+/>
+
+<PageSources />

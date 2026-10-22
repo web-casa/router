@@ -1,0 +1,193 @@
+---
+title: "ゲスト Wi-Fi: 専用 SSID、VLAN、DHCP、分離"
+description: 専用の SSID/サブネット/DHCP/ファイアウォールゾーンでゲストを分離し、インターネットのみ許可してメイン LAN へのアクセスを遮断します。Wi-Fi と VLAN は実機では検証していません。
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'OpenWrt 25.12 の Wi-Fi/VLAN/ファイアウォールのドキュメントから作成。実際の無線/スイッチでの検証なし'
+testRecipe: 'tests/recipes/guest-wifi-25.12.md'
+aliases: ['openwrt guest wifi', 'openwrt guest network', 'openwrt wifi isolation', 'openwrt guest wi-fi', 'openwrt ゲスト wifi 設定', 'openwrt ゲストネットワーク 分離', 'openwrt wifi 分離']
+symptoms: ['ゲストがLANにアクセスできてしまう', 'ゲストがインターネットに接続できない', 'ゲスト Wi-Fi にアドレスが割り当てられない', 'VLAN による分離が効かない']
+sources:
+  - label: OpenWrt ゲスト Wi-Fi
+    url: https://openwrt.org/docs/guide-user/network/wifi/guestwifi/guest-wlan
+  - label: OpenWrt Wi-Fi 設定
+    url: https://openwrt.org/docs/guide-user/network/wifi/basic
+  - label: OpenWrt ファイアウォールゾーン
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt DSA VLAN
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+sourceHash: 'b918dd049823d2a8'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="無線 + DSA デバイス(未検証)" tested={false} evidence="E1" />
+
+> **ステータス**: E1 のドキュメントです。ゲストの分離は Wi-Fi、VLAN、DHCP、ファイアウォールにまたがります。実際の無線ハードウェアがない状態で「分離済み」と断言しないでください。
+
+## 目標
+
+- ゲストは専用の SSID を使う。
+- ゲストは専用のサブネットを使う。
+- ゲストはインターネットには到達できるが、メイン LAN や管理 UI には到達できない。
+- メイン LAN からゲストへ接続を開始できない(ポリシーによる)。
+- ゲストをすばやく無効にできる。
+
+## 選択肢
+
+| 選択肢 | 分離の強さ | 必要なもの |
+|---|---|---|
+| 同じブリッジ + 専用 SSID/ゾーン | 中 | 複数の SSID、ファイアウォール |
+| 専用 VLAN + SSID | 強い | DSA/スイッチの VLAN、AP のタグ付け |
+| 別の AP/物理的な分離 | 最も強い | 別のデバイス/ポート |
+
+このページでは「専用 SSID + ゲストゾーン」と、VLAN でそれを強化する方法を扱います。VLAN の詳細は 023 にあります。
+
+## 1. ゲスト用サブネットを作成する
+
+```sh
+uci set network.guest=interface
+uci set network.guest.proto='static'
+uci set network.guest.device='br-guest'
+uci set network.guest.ipaddr='192.168.50.1/24'
+uci set network.guest.ip6assign='60'
+uci commit network
+```
+
+`br-guest` は、(無線インターフェースを追加した)専用のブリッジか、VLAN インターフェースにできます。`br-lan` に混在させて、ファイアウォールだけに頼ることは避けてください。
+
+## 2. ゲスト用の DHCP/DNS
+
+```sh
+uci set dhcp.guest=dhcp
+uci set dhcp.guest.interface='guest'
+uci set dhcp.guest.start='100'
+uci set dhcp.guest.limit='100'
+uci set dhcp.guest.leasetime='1h'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+```
+
+ゲストが VLAN の場合は、その VLAN のインターフェースに DHCP を割り当てます。メイン LAN のアドレスプールを配布しないでください。
+
+## 3. ファイアウォール: インターネットのみ
+
+```sh
+uci add firewall zone
+uci set firewall.@zone[-1].name='guest'
+uci set firewall.@zone[-1].input='REJECT'
+uci set firewall.@zone[-1].output='ACCEPT'
+uci set firewall.@zone[-1].forward='REJECT'
+uci add_list firewall.@zone[-1].network='guest'
+uci commit firewall
+
+uci add firewall forwarding
+uci set firewall.@forwarding[-1].src='guest'
+uci set firewall.@forwarding[-1].dest='wan'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+要点:
+
+- guest→lan の転送を追加**しないでください**。
+- guest→wan の転送は許可します。NAT は wan ゾーンのマスカレードに依存します。
+- DHCP/DNS が input REJECT でブロックされる場合は、input を ACCEPT にするのではなく、guest→ルーターの 53/67 を許可するルールを追加します。
+- メイン LAN からゲストへは、既定では接続を開始できません。印刷やキャストが必要な場合は、個別に許可します。
+
+## 4. ゲスト SSID を追加する
+
+```sh
+uci set wireless.guest=wifi-iface
+uci set wireless.guest.device='radio0'
+uci set wireless.guest.network='guest'
+uci set wireless.guest.mode='ap'
+uci set wireless.guest.ssid='OpenWrt-Guest'
+uci set wireless.guest.encryption='psk2'
+uci set wireless.guest.key='<guest-password>'
+uci set wireless.guest.isolate='1'
+uci commit wireless
+wifi reload
+```
+
+- `network='guest'` はゲストのインターフェースと一致している必要があります。
+- `isolate='1'` は無線クライアント同士を分離するもので、メイン LAN との分離ではありません。LAN との分離にはファイアウォール/VLAN が必要です。
+- 2.4/5GHz、チャンネル、チャンネル幅はデバイスに合わせて調整します。
+- 複数の AP を使う場合: SSID/パスワード/セキュリティは同じにし、チャンネルはずらします。
+
+## 5. VLAN を使う場合
+
+- DSA/スイッチ上に、ゲスト専用の VLAN(例: 20)を作成する。
+- ゲスト SSID をその VLAN にブリッジする。
+- トランクの両端でタグ付けし、VLAN 20 を許可する。
+- ゲストのインターフェース/DHCP を VLAN 20 に割り当てる。
+- ゲスト VLAN を、管理 VLAN 上の untagged PVID にしない。
+
+`bridge-vlan` の構文は 023 を参照してください。
+
+## 確認(ハードウェアがある場合)
+
+```sh
+iwinfo
+ip -4 addr show
+bridge vlan show
+```
+
+クライアント側:
+
+- `OpenWrt-Guest` に接続し、`192.168.50.x` を取得する。
+- インターネット/DNS に到達できる。
+- メイン LAN `192.168.1.0/24`、LuCI の管理画面、NAS/プリンターに**到達できない**。
+- メイン LAN からゲストへ接続を開始できない(ポリシーによる)。
+- ゲスト SSID を無効にしても、メイン LAN は影響を受けない。
+
+無線/VLAN のハードウェアがなければ、これらはいずれも「検証済み」ではありません。
+
+## よくある失敗
+
+### ゲストがメイン LAN に到達できてしまう
+
+- 専用のゾーン/転送がない
+- ゲストと lan が同じブリッジを共有している
+- ファイアウォールのルール/順序/ゾーンが間違っている
+- VLAN が分離されておらず、SSID を変えただけになっている
+
+### ゲストにアドレスが割り当てられない
+
+- DHCP がゲストのインターフェースに割り当てられていない
+- ゲストのインターフェースが down になっている
+- VLAN タグ/PVID が間違っている
+- ファイアウォールが DHCP/DNS をブロックしている
+
+### ゲストがインターネットに接続できない
+
+- guest→wan の転送がない
+- WAN のマスカレード/NAT
+- DNS が許可されていない
+- 上流のルート
+
+### ゲストを無効にするとメイン LAN が壊れる
+
+- ゲストと lan がブリッジ/VLAN を共有している
+- 管理ポートの PVID/タグを変更してしまった
+- コンソールから復旧する。ファクトリーリセットはしないでください
+
+## E1 の状況
+
+- ドキュメントのみです。実際の無線/DSA ハードウェアでは検証しておらず、「ゲストの分離が有効である」とは主張しません。
+- 本格的な E2 には次が必要です: 複数の SSID に対応した AP、VLAN 対応スイッチ/DSA デバイス、クライアント2台、コンソール、ロールバック用の設定。
+- テスト後に、デバイスのモデル、VLAN/SSID、ファイアウォールゾーン、DHCP、分離の結果を記録してください。
+
+<TestRecord
+  status="planned"
+  environment="OpenWrt 25.12 の Wi-Fi/VLAN/ファイアウォールのドキュメントから作成。実際の無線/スイッチでの検証なし"
+  recipe="tests/recipes/guest-wifi-25.12.md"
+  result="E1: 専用 SSID/サブネット/DHCP/ファイアウォールゾーン、分離と VLAN の方法を文書化。実際の無線/スイッチのハードウェアでは未検証"
+/>
+
+<PageSources />

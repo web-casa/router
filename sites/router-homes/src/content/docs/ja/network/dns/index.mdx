@@ -1,0 +1,264 @@
+---
+title: DNSを設定し、ルーター・クライアント・ブラウザーで確認する
+description: ルーター、クライアント、ブラウザーが実際にどのDNSサーバーを使っているかを調べ、復旧手段も確保します。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'PVE 9.2.2 シングルNIC、OpenWrt 25.12.6 VM 200、netns DHCPクライアント'
+lastVerifiedAt: '2026-10-20'
+testRecipe: 'tests/recipes/dns-25.12-x86.md'
+aliases: ['openwrt dns', 'openwrt dns 設定', 'openwrt dns 変更', 'openwrt dns 変え方', 'openwrt dnsmasq 設定', 'openwrt dns が引けない', 'openwrt dns 確認']
+symptoms: ['ページが開かない', '一部のサイトにつながらない', '名前解決に失敗する']
+sources:
+  - label: OpenWrt DHCP and DNS 設定
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp_configuration
+  - label: OpenWrt dnsmasq
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt 25.12 リリースノート
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: OpenWrt apk パッケージマネージャー
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+sourceHash: '0f4c118a13e248a2'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86 VM" tested={true} evidence="E2" />
+
+## 目的
+
+次の3点を個別に確認できるようになります。
+
+- ルーターはどの上流DNSサーバーを使っているか
+- クライアントはOpenWrtからどのDNSサーバーを受け取っているか
+- ブラウザーがDoHでシステムのリゾルバーを迂回していないか
+
+設定変更に失敗しても、名前解決できる状態に戻せます。
+
+## 対象環境
+
+- OpenWrt 25.12.6、既定の `dnsmasq` と `odhcpd`。25.12は `apk`、24.10は `opkg` を使います。
+- 確認コマンドに追加パッケージは不要です。`unbound` や `https-dns-proxy` を使っている場合は、先にどちらがポート53を使っているか確認してください。
+- 24.10でもメニュー名と設定キーはほぼ同じですが、パッケージ関連のコマンドは異なります。`apk` のコマンドを24.10にそのまま使わないでください。
+
+## DNSの経路と担当
+
+| 場所 | 既定の担当 | 確認すること |
+|---|---|---|
+| WAN上流 | DHCP/PPPoEクライアント | `cat /tmp/resolv.conf.d/resolv.conf.auto` |
+| ルーターのリゾルバー | `dnsmasq` | `nslookup openwrt.org 127.0.0.1` |
+| LANへの通知 | `dnsmasq` のDHCPオプション6、`odhcpd` のRDNSS | クライアントに表示されるDNS |
+| ブラウザー | システムのリゾルバー、またはブラウザーのDoH | ブラウザーのセキュアDNS設定 |
+
+DNSサーバーを置き換える前に、どの層に問題があるかを切り分けます。
+
+## 変更前の準備
+
+<Step where="router-shell" title="DHCP/DNS設定をバックアップする" expected="バックアップがあり、復元方法がわかっている。">
+
+```sh
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+uci export dhcp > /tmp/dhcp.before
+uci show dhcp | grep -E 'dns|resolv|server|option'
+```
+
+LuCIとSSHには有線LANで接続できる状態を保ってください。変更中のDNSに、唯一の管理経路を依存させないでください。
+
+</Step>
+
+## 最小手順
+
+<Step where="router-shell" title="上流DNSとdnsmasqの設定を確認する" expected="現在のresolvfile、server、noresolvの値を説明できる。">
+
+```sh
+cat /tmp/resolv.conf.d/resolv.conf.auto
+uci show dhcp.@dnsmasq[0]
+uci show network.wan | grep -E 'peerdns|dns'
+```
+
+`/tmp/resolv.conf.d/resolv.conf.auto` はWANクライアントが書き込みます。実際の `dhcp.@dnsmasq[0].resolvfile` の値を確認してください。`noresolv='1'` の場合、dnsmasqはこのファイルを無視し、`server` のリストを使います。
+
+</Step>
+
+<Step where="luci" title="WANにカスタムDNSを設定する（最も安全な最初の変更）" expected="WANを再接続すると、上流リゾルバーが設定した値になる。">
+
+**ネットワーク → インターフェース → WAN → 詳細設定** を開きます。
+
+1. 「ピアにより通知されたDNSサーバーを使用」のチェックを外します（`peerdns` が0になります）。
+2. 「カスタムDNSサーバーを使用」に、信頼できるDNSサーバーを追加します。例: `1.1.1.1`、`9.9.9.9`
+3. 保存して適用し、必要ならWANを再接続します。
+
+WANが一時的に途切れますが、LANのDHCP/DNS構成は変わらないため、元に戻しやすい方法です。
+
+</Step>
+
+<Step where="router-shell" title="dnsmasqが待ち受けており、新しい上流を読み込んだか確認する" expected="ポート53が待ち受け状態で、ログに設定エラーがない。">
+
+```sh
+netstat -lnp | grep ':53'
+/etc/init.d/dnsmasq restart
+logread -e dnsmasq | tail -20
+```
+
+`dnsmasq` が起動しない場合は、DHCPオプションの変更を止めてください。エラーメッセージから、構文エラーかポートの競合かを調べます。
+
+</Step>
+
+<Step where="luci" title="クライアントに通知されるDNSを確認する" expected="クライアントがOpenWrtのLANアドレス、または意図したオプション6のアドレスを受け取る。">
+
+**ネットワーク → DHCPおよびDNS → DHCPサーバー → 詳細設定** を開き、「DHCPオプション」を確認します。オプション6がなければ、クライアントは通常ルーターのLANアドレスをDNSとして使います。オプション6があれば、そのアドレスを直接受け取ります。
+
+ポート53で待ち受けていないアドレスを、クライアントのDNSに指定しないでください。
+
+</Step>
+
+<Step where="router-shell" title="CLIでの同等の手順（任意）" expected="resolv.autoに1.1.1.1が表示され、問い合わせが成功する。">
+
+```sh
+uci set network.wan.peerdns='0'
+uci -q delete network.wan.dns
+uci add_list network.wan.dns='1.1.1.1'
+uci commit network
+ifup wan
+cat /tmp/resolv.conf.d/resolv.conf.auto
+```
+
+変更後は `logread -e dnsmasq` で新しい上流を確認します。クライアントが古いDNSを受け取り続ける場合は、dnsmasqを再起動するか、DHCPオプション6を確認してください。
+
+</Step>
+
+## クライアントからの確認
+
+<Step where="router-shell" title="ルーター上でAとAAAAを確認する" expected="どちらの問い合わせもタイムアウトせず応答が返る。">
+
+```sh
+nslookup openwrt.org 127.0.0.1
+nslookup -type=AAAA openwrt.org 127.0.0.1
+```
+
+</Step>
+
+<Step where="client" title="クライアントが実際に受け取ったDNSを確認する" expected="クライアントのDNSがDHCPまたは静的設定と一致し、名前解決できる。">
+
+Linux:
+
+```sh
+resolvectl status
+cat /etc/resolv.conf
+nslookup openwrt.org
+```
+
+Windows:
+
+```powershell
+ipconfig /all
+nslookup openwrt.org
+```
+
+macOS:
+
+```sh
+scutil --dns
+nslookup openwrt.org
+```
+
+</Step>
+
+<Step where="client" title="ブラウザーがルーターを迂回していないか確認する" expected="テスト中はDoHがオフ、または向き先を正確に把握している。">
+
+Chrome/Edge: `chrome://settings/security`、または「プライバシーとセキュリティ → セキュリティ → セキュアDNSを使用する」。Firefox: 設定 → プライバシーとセキュリティ → DNS over HTTPS。DoHがオンだとシステムのリゾルバーがまったく使われないことがあり、「ルーターのDNS設定が効かない」ように見えます。
+
+</Step>
+
+<Step where="client" title="IPv6の名前解決とRA/RDNSSを確認する" expected="IPv6の上流があればAAAAが解決できる。なければ不足している条件を記録する。">
+
+```sh
+nslookup -type=AAAA openwrt.org
+ip -6 route
+```
+
+上流にIPv6プレフィックスがない場合、IPv4の結果からIPv6のDNSが正常だと判断しないでください。
+
+</Step>
+
+## 失敗時の分岐と復旧
+
+### ページは開かないが、IPアドレスへのpingは通る
+
+まずDNSを疑います。
+
+1. クライアントのリゾルバーを確認します: `resolvectl status`、`ipconfig /all`、`scutil --dns`
+2. ルーターでポート53とdnsmasqのログを確認します: `netstat -lnp | grep ':53'`、`logread -e dnsmasq`
+3. ブラウザーのDoHを確認し、一時的に無効にします。
+4. DHCPオプション6に誤ったアドレスがないか確認します。
+
+### LuCI/SSHにつながらない
+
+DNSの変更を止めます。有線のクライアントをLANに接続し、同じサブネットの静的アドレスを設定して、ゲートウェイがOpenWrtのLANアドレスであることを確認します。コンソールまたはSSHから復元します。
+
+```sh
+cp /etc/config/dhcp.bak.YYYY-MM-DD /etc/config/dhcp
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+```
+
+WANのDNSを変更した場合は、上流DNSの自動取得に戻します。
+
+```sh
+uci set network.wan.peerdns='1'
+uci -q delete network.wan.dns
+uci commit network
+ifup wan
+```
+
+### WANのDNSを変えたのにクライアントが古いリゾルバーを使う
+
+`resolv.auto` が変わったか、次にdnsmasqが新しい上流を読み込んだかを確認します。
+
+```sh
+cat /tmp/resolv.conf.d/resolv.conf.auto
+logread -e dnsmasq | tail -20
+/etc/init.d/dnsmasq restart
+```
+
+`resolv.auto` が変わっていなければ、`network.wan.dns` と `peerdns` を確認します。クライアントが古いDNSを受け取り続ける場合は、DHCPオプション6とブラウザーのDoHを確認してください。
+
+### dnsmasqが起動しない
+
+何度も再起動せず、エラーを読みます。
+
+```sh
+logread -e dnsmasq | tail -50
+dnsmasq --test
+```
+
+よくある原因は、別のリゾルバーによるポート53の占有、構文エラー、到達できない上流です。まずバックアップを復元し、カスタム設定は1つずつ戻してください。
+
+## E2ラボ検証（2026-10-20）
+
+- 環境: PVE 9.2.2 シングルNIC、OpenWrt 25.12.6 VM 200。WAN `192.168.50.77/24`、LAN `192.168.1.1/24`
+- ベースライン: `resolv.auto` は `nameserver 192.168.50.1`。`nslookup openwrt.org 127.0.0.1` はA/AAAAを返した。
+- カスタム: `peerdns=0` と `network.wan.dns=1.1.1.1`。`resolv.auto` は `nameserver 1.1.1.1` に変わり、問い合わせは成功した。
+- 障害: dnsmasqの上流を到達不能な `192.0.2.1` に設定すると、ランダムな `.example.com` の問い合わせは `connection timed out; no servers could be reached` を返した。`noresolv`/`server` を削除して `peerdns=1` に戻すと名前解決が復旧した。
+- クライアント: netnsのDHCPで `192.168.1.116/24`、DNS `192.168.1.1` を取得。`dig @192.168.1.1 openwrt.org` は成功し、`ping 192.168.50.1` も通った。
+- 未検証: ブラウザーのDoH、IPv6の上流/RA/RDNSS、物理LANクライアント、長期の安定性
+
+## 出典とレビュー
+
+- このページにはE2のラボ再現があります。ブラウザーのDoHとIPv6の上流は未検証のため、検証済みとは記述しないでください。
+- 根拠: `docs/dns-e2-run.md` と `tests/recipes/dns-25.12-x86.md`
+- メニューやバージョンが変わったら `testedVersions` と `lastVerifiedAt` を更新してください。25.12の手順に24.10の `opkg` コマンドを入れないでください。
+
+<TestRecord
+  status="partial"
+  environment="PVE 9.2.2 シングルNIC、OpenWrt 25.12.6 VM 200、netns DHCPクライアント"
+  recipe="tests/recipes/dns-25.12-x86.md"
+  result="WAN DNSを192.168.50.1から1.1.1.1に変更して反映。到達不能な上流はタイムアウト。復旧に成功。クライアントのDHCP DNSは192.168.1.1で、名前解決は正常"
+  date="2026-10-20"
+/>
+
+<PageSources />

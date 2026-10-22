@@ -1,0 +1,227 @@
+---
+title: "パッケージフィードと中国ミラー: apkとopkgを混同しない"
+description: OpenWrt 25.12のapkと24.10のopkgを見分け、リリース/ターゲット/アーキテクチャ/kmodsを合わせ、ABIを壊さずに中国のミラーへ切り替えます。
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200、公式/TUNAフィード、apk update/search/install、公式フィードへ復元'
+testRecipe: 'tests/recipes/package-sources.md'
+aliases: ['openwrt package feeds', 'openwrt パッケージ フィード', 'openwrt ミラー 設定', 'openwrt china mirror', 'apk feeds', 'opkg feeds', 'openwrt パッケージ インストール できない', 'openwrt apk update 404']
+symptoms: ['apk update が404になる', 'opkg update が失敗する', '依存関係が合わない', 'フィードの署名エラー']
+sources:
+  - label: OpenWrt apk パッケージマネージャー
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: OpenWrt opkg パッケージマネージャー
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg
+  - label: OpenWrt 25.12 リリースノート
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: TUNA OpenWrt ミラー
+    url: https://mirrors.tuna.tsinghua.edu.cn/openwrt/
+sourceHash: '55165ce9cac98759'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
+
+最初に押さえる点です。**apkとopkgの違い**は、「どのミラーが速いか」ではなく、ファームウェアのリリースで決まります。25.12は `apk`、24.10は `opkg` を使います。パッケージ形式、フィードのパス、検証方式が異なり、互換性はありません。
+
+## 目的
+
+- ファームウェアが `apk` と `opkg` のどちらを使うか、フィードファイルがどこにあるかを把握する。
+- リリース、ターゲット、アーキテクチャ、kmodsのカーネルハッシュを合わせる。
+- 中国のミラーがURLのどの部分を置き換えるか、どのパスを正確に保つ必要があるかを理解する。
+- 「ミラーを変えたらパッケージがインストールできない」理由と、復旧方法を理解する。
+- `apk upgrade`/`opkg upgrade` がファームウェアのアップグレードではない理由を理解する。
+
+## パッケージマネージャーとフィードを確認する
+
+<Step where="router-shell" title="バージョン、ターゲット、アーキテクチャを読み取る" expected="リリース/ターゲット/アーキテクチャの組み合わせを正確に書ける。">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+uname -m
+cat /etc/apk/arch 2>/dev/null
+opkg print-architecture 2>/dev/null
+```
+
+重要な項目は `release.version`、`release.target`、`DISTRIB_ARCH`、`release.revision` です。ミラーのパスと一致している必要があります。
+
+</Step>
+
+<Step where="router-shell" title="現在のフィードファイルを確認する" expected="各フィードの向き先と、apkかopkgかがわかる。">
+
+OpenWrt 25.12（apk）:
+
+```sh
+cat /etc/apk/repositories.d/distfeeds.list
+```
+
+OpenWrt 24.10（opkg）:
+
+```sh
+cat /etc/opkg/distfeeds.conf
+cat /etc/opkg/customfeeds.conf
+```
+
+編集前にバックアップします。
+
+```sh
+cp /etc/apk/repositories.d/distfeeds.list /etc/apk/repositories.d/distfeeds.list.bak.$(date +%F) 2>/dev/null || true
+cp /etc/opkg/distfeeds.conf /etc/opkg/distfeeds.conf.bak.$(date +%F) 2>/dev/null || true
+```
+
+</Step>
+
+## 25.12のapk構成
+
+OpenWrt 25.12は `apk` を使い、インデックスは `.adb`、パッケージは `.apk` です。代表的なフィードは次のとおりです。
+
+- `targets/<target>/packages/packages.adb`: ターゲット固有のパッケージ
+- `packages/<arch>/base/packages.adb`: base
+- `packages/<arch>/luci/packages.adb`: LuCI
+- `packages/<arch>/packages/packages.adb`: 一般のパッケージ
+- `packages/<arch>/routing|telephony|video/packages.adb`: カテゴリ別フィード
+- `targets/<target>/kmods/<kernel-hash>/packages.adb`: カーネルモジュール。ハッシュは実行中のカーネルと一致している必要があります。
+
+コマンド:
+
+```sh
+apk update
+apk search <name>
+apk add <name>
+apk info -e <name>
+```
+
+`opkg` は使わないでください。24.10の `.ipk` を `.apk` に名前変更してもインストールできません。
+
+## 24.10のopkg構成
+
+OpenWrt 24.10は `opkg` を使い、インデックスは `Packages.gz`、パッケージは `.ipk` です。
+
+```sh
+opkg update
+opkg list | grep <name>
+opkg install <name>
+opkg list-installed | grep <name>
+```
+
+`apk` は使わないでください。25.12の `.apk` をopkgに渡さないでください。
+
+## 中国のミラーへの書き換え
+
+TUNAミラーのルートは次のとおりです。
+
+```text
+https://mirrors.tuna.tsinghua.edu.cn/openwrt/
+```
+
+`https://downloads.openwrt.org` だけをこのルートに置き換え、**残りのパスはすべてそのまま**にします。
+
+```text
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/packages/packages.adb
+→ https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.6/targets/x86/64/packages/packages.adb
+```
+
+`.../openwrt/` で終わらせたり、`releases/25.12.6/targets/x86/64/...` を省いたりしないでください。パスが不完全だと404になります。
+
+<Step where="router-shell" title="編集前にミラーのパスを確認する" expected="curlが200を返し、パスが現在のリリース/ターゲットと一致する。">
+
+```sh
+curl -I https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.6/targets/x86/64/packages/packages.adb
+```
+
+URLは自分のリリース/ターゲットに置き換えてください。kmodsはカーネルハッシュも確認します。ミラーにパスがない場合は、無理に使わないでください。
+
+</Step>
+
+<Step where="router-shell" title="インデックスだけを更新し、システムはアップグレードしない" expected="apk/opkgのupdateが成功し、パッケージが一括アップグレードされない。">
+
+```sh
+apk update
+# または
+opkg update
+```
+
+`apk search`/`opkg list` でフィードが読めることを確認し、必要なものだけをインストールします。`apk upgrade`/`opkg upgrade` を**ファームウェアのアップグレードとして扱わないでください**。ファームウェアには sysupgrade/ASU/owut を使います。
+
+</Step>
+
+## よくある障害
+
+### 404
+
+- リリースの誤り（25.12.6と24.10.8）
+- ターゲットの誤り（`x86/64` であり、`x86_64` というディレクトリではない）
+- アーキテクチャの誤り（`x86_64`、`aarch64`）
+- ミラーがそのパスをまだ同期していない
+- `packages` と `targets` のディレクトリを取り違えている
+
+### 署名/検証の失敗
+
+- インデックスの破損、または別のリリースのもの
+- システム時刻や証明書の誤り
+- 別のフィードが混在している
+- `--allow-untrusted` に頼らず、フィードや検証の問題を直す
+
+### 依存関係/ABIの不一致
+
+- kmodsのカーネルハッシュが一致しない
+- 別のターゲット/アーキテクチャ向けにビルドされたパッケージ
+- 公式とImmortalWrt/iStoreOSのフィードを混在させている
+- 同じソース、リリース、アーキテクチャを使うか、再ビルドが必要
+
+### コマンドが見つからない
+
+- 25.12には `opkg` がなく、24.10には `apk` がありません。
+- コマンドを動かすためだけにパッケージマネージャーをインストールしないでください。先にファームウェアとソースを確認します。
+
+### パッケージはインストールされたがLuCIに表示されない
+
+- 本体のパッケージだけを入れ、`luci-app-*` を入れていない
+- 言語パックがない
+- ブラウザーのキャッシュ/再読み込み
+- パッケージのバージョンがLuCIと合っていない
+
+## 復旧
+
+```sh
+# apk
+cp /etc/apk/repositories.d/distfeeds.list.bak.YYYY-MM-DD /etc/apk/repositories.d/distfeeds.list
+apk update
+
+# opkg
+cp /etc/opkg/distfeeds.conf.bak.YYYY-MM-DD /etc/opkg/distfeeds.conf
+opkg update
+```
+
+ミラーを変えたあとに更新できなくなった場合は、まず公式フィードに戻し、DNS/時刻/証明書を確認してから、もう一度ミラーを試します。多数のミラーを渡り歩かないでください。
+
+## E2ラボ検証（2026-10-20）
+
+- 環境: OpenWrt 25.12.6 x86 VM 200、`apk`、公式フィードとTUNAミラー
+- 公式の `apk update`: `OK: 11220 distinct packages available`。`apk search -x sqm-scripts` で `sqm-scripts-1.7.2-r1` が見つかった。
+- TUNAへ切り替え: `apk update` も11220。`apk add sqm-scripts` で `1.7.2-r1` をインストールできた。
+- 公式フィードへ復元: `apk update` は成功し、最終的なフィードは `downloads.openwrt.org` に戻った。
+- 未検証: 24.10の `opkg`、署名エラー、混在/ABI不一致、ミラーのインデックス破損
+- レシピ: `tests/recipes/package-sources.md`
+
+## E2の状況と出典
+
+- これはE2の部分的な検証です。25.12の `apk` で公式/TUNA/インストール/復元の経路を検証しました。`opkg` と不正なフィードの分岐は、ドキュメントの記述にとどまります。
+- ミラーのパスはリリースごとに変わります。公開前に、対象のリリース/ターゲット/アーキテクチャで `update`/`search` を再実行してください。
+- 公式、ImmortalWrt、iStoreOSのフィードを混在させないでください。ABI、カーネル、署名のいずれも不一致になる可能性があります。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200、公式/TUNAフィード、apk update/search/install、公式フィードへ復元"
+  recipe="tests/recipes/package-sources.md"
+  result="E2部分検証: 25.12.6 x86の公式フィードは11220パッケージ、TUNAも11220。sqm-scripts 1.7.2をインストールでき、公式フィードへの復元後も通常どおり更新できた。24.10のopkgは未検証"
+/>
+
+<PageSources />

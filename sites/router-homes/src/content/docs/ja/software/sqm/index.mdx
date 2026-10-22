@@ -1,0 +1,247 @@
+---
+title: "SQMとCAKE：ダウンロード・アップロード中のラグを解消"
+description: ラグがバッファブロートかどうかを確認し、SQM/CAKEでWANトラフィックをシェーピングして、前後のレイテンシ計測値で検証します。仮想NICでは実際の回線を再現できません。
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; sqm-scripts 1.7.2 + luci-app-sqm; WAN eth1 DHCP; CAKE qdisc 適用済み; 実回線の性能データなし'
+testRecipe: 'tests/recipes/sqm-25.12.md'
+aliases: ['openwrt sqm', 'openwrt cake', 'sqm setup', 'bufferbloat', 'openwrt sqm 設定', 'openwrt cake 設定', 'openwrt バッファブロート 対策', 'openwrt ラグ 改善', 'openwrt 帯域制御']
+symptoms: ['ダウンロード中にゲームがラグい', 'ビデオ通話がカクつく', 'レイテンシのスパイク', 'アップロード中にブラウジングが遅い']
+sources:
+  - label: OpenWrt SQMドキュメント
+    url: https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm
+  - label: OpenWrt SQM scriptsパッケージ
+    url: https://openwrt.org/packages/pkgdata/sqm-scripts
+  - label: CAKE qdiscドキュメント
+    url: https://www.bufferbloat.net/projects/codel/wiki/Cake/
+  - label: Bufferbloatプロジェクト
+    url: https://www.bufferbloat.net/projects/bloat/wiki/Introduction/
+sourceHash: '59a725ea59a5c246'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
+
+## 達成できること
+
+- 「ダウンロード/アップロード中のラグ」が、Wi-Fi、ONU、ISPの混雑ではなくバッファブロートによるものか判断します。
+- OpenWrt 25.12に `sqm-scripts` とCAKEをインストールして設定します。
+- 「速くなった気がする」ではなく、アイドル時と負荷時のレイテンシ、パケットロス、スループットを記録します。
+- SQMが不適切なケースと、すぐに無効化する方法を把握します。
+
+## 対象環境
+
+- `apk` を使うOpenWrt 25.12.6、`sqm-scripts 1.7.2`、任意で `luci-app-sqm`。
+- ルーターが**メインのNATゲートウェイ**で、WANトラフィックがルーターを通過すること。APやバイパスルーターでは、SQMがメインのトラフィックを捕捉できない場合があります。
+- CAKEはCPUを消費します。ギガビット回線では、シェーピングを追加する前にシングルコアの使用率を確認してください。
+- このページはE2（一部）です。インストールとCAKEの適用/停止をテストしました。スループットやレイテンシに関する主張には実際のWANが必要で、E3の範囲です。
+
+## バッファブロートか確認する
+
+典型的な兆候：
+
+- アイドル時のpingは正常だが、ダウンロード/アップロードを始めるとすぐにレイテンシが跳ね上がり、ゲームが飛び、通話がカクつく。
+- ダウンロード/アップロードの帯域を制限すると、レイテンシが再び下がる。
+- 有線でもWi-Fiでも同じクライアントで発生し、WANキューが原因と考えられる。
+
+バッファブロートではないケース：
+
+- Wi-Fiの特定の部屋/クライアントだけが悪い：電波強度、干渉、ローミングを確認します。
+- アイドル時でもレイテンシやパケットロスが高い：ONU、ISP、回線を確認します。
+- ルーターのCPUがすでに飽和している：SQMで悪化する可能性があります。
+
+## 主なパラメーター
+
+| パラメーター | 意味 | よくある間違い |
+|---|---|---|
+| `interface` | シェーピング対象のインターフェース（通常は `wan`） | `eth0`/`br-lan` を指定してトラフィックが迂回される |
+| `download`/`upload` | シェーピング後の速度（kbit/s） | 契約上の速度をそのまま使い、キューが満杯のままになる |
+| `qdisc` | `cake` または `fq_codel` | SQMを有効にしたのにデフォルトのqdiscのまま |
+| `script` | `piece_of_cake.qos` / `simplest.qos` | スクリプトが違い、オプションが適用されない |
+| `linklayer`/`overhead` | リンク層のオーバーヘッド | PPPoE/VLANでEthernetの値をコピーする |
+| CPU | CAKEの計算コスト | 処理が追いつかないCPUでギガビットのCAKEを使う |
+
+計測したスループットの**85%～95%**から始め、負荷時のレイテンシを見ながら調整します。「100Mの契約だから100000」としないでください。
+
+## 変更する前に
+
+<Step where="router-shell" title="WAN、CPU、現在のqdiscを記録する" expected="どのインターフェースを変更するか、SQMがすでに有効かどうかが分かります。">
+
+```sh
+ip -br link
+ip -br addr
+uci show network | grep -E "wan|device"
+uci show sqm 2>/dev/null || echo "sqm not installed"
+top -bn1 | head -15
+```
+
+WANの論理インターフェース、物理デバイス、契約速度/計測速度、CPUモデルを書き留めます。LuCI/SSHでのアクセスは維持してください。
+
+</Step>
+
+<Step where="router-shell" title="アイドル時のベースラインを取る" expected="比較用にアイドル時のレイテンシ/パケットロスが記録されます。">
+
+```sh
+ping -c 20 1.1.1.1
+ping -c 20 192.168.50.1
+```
+
+`irtt`/`flent` が使えればそちらを使います。なければ、min/avg/max/mdevとパケットロスを記録します。
+
+</Step>
+
+## 最小限の手順
+
+<Step where="router-shell" title="SQMをインストールする" expected="sqm-scriptsとLuCIアプリがインストールされます。">
+
+```sh
+apk update
+apk add sqm-scripts luci-app-sqm
+```
+
+`luci-app-sqm` だけではスクリプトはインストールされません。`apk info -e sqm-scripts` で確認してください。
+
+</Step>
+
+<Step where="luci" title="LuCIでSQMを設定する" expected="WANにcake/piece_of_cakeが設定され、有効/無効を切り替えられます。">
+
+**ネットワーク → SQM QoS** を開きます。
+
+1. 有効にします。
+2. `wan` を選択します（`br-lan` ではありません）。
+3. ダウンロード/アップロードを、計測したスループットの85%～95%に設定します。
+4. `cake` と `piece_of_cake.qos` を選択します。
+5. 実際のリンク層を選択します（PPPoE/VLANでEthernetの値をコピーしないでください）。
+6. 保存して適用します。
+
+控えめな値から始め、レイテンシが改善してから速度を上げます。
+
+</Step>
+
+<Step where="router-shell" title="CLIでの同等の操作（先にセクション名を確認）" expected="uci show sqm に、変更したキューが表示されます。">
+
+```sh
+uci show sqm
+```
+
+セクション名は `@queue[0]` とは限りません。実際の名前を使ってください。例：
+
+```sh
+uci set sqm.@queue[0].enabled='1'
+uci set sqm.@queue[0].interface='wan'
+uci set sqm.@queue[0].download='90000'
+uci set sqm.@queue[0].upload='18000'
+uci set sqm.@queue[0].qdisc='cake'
+uci set sqm.@queue[0].script='piece_of_cake.qos'
+uci set sqm.@queue[0].linklayer='ethernet'
+uci set sqm.@queue[0].overhead='0'
+uci commit sqm
+/etc/init.d/sqm restart
+```
+
+これらの数値は例であり、お使いの回線のパラメーターではありません。`linklayer`/`overhead` を確認してください。
+
+</Step>
+
+<Step where="router-shell" title="qdiscが適用されたことを確認する" expected="wanにcake/fq_codelが表示され、ログに異常がありません。">
+
+```sh
+tc -s qdisc show dev wan
+tc -s qdisc show | grep -E "cake|fq_codel|ifb"
+logread -e sqm | tail -30
+```
+
+`noqueue`/`pfifo_fast` しか表示されない場合、SQMは有効になっていません。インターフェースと `/etc/init.d/sqm` のログを確認してください。
+
+</Step>
+
+## 負荷時の検証
+
+<Step where="client" title="ダウンロード/アップロード中のレイテンシを計測する" expected="感覚ではなく、前後のデータが得られます。">
+
+別のターミナルで回線を飽和させている間、pingを実行し続けます。
+
+```sh
+# terminal A
+ping -i 0.2 1.1.1.1
+
+# terminal B: use a trusted speed/download tool to saturate the line
+```
+
+記録する項目：
+
+- アイドル時と負荷時のmin/avg/max/mdev
+- パケットロス
+- スループットが大きく低下していないか
+- ルーターのCPUコアが1つ飽和していないか
+
+このデータがない場合は、「SQMでレイテンシが下がった」と書かないでください。
+
+</Step>
+
+## 失敗時の分岐と復旧
+
+### SQMが起動しない / qdiscがない
+
+```sh
+logread -e sqm | tail -50
+tc -s qdisc show dev wan
+uci show sqm
+```
+
+よくある原因：インターフェースの誤り、`sqm-scripts` の未インストール、未対応のqdisc/スクリプトの組み合わせ、`tc` のエラー。デバッグの前にSQMを無効にして、以前の状態に戻してください。
+
+### スループットが激減する / CPUが飽和する
+
+- 速度設定が低すぎる：計測値から段階的に引き上げます。
+- 非力なCPUではCAKEの負荷が大きい：`fq_codel` を使うか、速度を下げます。
+- リンクのオーバーヘッドが誤っている：PPPoE/VLAN向けに修正します。
+- SQMを無効にして、スループットが戻ることを確認します。
+
+### 効果がない
+
+- トラフィックがルーターを経由していない（AP/バイパス/スイッチ）。
+- ボトルネックがWi-FiまたはISPの混雑にある。
+- ダウンロードだけがシェーピングされ、アップロードは混雑したまま。
+- 負荷時ではなく、アイドル時のレイテンシを計測した。
+
+### すばやく無効にする
+
+```sh
+uci set sqm.@queue[0].enabled='0'
+uci commit sqm
+/etc/init.d/sqm restart
+```
+
+または、以前の `/etc/config/sqm` のバックアップを復元します。
+
+## E2ラボ実行（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200、WAN `eth1` DHCP `192.168.50.158/24`、`sqm-scripts 1.7.2-r1`、`luci-app-sqm`。
+- 設定：`eth1`、ダウンロード `100000 Kbps`、アップロード `20000 Kbps`、`piece_of_cake.qos`、`cake`。
+- 開始：`SQM: ... started on eth1 successfully`。`tc -s qdisc show dev eth1` に `qdisc cake ... bandwidth 20Mbit` が表示されました。
+- 停止：`SQM: Stopping SQM on eth1`。qdiscは `fq_codel` に戻りました。
+- このVMの数値を、レイテンシの低下や体感の改善の根拠として使わないでください。実回線、負荷時のレイテンシ、スループットの比較はありません。
+- 未テスト：実際のブロードバンドでのバッファブロートの前後比較、CPUシングルコアの使用率、PPPoE/VLANのオーバーヘッド、Wi-Fiのボトルネック。
+- レシピ：`tests/recipes/sqm-25.12.md`。
+
+## E2の状況と情報源
+
+- このページはE2（一部）です。インストール、CAKEの適用/停止、復旧をテストしました。実回線での性能はE3の範囲です。
+- VMで確認できるのはコマンドとqdiscの適用だけで、家庭用ブロードバンドは再現できません。VMの数値を「動作する」ことの根拠にしないでください。
+- 実環境では、回線/CPU/qdisc、アイドル時/負荷時のレイテンシ、スループットを記録してから、SQMを使い続けるか判断してください。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; sqm-scripts 1.7.2 + luci-app-sqm; WAN eth1 DHCP; CAKE qdisc 適用済み; 実回線の性能データなし"
+  recipe="tests/recipes/sqm-25.12.md"
+  result="E2（一部）：piece_of_cake.qosでeth1に100/20 MbitのSQMを開始。tcでcake 20Mbitを確認。停止するとfq_codelに戻った。実回線のスループット/レイテンシのデータなし"
+/>
+
+<PageSources />

@@ -1,0 +1,154 @@
+---
+title: "DSA VLAN: ポート、PVID、tagged/untagged とロールバック"
+description: DSA 環境で bridge-vlan によるポート VLAN を設定します。tagged/untagged/PVID とトランクの考え方、管理用ポートの確保、ポートを 1 つずつ変更する手順を説明します。ドキュメントのみで、実際のスイッチングハードウェアでは未検証です。
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'OpenWrt 25.12 の DSA/VLAN ドキュメントを基に作成。実際のマルチポート DSA ハードウェア/スイッチでは未検証'
+testRecipe: 'tests/recipes/dsa-vlan-25.12.md'
+aliases: ['openwrt dsa vlan', 'openwrt vlan 設定', 'openwrt vlan 分離', 'bridge-vlan', 'openwrt tagged untagged', 'openwrt タグ付き タグなし', 'openwrt vlan アクセスできない']
+symptoms: ['VLAN が動作しない', 'VLAN 変更後に接続できなくなった', 'トランクが認識されない', 'ポートの PVID が正しくない']
+sources:
+  - label: OpenWrt DSA ミニチュートリアル
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+  - label: OpenWrt VLAN 設定
+    url: https://openwrt.org/docs/guide-user/network/vlan/switch_configuration
+  - label: OpenWrt ネットワーク設定
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt ファイアウォール
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: 'ffd770023be30d71'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="DSA マルチポートデバイス (未検証)" tested={false} evidence="E1" />
+
+> **ステータス**: E1 のドキュメントです。VLAN 設定は、DSA のポート名、CPU ポート、スイッチの接続先によって変わります。実機で確認していないため、この例を検証済みとは見なさないでください。
+
+## DSA と swconfig の違い
+
+- 古いデバイスでは `swconfig` が使われることが多く、`switch0` やポート 0/1/2 で表します。
+- DSA では各ポートが `lan1`、`lan2`、`wan` などとして見えます。
+- 現在の OpenWrt では、`swconfig` の `vid/ports` 構文ではなく **bridge VLAN filtering** を使います。
+- ポート名はデバイスによって異なります。`ip -d link show` や `ls /sys/class/net` で確認してください。
+
+## 変更前に記録する
+
+<Step where="router-shell" title="DSA、ポート名、管理用の入口を確認する" expected="どのポートが LAN/WAN か、どこからデバイスを管理しているかが分かる。">
+
+```sh
+ip -d link show
+ls /sys/class/net
+uci show network
+uci show firewall | grep -E 'zone.*name|zone.*network'
+bridge vlan show
+```
+
+- `br-lan` にすでに `bridge-vlan` はありますか。
+- どの物理ポートで管理していますか。
+- 接続先のスイッチはすでにトランク/tagged に設定されていますか。
+- バックアップ: `cp /etc/config/network /etc/config/network.bak.$(date +%F)`。
+
+</Step>
+
+## bridge-vlan の例
+
+DSA ポートが `lan1`、`lan2`、`lan3` だとします。`lan1` をトランク (VLAN 1 と 20 を tagged) にし、`lan2` と `lan3` を VLAN 1 のアクセスポートにします。
+
+```uci
+config device
+    option name 'br-lan'
+    option type 'bridge'
+    list ports 'lan1'
+    list ports 'lan2'
+    list ports 'lan3'
+
+config bridge-vlan
+    option device 'br-lan'
+    option vlan '1'
+    list ports 'lan1:u*'
+    list ports 'lan2:u*'
+    list ports 'lan3:u*'
+
+config bridge-vlan
+    option device 'br-lan'
+    option vlan '20'
+    list ports 'lan1:t'
+```
+
+ポイント:
+
+- `u*`: untagged で、その VLAN におけるこのポートの PVID です。
+- `t`: tagged で、トランク経由で運ばれます。
+- アクセスポートの untagged PVID は、通常 1 つだけです。
+- スイッチ間のトランクは、両端とも tagged にし、同じ VLAN を許可する必要があります。
+- 古い `swconfig` の設定を残したまま併用しないでください。
+
+> ポート名や CPU ポートはお使いのデバイスに合わせて置き換えてください。不安な場合は、予備のポートやデバイスでテストしてください。
+
+## 適用と確認
+
+```sh
+uci commit network
+/etc/init.d/network reload
+bridge vlan show
+ip -d link show br-lan
+```
+
+確認項目:
+
+- 管理用の LuCI/SSH に引き続き接続できる。
+- アクセスポートのクライアントが、正しい VLAN の DHCP からアドレスを取得できる。
+- トランクの接続先で tagged の VLAN が見える。
+- `bridge vlan show` の内容が、設計した PVID/tagged と一致している。
+
+## 接続できなくなった場合の復旧
+
+1. コンソール/シリアルを使います。ネットワークだけに頼らないでください。
+2. `/etc/config/network.bak.*` を復元します。
+3. または、管理用ポートを一時的に untagged の VLAN 1 に戻します。
+4. ネットワークを再起動し、管理に接続できることを確認します。
+5. VLAN はポートを 1 つずつ追加します。
+
+## よくある失敗
+
+### 変更直後に接続できなくなる
+
+- 管理用ポートを tagged に変えた、または PVID が間違っている。
+- トランクの接続先がその VLAN を許可していない。
+- CPU/アップリンクのポートをまとめて変更した。
+- コンソールから復旧します。むやみに初期化しないでください。
+
+### VLAN 20 に到達できない
+
+- 両端で tagged/untagged が一致していない。
+- PVID が設定されていない。
+- その VLAN 用のインターフェース/DHCP/ファイアウォールがない。
+- スイッチ側で VLAN が作成または許可されていない。
+
+### アドレスは取得できるがインターネットに出られない
+
+- ゲスト/サービス用 VLAN に DHCP/DNS がない。
+- ファイアウォールのゾーンやフォワーディングが一致していない。
+- NAT や戻りのルートがない。
+- VLAN で通信できることは、ルーティングや NAT ができることとは別です。
+
+## E1 の状況
+
+- ドキュメントのみです。実際の DSA ハードウェア/スイッチでは検証しておらず、「設定に成功した」とは述べません。
+- 実機でのテストには、マルチポートの DSA デバイス、マネージドスイッチ、コンソール、ロールバック用の設定、少なくとも 2 台のクライアントが必要です。
+- E2 に引き上げるのは、デバイスのモデル、ポート名、スイッチの設定、障害からの復旧を記録したあとです。
+
+<TestRecord
+  status="planned"
+  environment="OpenWrt 25.12 の DSA/VLAN ドキュメントを基に作成。実際のマルチポート DSA ハードウェア/スイッチでは未検証"
+  recipe="tests/recipes/dsa-vlan-25.12.md"
+  result="E1: DSA ポート、bridge-vlan、tagged/untagged/PVID、ロールバックを記載。実機での検証はなく、「動作する」とは述べません"
+/>
+
+<PageSources />

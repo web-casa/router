@@ -1,0 +1,53 @@
+---
+title: "OpenWrtのSQMとCAKE: 回線が埋まっても低遅延を保つ"
+description: "SQMは回線速度のわずかに下で通信を整形し、キューを短く保ちます。CAKEと組み合わせてバッファブロートに対処します。OpenWrtのガイドが推奨する設定を紹介します。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt sqm", "openwrt cake", "openwrt sqm 設定", "openwrt qos", "openwrt 遅延 対策", "bufferbloat openwrt", "openwrt バッファブロート"]
+sources:
+  - label: "OpenWrt SQMガイド"
+    url: https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm
+  - label: "Linux 4.19 (kernelnewbies)"
+    url: https://kernelnewbies.org/Linux_4.19
+  - label: "CAKE (bufferbloat.net)"
+    url: https://www.bufferbloat.net/projects/codel/wiki/Cake/
+sourceHash: '97230357bbbdc535'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="sqm" />
+
+## ひとことで言うと
+
+SQM（Smart Queue Management）は、回線速度のわずかに下で通信を整形します。これにより、キューがモデムではなく、管理できるルーターの中にできます。CAKEキューイング規律と組み合わせると、回線が混み合っていても遅延を低く保てます。この問題はバッファブロートと呼ばれます。
+
+## OpenWrtのガイドの推奨
+
+1. `luci-app-sqm` をインストールします。LuCIを使わない場合は `sqm-scripts` をインストールします。
+2. 実際のダウンロードとアップロードの速度を測定し、どちらも測定値の**90%**に設定します。
+3. `piece_of_cake.qos` で `cake` を選びます。
+4. 負荷をかけて再度テストし、調整します。`simple.qos` の `fq_codel` は、より軽量で機能の少ない代替手段です。
+
+CAKEはLinuxカーネル4.19から含まれています。
+
+## ルーターで確認する
+
+SQMをインストールしたら、次を実行します。
+
+```sh
+cat /etc/config/sqm
+```
+
+## 注意
+
+- 整形はCPUを使います。高速な回線では小型のルーターが追いつかないことがあるため、前後で速度と遅延を比較してください。
+- 契約プランの公称速度ではなく、測定値から速度を設定してください。
+
+## 関連ガイド
+
+- [SQM / CAKE](/ja/software/sqm/)
+
+<PageSources />
