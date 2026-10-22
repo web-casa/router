@@ -1,0 +1,176 @@
+---
+title: "這是哪一種 OpenWrt：官方版、ImmortalWrt、iStoreOS 還是原廠韌體？"
+description: 用唯讀指令讀取發行版、版本、target、套件管理員與硬體型號，讓你選對映像檔與軟體源。
+pageType: troubleshoot
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: '裝置擷取待補；指令皆為唯讀，不依賴實驗室環境'
+testRecipe: 'tests/recipes/which-openwrt.md'
+aliases: ['openwrt version', 'immortalwrt vs openwrt', 'istoreos openwrt', 'openwrt firmware identify']
+symptoms: ['不知道該刷哪個映像檔', '套件無法安裝', '韌體來源不明']
+sources:
+  - label: OpenWrt 25.12 發行說明
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: OpenWrt 韌體選擇器
+    url: https://firmware-selector.openwrt.org/
+  - label: OpenWrt 套件管理員（apk）
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: ImmortalWrt
+    url: https://immortalwrt.org/
+  - label: iStoreOS
+    url: https://www.istoreos.com/
+sourceHash: 'c81d8dfe3c689c0e'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="unknown" version="—" packageManager="—" device="any OpenWrt-like device" tested={false} evidence="E1" />
+
+## 預期結果
+
+- 判斷裝置執行的是**官方 OpenWrt、ImmortalWrt、iStoreOS 還是原廠韌體**。
+- 讀取發行版、版本、修訂版、target、架構與硬體型號。
+- 知道套件管理員是 `apk` 還是 `opkg`，以及哪些軟體源屬於它。
+- 選對 sysupgrade/原廠映像檔，而不是刷錯。
+
+## 從三個唯讀指令開始
+
+<Step where="router-shell" title="讀取系統板資料" expected="你可以看到發行版、版本、target 與型號。">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+```
+
+四個關鍵欄位是 `release.distribution`、`release.version`、`release.target` 與 `model`。
+
+</Step>
+
+<Step where="router-shell" title="讀取套件管理員與架構" expected="你知道是 apk 還是 opkg，以及 CPU 架構。">
+
+```sh
+command -v apk
+command -v opkg
+cat /etc/apk/arch 2>/dev/null
+opkg print-architecture 2>/dev/null
+uname -a
+```
+
+不要從版本號猜測套件管理員：官方 25.12 通常使用 `apk`，24.10 使用 `opkg`，但衍生版本/原廠映像檔可能不同。請以實際存在的指令為準。
+
+</Step>
+
+<Step where="router-shell" title="讀取型號與硬體修訂版" expected="型號與板名和裝置標籤相符。">
+
+x86：
+
+```sh
+cat /sys/class/dmi/id/sys_vendor
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/board_version
+cat /sys/class/dmi/id/bios_version
+```
+
+ARM/路由器：
+
+```sh
+cat /tmp/sysinfo/model
+cat /tmp/sysinfo/board_name
+```
+
+`model` 並不等於硬體修訂版；同一個型號可能有多個修訂版。刷機前，請參照標籤、`board_name` 與原廠下載頁面。
+
+</Step>
+
+## 判斷表
+
+| 欄位/特徵 | 官方 OpenWrt | ImmortalWrt | iStoreOS | 原廠韌體 |
+|---|---|---|---|---|
+| `release.distribution` | `OpenWrt` | 通常為 `ImmortalWrt` | 通常為 `iStoreOS`/原廠 | 原廠 |
+| 軟體源 | `downloads.openwrt.org` | ImmortalWrt 軟體源 | iStoreOS 軟體源 | 原廠商店 |
+| 套件管理員 | `apk`（25.12）或 `opkg`（24.10） | 檢查實際指令 | 通常為 `opkg` | 可能沒有/受限 |
+| 網頁介面 | LuCI | LuCI + 自訂 | iStoreOS 介面 | 原廠介面 |
+| 升級映像檔 | OpenWrt sysupgrade | ImmortalWrt 映像檔 | iStoreOS 映像檔 | 原廠韌體 |
+| 支援 | OpenWrt 社群 | ImmortalWrt 社群 | iStoreOS 社群 | 原廠 |
+
+**不要混用**：不要把 OpenWrt 官方軟體源加到 ImmortalWrt/iStoreOS，也不要刷入其他型號的 sysupgrade；ABI、核心與分割區配置可能不相符。
+
+## 為什麼只看「關於」頁面不夠
+
+- 有些原廠映像檔只是替 LuCI 換了外觀，底層並不是官方 OpenWrt。
+- `DISTRIB_DESCRIPTION` 可以被自訂，單靠它並不足夠。
+- 相同的版本號並不代表相同的 target/設定檔。
+- 安裝外掛時，真正重要的是套件管理員與軟體源。
+
+請交叉比對 `ubus call system board`、`/etc/openwrt_release` 與套件管理員。
+
+## 選擇升級映像檔
+
+<Step where="router-shell" title="記錄 target 與 board_name" expected="你可以在韌體選擇器/原廠頁面找到完全相符的項目。">
+
+```sh
+ubus call system board
+```
+
+重點在於：
+
+- `release.target`（例如 `x86/64`、`mediatek/filogic`）；
+- `board_name`；
+- `model`；
+- 目前的版本/修訂版。
+
+官方支援的裝置，請使用 [OpenWrt 韌體選擇器](https://firmware-selector.openwrt.org/)，並輸入確切的 target/型號。ImmortalWrt/iStoreOS/原廠裝置請使用各自的下載頁面。**切勿交叉刷入其他型號或 target 的 sysupgrade。**
+
+</Step>
+
+<Step where="router-shell" title="確認映像檔類型" expected="你知道這是 sysupgrade 還是 factory/原廠映像檔。">
+
+- 升級現有的 OpenWrt 通常使用 `sysupgrade`。
+- 從原廠韌體首次安裝，通常使用 `factory`/原廠過渡映像檔。
+- x86 可能使用 combined/ext4 映像檔，寫入方式不同。
+- 如果不確定，請閱讀裝置頁面；不要憑檔名猜測。
+
+</Step>
+
+## 失敗分支與復原
+
+### `ubus` 不存在或執行失敗
+
+這可能是原廠韌體或非 OpenWrt 系統。請查看網頁介面的「關於/系統」與裝置標籤；不要盲目刷入 OpenWrt。
+
+### 只有網頁介面，沒有 SSH
+
+原廠韌體可能停用 SSH。請先查看原廠文件/保固；不要只為了取得 root 而刷機。如果你需要原廠功能，請使用原廠的升級途徑。
+
+### 套件無法安裝
+
+- 套件管理員與韌體不符（`apk` 對 `opkg`）；
+- 軟體源的架構/版本不符；
+- 核心模組 ABI 不符；
+- 混入了其他衍生版本的軟體源。
+
+回到 `ubus call system board` 與套件管理員，確認來源後再除錯。
+
+### 映像檔錯誤 / 裝置變磚
+
+停止刷機。使用裝置的 failsafe、TFTP 或原廠復原程序。如果沒有復原途徑，不要再「多試一個映像檔」。
+
+## E1 狀態與來源
+
+- 這是 E1：欄位、判斷表與映像檔選擇方法依據公開文件；本環境中沒有擷取任何裝置。
+- 衍生版本/原廠的輸出可能不同；請在真實裝置上執行 `tests/recipes/which-openwrt.md`，記錄欄位與螢幕截圖後，再升級為 E2。
+- 本頁僅用於辨識韌體；不提供跨型號刷機或繞過原廠限制的方法。
+
+<TestRecord
+  status="planned"
+  environment="裝置擷取待補；唯讀指令，不依賴實驗室環境"
+  recipe="tests/recipes/which-openwrt.md"
+  result="E1：已記載欄位、判斷表與映像檔選擇方法；尚無裝置擷取"
+/>
+
+<PageSources />

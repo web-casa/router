@@ -1,0 +1,58 @@
+---
+title: "Linux 6.12 與 25.12 工具鏈：為何核心模組必須相符"
+description: "OpenWrt 25.12 由 Linux 6.6 升到 6.12，GCC 由 13.3 升到 14.3。這對 kmod 套件與第三方軟體源代表什麼。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt 核心版本", "openwrt 25.12 核心", "openwrt kmod 不相符"]
+sources:
+  - label: "OpenWrt 25.12.0 發行公告"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: "OpenWrt 25.12.6 維護版本"
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: "OpenWrt 24.10.0 發行公告"
+    url: https://forum.openwrt.org/t/openwrt-24-10-0-first-stable-release/223845
+sourceHash: 'b6196d9a49934dce'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="kernel-toolchain" />
+
+## 一句話說明
+
+25.12 讓所有 target 由 Linux 6.6 升到 6.12，並更新工具鏈，因此為 24.10 編譯的核心模組無法在 25.12 上載入。
+
+## 版本對照
+
+| 元件 | 24.10.0 | 25.12.0 |
+|---|---|---|
+| Linux 核心 | 6.6.73 | 6.12.71 |
+| GCC | 13.3.0 | 14.3.0 |
+| binutils | 2.42 | 2.44 |
+| musl | 1.2.5 | 1.2.5 |
+| glibc | 2.38 | 2.41 |
+
+25.12.6 將核心更新到 6.12.112。在 25.12.0 中，無線堆疊（cfg80211/mac80211）來自核心 6.18.7，同時包含 dnsmasq 2.91、dropbear 2025.89 與 busybox 1.37.0。
+
+## 為何對家用環境很重要
+
+- `kmod-*` 套件是針對某一個確切的核心編譯的。軟體源路徑包含核心雜湊值，例如 `targets/<target>/kmods/<kernel-hash>/`，且必須與正在執行的核心相符。
+- 來自其他 release、其他建置或雜湊值不同的鏡像的 kmod，會安裝失敗或無法載入。這是套件「裝不起來」的常見原因。
+- 第三方建置通常自帶核心。官方的 kmod 可能完全不適用。
+
+## 在你的路由器上查看
+
+```sh
+uname -r
+grep -E 'RELEASE|TARGET' /etc/openwrt_release
+```
+
+## 相關指南
+
+- [套件軟體源](/zh-hant/software/package-sources/)
+- [套件裝不起來](/zh-hant/troubleshooting/plugin-install/)
+- [這是哪個 OpenWrt？](/zh-hant/getting-started/which-openwrt/)
+
+<PageSources />

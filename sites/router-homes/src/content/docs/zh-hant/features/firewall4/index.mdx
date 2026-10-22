@@ -1,0 +1,51 @@
+---
+title: "firewall4：OpenWrt 的 nftables 防火牆與區域"
+description: "自 22.03 起，OpenWrt 的防火牆為基於 nftables 的 firewall4，設定仍沿用與先前相同的區域式 UCI 語法。本文說明如何閱讀它，以及哪些舊作法已不再適用。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt firewall4", "openwrt fw4", "openwrt nftables"]
+sources:
+  - label: "OpenWrt 22.03.0 發行公告"
+    url: https://forum.openwrt.org/t/openwrt-22-03-0-first-stable-release/136252
+  - label: "OpenWrt 防火牆設定"
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: 'df759f219b1c8f62'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="firewall4" />
+
+## 一句話說明
+
+自 22.03 起，OpenWrt 預設的防火牆是 firewall4（fw4）。它產生的是 nftables 規則而非 iptables，並在 `/etc/config/firewall` 中沿用舊版 fw3 的 UCI 語法。
+
+## 以區域為單位，而不是規則清單
+
+- 介面會被分組成區域，通常是 `lan` 和 `wan`。政策與轉送是在區域之間設定的。
+- 在預設設定下，LAN 與 WAN 是不同的區域，LAN 流量會被轉送到 WAN。除非你新增規則，否則從 WAN 進入你網路的連線不會被轉送。
+- 新介面（例如訪客網路或 WireGuard 通道）通常需要自己的區域，或需要加入既有的區域。
+
+## 在你的路由器上查看
+
+```sh
+uci show firewall | grep '=zone'
+fw4 print
+```
+
+`fw4 print` 會印出 fw4 將載入的 table、chain 與規則結構，但不會套用任何東西。編輯設定後，執行 `fw4 reload` 即可套用。
+
+## 注意事項
+
+- 以 `iptables -A …` 指令為基礎的教學不適用於 fw4。請改用 UCI 來表達規則。
+- 新介面的區域設錯，是通道或訪客網路「已連線但無法上網」的常見原因。
+
+## 相關指南
+
+- [WireGuard 伺服器](/zh-hant/remote-access/wireguard-server/)
+- [訪客 Wi-Fi](/zh-hant/wireless-vlan/guest-wifi/)
+- [旁路閘道](/zh-hant/network/bypass-gateway/)
+
+<PageSources />

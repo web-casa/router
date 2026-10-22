@@ -1,0 +1,264 @@
+---
+title: 設定 DNS，並確認路由器、用戶端與瀏覽器各自使用的 DNS
+description: 找出路由器、用戶端與瀏覽器實際使用的 DNS 伺服器，並保留一條可回復的路徑。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'PVE 9.2.2 單網卡；OpenWrt 25.12.6 VM 200；netns DHCP 用戶端'
+lastVerifiedAt: '2026-10-20'
+testRecipe: 'tests/recipes/dns-25.12-x86.md'
+aliases: ['openwrt dns', 'openwrt dns 設定', 'openwrt 更改 dns']
+symptoms: ['網頁無法載入', '部分網站無法開啟', 'DNS 解析失敗']
+sources:
+  - label: OpenWrt DHCP 與 DNS 設定
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp_configuration
+  - label: OpenWrt dnsmasq
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt 25.12 版本說明
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: OpenWrt apk 套件管理員
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+sourceHash: '0f4c118a13e248a2'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="x86 VM" tested={true} evidence="E2" />
+
+## 預期結果
+
+你可以分別回答三個問題：
+
+- 路由器使用哪一個上游 DNS 伺服器？
+- 用戶端從 OpenWrt 取得哪一個 DNS 伺服器？
+- 瀏覽器是否透過 DoH 繞過系統解析器？
+
+並且在變更失敗後，能夠回到可解析的狀態。
+
+## 適用環境
+
+- OpenWrt 25.12.6，預設為 `dnsmasq` + `odhcpd`；25.12 使用 `apk`，24.10 使用 `opkg`。
+- 檢查指令不需要額外安裝套件。若裝置執行 `unbound` 或 `https-dns-proxy`，請先確認是否由它們佔用 53 連接埠。
+- 24.10 的選單名稱與設定鍵相近，但套件指令不同；請勿把 `apk` 指令複製到 24.10。
+
+## DNS 路徑與各層職責
+
+| 位置 | 預設負責者 | 檢查項目 |
+|---|---|---|
+| WAN 上游 | DHCP/PPPoE 用戶端 | `cat /tmp/resolv.conf.d/resolv.conf.auto` |
+| 路由器解析器 | `dnsmasq` | `nslookup openwrt.org 127.0.0.1` |
+| LAN 通告 | `dnsmasq` DHCP option 6 / `odhcpd` RDNSS | 用戶端上顯示的 DNS |
+| 瀏覽器 | 系統解析器或瀏覽器 DoH | 瀏覽器的安全 DNS 設定 |
+
+更換 DNS 伺服器之前，請先判斷問題出在哪一層。
+
+## 變更之前
+
+<Step where="router-shell" title="備份 DHCP/DNS 設定" expected="已有備份，且你知道如何還原。">
+
+```sh
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+uci export dhcp > /tmp/dhcp.before
+uci show dhcp | grep -E 'dns|resolv|server|option'
+```
+
+請保留一條連到 LuCI/SSH 的有線 LAN 路徑。不要讓唯一的管理路徑依賴你正在變更的 DNS。
+
+</Step>
+
+## 最簡步驟
+
+<Step where="router-shell" title="讀取上游 DNS 與 dnsmasq 設定" expected="你能說出目前的 resolvfile、server 與 noresolv 值。">
+
+```sh
+cat /tmp/resolv.conf.d/resolv.conf.auto
+uci show dhcp.@dnsmasq[0]
+uci show network.wan | grep -E 'peerdns|dns'
+```
+
+`/tmp/resolv.conf.d/resolv.conf.auto` 由 WAN 用戶端寫入。請檢查實際的 `dhcp.@dnsmasq[0].resolvfile` 值。若 `noresolv='1'`，dnsmasq 會忽略該檔案，改用它的 `server` 清單。
+
+</Step>
+
+<Step where="luci" title="在 WAN 上設定自訂 DNS（最安全的第一個變更）" expected="重新連線 WAN 後，上游解析器是你設定的值。">
+
+開啟 **網路 → 介面 → WAN → 進階設定**：
+
+1. 取消勾選「使用對端通告的 DNS 伺服器」（`peerdns` 變為 0）。
+2. 在「使用自訂 DNS 伺服器」下新增你信任的 DNS 伺服器，例如 `1.1.1.1` 與 `9.9.9.9`。
+3. 儲存並套用，必要時重新連線 WAN。
+
+這會短暫中斷 WAN，但 LAN 的 DHCP/DNS 結構維持不變，因此較容易回復。
+
+</Step>
+
+<Step where="router-shell" title="確認 dnsmasq 正在監聽並已載入新的上游" expected="53 連接埠正在監聽，記錄中沒有設定錯誤。">
+
+```sh
+netstat -lnp | grep ':53'
+/etc/init.d/dnsmasq restart
+logread -e dnsmasq | tail -20
+```
+
+若 `dnsmasq` 無法啟動，請停止修改 DHCP 選項，並依錯誤訊息找出語法錯誤或連接埠衝突。
+
+</Step>
+
+<Step where="luci" title="檢查通告給用戶端的 DNS" expected="用戶端取得 OpenWrt 的 LAN 位址，或你刻意設定的 option 6。">
+
+開啟 **網路 → DHCP與DNS → DHCP 伺服器 → 進階設定**，檢查「DHCP 選項」。沒有 option 6 時，用戶端通常以路由器的 LAN 位址作為 DNS；有 option 6 時，用戶端會直接取得該位址。
+
+請勿讓用戶端指向沒有在 53 連接埠監聽的位址。
+
+</Step>
+
+<Step where="router-shell" title="CLI 對應做法（選用）" expected="resolv.auto 顯示 1.1.1.1，且查詢成功。">
+
+```sh
+uci set network.wan.peerdns='0'
+uci -q delete network.wan.dns
+uci add_list network.wan.dns='1.1.1.1'
+uci commit network
+ifup wan
+cat /tmp/resolv.conf.d/resolv.conf.auto
+```
+
+變更後，使用 `logread -e dnsmasq` 確認新的上游。若用戶端仍取得舊的 DNS，請重新啟動 dnsmasq 或檢查 DHCP option 6。
+
+</Step>
+
+## 從用戶端驗證
+
+<Step where="router-shell" title="在路由器上檢查 A 與 AAAA" expected="兩種查詢都有回應，沒有逾時。">
+
+```sh
+nslookup openwrt.org 127.0.0.1
+nslookup -type=AAAA openwrt.org 127.0.0.1
+```
+
+</Step>
+
+<Step where="client" title="檢查用戶端實際取得的 DNS" expected="用戶端的 DNS 與 DHCP/靜態設定相符，且能解析名稱。">
+
+Linux：
+
+```sh
+resolvectl status
+cat /etc/resolv.conf
+nslookup openwrt.org
+```
+
+Windows：
+
+```powershell
+ipconfig /all
+nslookup openwrt.org
+```
+
+macOS：
+
+```sh
+scutil --dns
+nslookup openwrt.org
+```
+
+</Step>
+
+<Step where="client" title="檢查瀏覽器是否繞過路由器" expected="測試期間 DoH 已關閉，或你清楚知道它指向哪裡。">
+
+Chrome/Edge：`chrome://settings/security`，或「隱私權和安全性 → 安全性 → 使用安全 DNS」。Firefox：設定 → 隱私權與安全性 → DNS over HTTPS。若 DoH 已開啟，系統解析器可能完全沒有被使用；這看起來就像「路由器 DNS 沒有生效」。
+
+</Step>
+
+<Step where="client" title="檢查 IPv6 解析與 RA/RDNSS" expected="有 IPv6 上游時 AAAA 可解析；否則記錄缺少的條件。">
+
+```sh
+nslookup -type=AAAA openwrt.org
+ip -6 route
+```
+
+當上游沒有 IPv6 前綴時，不要從 IPv4 的結果推論 IPv6 DNS 正常。
+
+</Step>
+
+## 失敗分支與回復
+
+### 網頁無法載入，但 ping IP 正常
+
+先懷疑 DNS：
+
+1. 檢查用戶端解析器：`resolvectl status`、`ipconfig /all` 或 `scutil --dns`。
+2. 在路由器上檢查 53 連接埠與 dnsmasq 記錄：`netstat -lnp | grep ':53'`、`logread -e dnsmasq`。
+3. 檢查瀏覽器 DoH，並暫時停用。
+4. 檢查 DHCP option 6 是否有錯誤的位址。
+
+### 無法連到 LuCI/SSH
+
+停止變更 DNS。將有線用戶端接上 LAN，為它設定同一子網路的靜態位址，並確認閘道是 OpenWrt 的 LAN 位址。再從主控台或 SSH 還原：
+
+```sh
+cp /etc/config/dhcp.bak.YYYY-MM-DD /etc/config/dhcp
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+```
+
+若你修改了 WAN DNS，請還原為自動取得的上游 DNS：
+
+```sh
+uci set network.wan.peerdns='1'
+uci -q delete network.wan.dns
+uci commit network
+ifup wan
+```
+
+### 已變更 WAN DNS，但用戶端仍使用舊的解析器
+
+先檢查 `resolv.auto` 是否改變，再檢查 dnsmasq 是否載入了新的上游：
+
+```sh
+cat /tmp/resolv.conf.d/resolv.conf.auto
+logread -e dnsmasq | tail -20
+/etc/init.d/dnsmasq restart
+```
+
+若 `resolv.auto` 沒有改變，請檢查 `network.wan.dns` 與 `peerdns`。若用戶端仍取得舊的 DNS，請檢查 DHCP option 6 與瀏覽器 DoH。
+
+### dnsmasq 無法啟動
+
+請閱讀錯誤訊息，不要反覆重新啟動：
+
+```sh
+logread -e dnsmasq | tail -50
+dnsmasq --test
+```
+
+常見原因是其他解析器佔用 53 連接埠、語法錯誤，或上游無法連線。請先還原備份，再逐項重新加入自訂設定。
+
+## E2 實驗室測試（2026-10-20）
+
+- 環境：PVE 9.2.2 單網卡；OpenWrt 25.12.6 VM 200；WAN `192.168.50.77/24`，LAN `192.168.1.1/24`。
+- 基準：`resolv.auto` 為 `nameserver 192.168.50.1`；`nslookup openwrt.org 127.0.0.1` 回傳 A/AAAA。
+- 自訂：`peerdns=0` + `network.wan.dns=1.1.1.1`；`resolv.auto` 變為 `nameserver 1.1.1.1`；查詢仍然成功。
+- 失敗情境：將 dnsmasq 上游設為無法連線的 `192.0.2.1`；隨機的 `.example.com` 查詢回傳 `connection timed out; no servers could be reached`；刪除 `noresolv`/`server` 並還原 `peerdns=1` 後，解析恢復。
+- 用戶端：netns DHCP 取得 `192.168.1.116/24`，DNS 為 `192.168.1.1`；`dig @192.168.1.1 openwrt.org` 成功；`ping 192.168.50.1` 成功。
+- 未測試：瀏覽器 DoH、IPv6 上游/RA/RDNSS、實體 LAN 用戶端、長時間穩定性。
+
+## 來源與審閱
+
+- 本頁有 E2 實驗室重現；瀏覽器 DoH 與 IPv6 上游仍未測試，不可描述為已驗證。
+- 證據：`docs/dns-e2-run.md` 與 `tests/recipes/dns-25.12-x86.md`。
+- 選單或版本改變時，請更新 `testedVersions` 與 `lastVerifiedAt`；不要把 24.10 的 `opkg` 指令放進 25.12 的流程。
+
+<TestRecord
+  status="partial"
+  environment="PVE 9.2.2 單網卡；OpenWrt 25.12.6 VM 200；netns DHCP 用戶端"
+  recipe="tests/recipes/dns-25.12-x86.md"
+  result="WAN DNS 192.168.50.1 → 1.1.1.1 已套用；錯誤的上游查詢逾時；回復成功；用戶端 DHCP DNS 192.168.1.1，解析正常"
+  date="2026-10-20"
+/>
+
+<PageSources />

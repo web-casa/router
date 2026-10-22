@@ -1,0 +1,227 @@
+---
+title: "套件來源與中國鏡像站：分開處理 apk 與 opkg"
+description: 區分 OpenWrt 25.12 的 apk 與 24.10 的 opkg，對齊版本/target/架構/kmods，並在不破壞 ABI 的前提下切換到中國鏡像站。
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；官方/TUNA 套件來源，apk update/search/install，並還原官方來源'
+testRecipe: 'tests/recipes/package-sources.md'
+aliases: ['openwrt 套件來源', 'openwrt 中國鏡像站', 'apk 套件來源', 'opkg 套件來源', 'openwrt 套件無法安裝']
+symptoms: ['apk update 404', 'opkg update 失敗', '相依性不符', '套件來源簽章錯誤']
+sources:
+  - label: OpenWrt apk 套件管理員
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: OpenWrt opkg 套件管理員
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg
+  - label: OpenWrt 25.12 版本說明
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: TUNA OpenWrt 鏡像站
+    url: https://mirrors.tuna.tsinghua.edu.cn/openwrt/
+sourceHash: '55165ce9cac98759'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
+
+首先要知道：**apk 與 opkg 的差異**取決於韌體版本，而不是「哪個鏡像站比較快」。25.12 使用 `apk`；24.10 使用 `opkg`。套件格式、套件來源路徑與驗證方式都不同，兩者不能互換。
+
+## 預期結果
+
+- 知道韌體使用 `apk` 還是 `opkg`，以及它的套件來源檔位於何處。
+- 對齊版本、target、架構與 kmods 核心雜湊值。
+- 知道中國鏡像站取代的是 URL 的哪一部分，以及哪些路徑必須保持一致。
+- 了解為什麼「更換鏡像站後套件裝不起來」，以及如何回復。
+- 了解為什麼 `apk upgrade`/`opkg upgrade` 不是韌體升級。
+
+## 辨識套件管理員與套件來源
+
+<Step where="router-shell" title="讀取版本、target 與架構" expected="你能寫出完整的版本/target/架構組合。">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+uname -m
+cat /etc/apk/arch 2>/dev/null
+opkg print-architecture 2>/dev/null
+```
+
+關鍵欄位：`release.version`、`release.target`、`DISTRIB_ARCH`、`release.revision`。它們必須與鏡像站路徑相符。
+
+</Step>
+
+<Step where="router-shell" title="檢查目前的套件來源檔" expected="你知道每個來源指向哪裡，以及它是 apk 還是 opkg。">
+
+OpenWrt 25.12（apk）：
+
+```sh
+cat /etc/apk/repositories.d/distfeeds.list
+```
+
+OpenWrt 24.10（opkg）：
+
+```sh
+cat /etc/opkg/distfeeds.conf
+cat /etc/opkg/customfeeds.conf
+```
+
+編輯之前先備份：
+
+```sh
+cp /etc/apk/repositories.d/distfeeds.list /etc/apk/repositories.d/distfeeds.list.bak.$(date +%F) 2>/dev/null || true
+cp /etc/opkg/distfeeds.conf /etc/opkg/distfeeds.conf.bak.$(date +%F) 2>/dev/null || true
+```
+
+</Step>
+
+## 25.12 的 apk 結構
+
+OpenWrt 25.12 使用 `apk`；索引為 `.adb`，套件為 `.apk`。典型的套件來源：
+
+- `targets/<target>/packages/packages.adb`：target 專屬套件；
+- `packages/<arch>/base/packages.adb`：base；
+- `packages/<arch>/luci/packages.adb`：LuCI；
+- `packages/<arch>/packages/packages.adb`：一般套件；
+- `packages/<arch>/routing|telephony|video/packages.adb`：分類套件來源；
+- `targets/<target>/kmods/<kernel-hash>/packages.adb`：核心模組；雜湊值必須與正在執行的核心相符。
+
+指令：
+
+```sh
+apk update
+apk search <name>
+apk add <name>
+apk info -e <name>
+```
+
+請勿使用 `opkg`，也不要把 24.10 的 `.ipk` 改名為 `.apk`。
+
+## 24.10 的 opkg 結構
+
+OpenWrt 24.10 使用 `opkg`；索引為 `Packages.gz`，套件為 `.ipk`：
+
+```sh
+opkg update
+opkg list | grep <name>
+opkg install <name>
+opkg list-installed | grep <name>
+```
+
+請勿使用 `apk`，也不要把 25.12 的 `.apk` 交給 opkg。
+
+## 改寫為中國鏡像站
+
+以 TUNA 鏡像站為例，根路徑為：
+
+```text
+https://mirrors.tuna.tsinghua.edu.cn/openwrt/
+```
+
+只把 `https://downloads.openwrt.org` 換成該根路徑，並**保留完整的路徑**：
+
+```text
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/packages/packages.adb
+→ https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.6/targets/x86/64/packages/packages.adb
+```
+
+不要只寫到 `.../openwrt/`，也不要省略 `releases/25.12.6/targets/x86/64/...`；路徑不完整會回傳 404。
+
+<Step where="router-shell" title="編輯前先驗證鏡像站路徑" expected="curl 回傳 200，且路徑與目前的版本/target 相符。">
+
+```sh
+curl -I https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.6/targets/x86/64/packages/packages.adb
+```
+
+請把 URL 換成你的版本/target；若是 kmods，也要驗證核心雜湊值。若鏡像站沒有該路徑，不要強行使用。
+
+</Step>
+
+<Step where="router-shell" title="只更新索引，不要升級系統" expected="apk/opkg update 成功，且不會大量升級套件。">
+
+```sh
+apk update
+# or
+opkg update
+```
+
+使用 `apk search`/`opkg list` 確認套件來源可讀取，再只安裝你需要的套件。**不要**把 `apk upgrade`/`opkg upgrade` 當成韌體升級；韌體請使用 sysupgrade/ASU/owut。
+
+</Step>
+
+## 常見失敗
+
+### 404
+
+- 版本錯誤（25.12.6 與 24.10.8）；
+- target 錯誤（是 `x86/64`，不是 `x86_64` 目錄）；
+- 架構錯誤（`x86_64`、`aarch64`）；
+- 鏡像站尚未同步該路徑；
+- 混淆了 `packages` 與 `targets` 目錄。
+
+### 簽章/驗證失敗
+
+- 索引損毀或屬於不同版本；
+- 系統時間/憑證錯誤；
+- 混入了其他套件來源；
+- 不要依賴 `--allow-untrusted`；請修正套件來源/驗證。
+
+### 相依性/ABI 不符
+
+- kmods 核心雜湊值不符；
+- 套件是為其他 target/架構建置的；
+- 混用官方與 ImmortalWrt/iStoreOS 套件來源；
+- 你需要相同的來源、版本與架構，或自行重新建置。
+
+### 找不到指令
+
+- 25.12 沒有 `opkg`；24.10 沒有 `apk`；
+- 不要為了執行某個指令而安裝套件管理員；請先辨識韌體/來源。
+
+### 套件已安裝，但 LuCI 沒有顯示
+
+- 只安裝了核心套件，缺少 `luci-app-*` 套件；
+- 缺少語言套件；
+- 瀏覽器快取/重新整理；
+- 套件版本與 LuCI 不符。
+
+## 回復
+
+```sh
+# apk
+cp /etc/apk/repositories.d/distfeeds.list.bak.YYYY-MM-DD /etc/apk/repositories.d/distfeeds.list
+apk update
+
+# opkg
+cp /etc/opkg/distfeeds.conf.bak.YYYY-MM-DD /etc/opkg/distfeeds.conf
+opkg update
+```
+
+若更換鏡像站後更新失效，請先還原官方來源，驗證 DNS/時間/憑證，再重試鏡像站。不要在許多鏡像站之間跳來跳去。
+
+## E2 實驗室測試（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200；`apk`；官方來源與 TUNA 鏡像站。
+- 官方 `apk update`：`OK: 11220 distinct packages available`；`apk search -x sqm-scripts` 找到 `sqm-scripts-1.7.2-r1`。
+- 切換到 TUNA：`apk update` 同樣是 11220；`apk add sqm-scripts` 安裝了 `1.7.2-r1`。
+- 還原官方來源：`apk update` 正常；最終來源已回到 `downloads.openwrt.org`。
+- 未測試：24.10 `opkg`、簽章錯誤、混用/ABI 不符、鏡像站索引損毀。
+- 測試配方：`tests/recipes/package-sources.md`。
+
+## E2 狀態與來源
+
+- 這是 E2 部分驗證：已測試 25.12 `apk` 的官方/TUNA/安裝/還原路徑；`opkg` 與錯誤套件來源的分支仍屬文件說明。
+- 鏡像站路徑會隨版本變動；發布前請在目標版本/target/架構上重新執行 `update`/`search`。
+- 不要混用官方、ImmortalWrt 或 iStoreOS 套件來源；ABI/核心/簽章都可能不符。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；官方/TUNA 套件來源，apk update/search/install，並還原官方來源"
+  recipe="tests/recipes/package-sources.md"
+  result="E2 部分驗證：25.12.6 x86 官方來源回報 11220 個套件；TUNA 同樣是 11220；已安裝 sqm-scripts 1.7.2；還原官方來源後更新正常；24.10 opkg 未測試"
+/>
+
+<PageSources />

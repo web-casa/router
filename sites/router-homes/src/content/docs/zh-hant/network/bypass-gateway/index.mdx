@@ -1,0 +1,234 @@
+---
+title: "旁路閘道：停用 DHCP、設定用戶端閘道／DNS，以及切換回去"
+description: 分辨單臂旁路與具備 WAN 的第二閘道，然後修改 LAN、停用 DHCP、讓用戶端指向旁路，並保留回復途徑。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: '具備 WAN 的旁路 E2：LAN 192.168.1.2/24，DHCP 關閉，WAN 192.168.50.5/24；靜態用戶端 192.168.1.100；純單臂旁路未測試'
+testRecipe: 'tests/recipes/bypass-gateway-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt 旁路閘道', 'openwrt 旁路由', '旁路由 dhcp', 'openwrt 更改閘道']
+symptoms: ['旁路由導致無法上網', '如何設定用戶端閘道', '旁路 DHCP 衝突']
+sources:
+  - label: OpenWrt 網路設定
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP 與 DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt 防火牆
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt 橋接／中繼
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+sourceHash: '111105920d4777d6'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## 選擇模式：單臂旁路 vs 具備 WAN 的閘道
+
+| 模式 | OpenWrt 介面 | 誰提供 DHCP | 用戶端閘道／DNS | 本頁是否測試 |
+|---|---|---|---|---|
+| 單臂旁路 | 僅 LAN，無 WAN | 上游主路由器 | 旁路的 LAN IP | 否（E1 步驟） |
+| 具備 WAN 的閘道 | LAN + WAN | 上游或旁路 | 旁路的 LAN IP | **E2** |
+
+兩者都能「讓用戶端經過 OpenWrt」，但故障點不同：
+
+- 單臂旁路：沒有 DHCP／NAT 時，主路由器必須知道回程路由，或旁路必須做 NAT；
+- 具備 WAN：OpenWrt 取得自己的 WAN 位址並對 LAN 用戶端做 NAT；這就是本次實驗的模式。
+
+沒有說明是否具備 WAN、由誰提供 DHCP，就不要說「旁路可用」。
+
+## 實驗拓樸
+
+```text
+Upstream 192.168.50.1
+      │
+  WAN eth1 (DHCP 192.168.50.5/24)
+      │
+  OpenWrt VM 200
+      │
+  LAN br-lan 192.168.1.2/24
+      │  DHCP disabled
+  Client 192.168.1.100/24
+  gateway/DNS = 192.168.1.2
+```
+
+- 此 LAN 上沒有 `.1`，以避免與上游／主路由器衝突；
+- 用戶端必須使用靜態設定；
+- DHCP 關閉後，DHCP 請求不會得到回應，這是預期行為。
+
+## 設定
+
+<Step where="router-shell" title="備份並記錄 LAN／WAN 狀態" expected="知道 LAN IP、WAN 協定與 DHCP 狀態。">
+
+```sh
+uci show network.lan
+uci show network.wan
+uci show dhcp.lan
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+請保留主控台存取；舊的 LAN IP 會立即失效。
+
+</Step>
+
+<Step where="luci" title="修改 LAN IP 並停用 DHCP" expected="LAN 為 192.168.1.2/24，且 DHCP 不再發放位址。">
+
+**網路 → 介面 → LAN → 編輯**：
+
+1. IPv4 位址：`192.168.1.2/24`；
+2. **DHCP 伺服器 → 一般設定 → 忽略介面**；
+3. 儲存並套用。
+
+等效的 CLI 指令：
+
+```sh
+uci set network.lan.ipaddr='192.168.1.2/24'
+uci set dhcp.lan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+然後以 `192.168.1.2` 重新開啟 LuCI／SSH。
+
+</Step>
+
+<Step where="router-shell" title="保留 WAN 與 NAT（具備 WAN 模式）" expected="WAN 有位址，且 LAN→WAN 轉送／NAT 正常。">
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+uci show firewall | grep -E 'zone|masquerade|forward'
+```
+
+本次實驗使用 WAN `192.168.50.5/24`、閘道 `192.168.50.1`；LAN 用戶端透過 OpenWrt 做 NAT。
+
+</Step>
+
+<Step where="client" title="讓用戶端指向旁路" expected="用戶端閘道／DNS 為 192.168.1.2；公網 IP 與 DNS 正常。">
+
+```sh
+# Linux example
+ip addr add 192.168.1.100/24 dev eth0
+ip route add default via 192.168.1.2
+echo 'nameserver 192.168.1.2' > /etc/resolv.conf
+ping -c 2 192.168.1.2
+ping -c 2 1.1.1.1
+nslookup openwrt.org 192.168.1.2
+```
+
+Windows：手動設定 IP、閘道與 DNS；不要保留舊的 DHCP 位址。
+
+</Step>
+
+<Step where="client" title="確認 DHCP 確實已關閉" expected="DHCP 收不到 offer；靜態設定仍可運作。">
+
+```sh
+# Linux example
+udhcpc -i eth0 -f -q -n -t 3
+```
+
+本次實驗印出 `no lease, failing`；靜態位址仍可 ping／解析。如果仍取得租約，表示還有第二台 DHCP 伺服器，或 `ignore` 沒有生效。
+
+</Step>
+
+<Step where="client" title="切換 DNS／閘道作為對照" expected="區分 DNS 故障與閘道故障。">
+
+```sh
+# public DNS
+nslookup openwrt.org 1.1.1.1
+# dead gateway
+ip route replace default via 192.168.1.250
+ping -c 2 1.1.1.1
+# restore
+ip route replace default via 192.168.1.2
+```
+
+本次實驗：公共 DNS 可用；`.250` 造成 100% 封包遺失；恢復 `.2` 後復原。
+
+</Step>
+
+## 單臂旁路（E1，本頁未測試）
+
+僅 LAN、無 WAN：
+
+- 旁路 LAN 為 `192.168.1.2/24`，閘道指向主路由器 `192.168.1.1`；
+- 停用旁路的 DHCP；
+- 用戶端閘道／DNS 為 `.2`；
+- 啟用轉送；主路由器需要回程路由，或由旁路對 LAN 流量做 NAT；
+- 主路由器的防火牆必須允許用戶端→網際網路的轉送。
+
+沒有可用的主路由器實驗環境，因此這部分是 **E1**，不是 E2；請對照你自己的路由器／防火牆驗證。
+
+## 常見故障
+
+### 修改 LAN 後連不上旁路
+
+- 仍在使用舊的 IP；
+- 用戶端不在 `192.168.1.0/24`；
+- ARP 過期：`ip neigh flush dev <iface>`；
+- 使用主控台：`ip -4 addr show br-lan`。
+
+### 用戶端取不到位址
+
+- 旁路的 DHCP 已關閉；這是預期行為；請設定靜態位址；
+- 如果想用 DHCP，只保留一台伺服器（旁路或主路由器）；
+- 檢查 `dhcp.lan.ignore` 以及是否有第二台 DHCP。
+
+### 用戶端有位址但無法上網
+
+- 閘道／DNS 沒有指向旁路；
+- 旁路沒有預設路由／上游；
+- 防火牆轉送／NAT；
+- 主路由器缺少回程路由（單臂）；
+- 子網路衝突／雙重 NAT。
+
+### DNS 失敗
+
+- 用戶端仍使用舊閘道做 DNS；
+- 旁路的 dnsmasq 沒有在 LAN 上監聽；
+- 上游 DNS 被封鎖；
+- 應用程式層的 DoH／私人 DNS。
+
+## 錄製示範（009 實驗）
+
+<TerminalCast
+  src="/casts/009-bypass.cast"
+  title="009 實驗：旁路閘道、DHCP 關閉、靜態閘道／DNS"
+  caption="真實的 OpenWrt 25.12.6 VM：LAN .2 + WAN DHCP，DHCP 已停用；靜態用戶端 .100 驗證公網 IP／DNS、DNS 切換、閘道失效與復原。此錄製不包含純單臂旁路。"
+/>
+
+## E2 實驗紀錄（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200；LAN `192.168.1.2/24`；`DHCP ignore=1`；WAN DHCP `192.168.50.5/24`；netns 用戶端 `192.168.1.100/24`。
+- DHCP 關閉：`udhcpc` 收不到 offer（`no lease, failing`）；靜態位址可用。
+- 靜態閘道／DNS `.2`：閘道 ping、`1.1.1.1` 與 `nslookup` 都可用。
+- DNS `1.1.1.1` 可用；失效閘道 `.250` 使公網存取中斷；恢復 `.2` 後復原。
+- 未測試：純單臂旁路、主路由器回程路由、真實 Wi-Fi／Windows 用戶端、IPv6/RA。
+- 錄製檔：`public/casts/009-bypass.cast`；測試配方：`tests/recipes/bypass-gateway-25.12.md`。
+
+## 來源與審閱
+
+- 這是 E2 部分驗證：已測試具備 WAN 的旁路；單臂路徑僅有 E1 步驟。
+- 沒有獨立審閱者；結論僅限於此 VM／netns 環境。
+- 「旁路閘道」不是單一固定設定；請確認誰提供 DHCP、誰做 NAT，以及是否有回程路由。
+
+<TestRecord
+  status="partial"
+  environment="具備 WAN 的旁路 E2：LAN 192.168.1.2/24，DHCP 關閉，WAN 192.168.50.5/24；靜態用戶端 192.168.1.100；純單臂旁路未測試"
+  recipe="tests/recipes/bypass-gateway-25.12.md"
+  result="E2 部分驗證：DHCP 關閉時用戶端取不到租約；靜態閘道／DNS .2 可正常 ping 公網與解析 DNS；DNS 1.1.1.1 可用；失效閘道 .250 使公網存取中斷，恢復 .2 後復原。"
+  date="2026-10-20"
+/>
+
+<PageSources />

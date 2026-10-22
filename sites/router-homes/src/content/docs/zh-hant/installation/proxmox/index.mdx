@@ -1,0 +1,281 @@
+---
+title: 在單網卡 Proxmox VE 主機上安裝 OpenWrt
+description: 在只有一張實體網卡的 PVE 主機上，使用旁路解析器或內部橋接來執行 OpenWrt，同時保留對主機的存取。
+pageType: install
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'Proxmox VE 9.2.2，單張 Realtek RTL8111；OpenWrt 25.12.6 VM 200；netns DHCP 用戶端'
+lastVerifiedAt: '2026-10-20'
+testRecipe: 'tests/recipes/pve-single-nic-25.12.md'
+aliases: ['openwrt proxmox', 'pve openwrt', 'proxmox 單網卡 openwrt']
+symptoms: ['安裝後無法上網', '無法連到主機', 'PVE 只有一張網卡']
+sources:
+  - label: Proxmox VE 網路設定
+    url: https://pve.proxmox.com/wiki/Network_Configuration
+  - label: Proxmox VE qm 指令
+    url: https://pve.proxmox.com/pve-docs/qm.1.html
+  - label: OpenWrt x86 安裝
+    url: https://openwrt.org/docs/guide-user/installation/openwrt_x86
+  - label: OpenWrt 25.12 版本說明
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+sourceHash: 'b8b086f75bf2a67f'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import pveConsole from '@assets/screenshots/pve/openwrt-console-login.webp';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import TopologyTable from '@components/TopologyTable.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="Proxmox VE" version="9.2.2" packageManager="—" device="single-NIC x86 host" tested={true} evidence="E2" />
+
+## 預期成果
+
+在**只有一張實體網卡**的 PVE 主機上，你可以選出合適的拓樸：
+
+- 不更動 PVE 管理位址；
+- 不會意外在 `vmbr0` 上提供 DHCP；
+- 使用旁路解析器或內部 LAN 實驗環境；
+- 即使路由器 VM 停止，仍可存取主機。
+
+## 適用環境
+
+- Proxmox VE 8.x/9.x，一張實體網卡；`vmbr0` 同時承載 PVE 管理位址與上游閘道。
+- 本頁以 PVE 9.2.2、一張 Realtek RTL8111 網卡、`vmbr0 192.168.50.2/24`、閘道 `192.168.50.1` 編寫。
+- **單張網卡無法在實體上分離 WAN 與 LAN。** 不要照抄雙網卡指南中的 `enp1s0/enp2s0` 配置。請使用旁路服務或 PVE 內部橋接。
+- 第二張網卡或支援 VLAN 的交換器會更容易；該拓樸不在本頁範圍內。
+
+## 兩種拓樸
+
+### A. 旁路 DNS／閘道（改動最小）
+
+OpenWrt 只有一張接在 `vmbr0` 的 vNIC，LAN 位址為 `192.168.50.3/24`，且**停用 DHCP**。用戶端手動將它設為 DNS（或閘道）；它透過 `192.168.50.1` 連上網際網路。
+
+<TopologyTable rows={[
+  { physical: 'nic0', bridge: 'vmbr0', vnic: 'net0', iface: 'lan 192.168.50.3', role: '旁路 DNS／閘道' },
+]} />
+
+適合在不動主路由器 DHCP 的情況下，驗證 DNS、AdGuard Home 或 OpenClash 的 DNS／規則。
+
+### B. PVE 內部 LAN 實驗（建議用於路由測試）
+
+OpenWrt 有兩張 vNIC：`net0` 接在 `vmbr0` 作為 WAN（DHCP），`net1` 接在 `vmbr1` 作為 LAN（`192.168.1.1/24`）。`vmbr1` **沒有實體連接埠**，僅供測試用戶端 VM 使用。
+
+<TopologyTable rows={[
+  { physical: 'nic0', bridge: 'vmbr0', vnic: 'net0', iface: 'wan DHCP', role: '上游 192.168.50.1' },
+  { physical: '—', bridge: 'vmbr1', vnic: 'net1', iface: 'lan 192.168.1.1', role: '內部測試用戶端' },
+]} />
+
+這可以在不影響實體 LAN 的情況下，驗證路由、NAT、DHCP、DNS，以及「路由器 VM 停止後主機仍可存取」。
+
+## 動手之前
+
+<Step where="router-shell" title="記錄主機網路與 VM 狀態" expected="萬一出問題，可以依筆記還原 vmbr0。">
+
+```sh
+ip -br link
+ip -br addr
+cat /etc/network/interfaces
+bridge link
+qm list
+pvesm status
+```
+
+記下 `vmbr0` 的位址、閘道、實體連接埠與 VM 清單。在單網卡主機上，`vmbr0` 是你唯一的管理路徑；一個失誤就可能把自己鎖在外面。
+
+</Step>
+
+<Step where="router-shell" title="準備主控台存取與映像檔" expected="即使 SSH 中斷，仍可連上 PVE。">
+
+使用螢幕／鍵盤、IPMI 或雲端 VNC；不要只依賴 SSH。接著在 PVE 主機上下載 OpenWrt x86_64 映像檔：
+
+```sh
+cd /var/lib/vz/template/iso
+wget https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+wget https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/sha256sums
+sha256sum -c sha256sums --ignore-missing
+gzip -d openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz
+```
+
+如果校驗和不符，就不要繼續。請使用 downloads.openwrt.org 上目前的檔名／版本。
+
+</Step>
+
+## 最小步驟
+
+<Step where="router-shell" title="建立內部橋接 vmbr1（僅實驗 B）" expected="vmbr1 存在且為 up；vmbr0 位址未變。">
+
+先建立暫時性橋接；確認可用後才讓它持久化：
+
+```sh
+ip link add name vmbr1 type bridge
+ip link set vmbr1 up
+ip -br link show vmbr1
+ip -br addr show vmbr0
+```
+
+`vmbr1` 沒有實體連接埠，因此不會把 DHCP 洩漏到家用 LAN。不要在 `vmbr0` 上執行 DHCP 伺服器。
+
+</Step>
+
+<Step where="router-shell" title="建立 OpenWrt VM 200" expected="VM 200 有 scsi0 開機磁碟以及 net0/net1。">
+
+```sh
+qm create 200 --name openwrt-lab --memory 512 --cores 2 --ostype l26 \
+  --scsihw virtio-scsi-pci \
+  --net0 virtio,bridge=vmbr0 \
+  --net1 virtio,bridge=vmbr1 \
+  --serial0 socket
+qm importdisk 200 /var/lib/vz/template/iso/openwrt-25.12.6-x86-64-generic-ext4-combined.img local-lvm
+qm set 200 --scsi0 local-lvm:vm-200-disk-0
+qm set 200 --boot order=scsi0
+qm start 200
+```
+
+請用 `pvesm status` 查出實際的儲存空間 ID。`qm importdisk` 之後，請從指令輸出確認磁碟名稱；可能是 `vm-200-disk-0`。
+
+</Step>
+
+<Step where="router-shell" title="開啟 OpenWrt 主控台並辨識網卡順序" expected="知道哪個介面是 WAN、哪個是 LAN。">
+
+```sh
+qm terminal 200
+```
+
+如果序列埠沒有輸出，請使用 PVE 的 VNC 主控台。在 OpenWrt 內：
+
+```sh
+ip link show
+ip addr show
+uci show network
+```
+
+`eth0/eth1` 的順序不保證與 `net0/net1` 一致；請以 MAC／連線狀態與 `uci show network` 確認。不要假設 `eth0` 就是 WAN。本次實驗中，`net0=eth0=WAN`、`net1=eth1=LAN`，但換一台主機請重新確認。
+
+</Step>
+
+<Step where="router-shell" title="設定 WAN／LAN，並在 WAN 上停用 DHCP" expected="WAN 從 192.168.50.1 取得位址；LAN 為 192.168.1.1；vmbr0 上沒有 DHCP。">
+
+在 OpenWrt 主控台中，把 `eth0/eth1` 換成你確認過的介面：
+
+```sh
+uci set network.wan=interface
+uci set network.wan.proto='dhcp'
+uci set network.wan.device='eth0'
+uci set network.lan=interface
+uci set network.lan.proto='static'
+uci set network.lan.device='eth1'
+uci set network.lan.ipaddr='192.168.1.1'
+uci set network.lan.netmask='255.255.255.0'
+uci set dhcp.wan=dhcp
+uci set dhcp.wan.interface='wan'
+uci set dhcp.wan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+```
+
+請確認 `dhcp.wan.ignore='1'`；否則 OpenWrt 可能在上游的 `vmbr0` 上提供 DHCP，干擾家用網路。
+
+</Step>
+
+<Step where="client" title="從測試用戶端驗證路由" expected="用戶端可連到 192.168.1.1、上游閘道與 DNS。">
+
+在 `vmbr1` 上建立一台測試 VM（或把它的網卡接到該處），讓它從 OpenWrt LAN 取得租約。然後執行：
+
+```sh
+ip route
+ping 192.168.1.1
+ping 192.168.50.1
+nslookup openwrt.org
+```
+
+如果用戶端取不到租約，請先檢查 OpenWrt 的 `dhcp.lan` 與 `dnsmasq`，再考慮更動 `vmbr0`。
+
+</Step>
+
+## 驗證
+
+<Figure src={pveConsole} alt="Proxmox VE VM 主控台中 OpenWrt 25.12.6 的 root shell 與 apk 提示" caption="OpenWrt 25.12.6 在 Proxmox VE VM 主控台開機後的 root shell。截圖來自暫時的截圖 VM；網卡名稱、子網路與磁碟依你的拓樸而異。" />
+
+- `qm status 200` 為 running；`qm config 200` 顯示 `net0` 在 `vmbr0`、`net1` 在 `vmbr1`。
+- 在 OpenWrt 內，`ip addr show` 顯示 WAN 為 `192.168.50.x`、LAN 為 `192.168.1.1/24`。
+- 測試用戶端：預設閘道為 `192.168.1.1`，可以 ping 到 `192.168.50.1`，並能解析 `openwrt.org`。
+- 主機：`ssh root@192.168.50.2` 與 PVE 網頁介面仍可使用。
+- 停止路由器 VM（`qm stop 200`）；主機管理仍可使用；`qm start 200` 即可恢復。
+
+## 故障分支與復原
+
+### 無法 SSH 連到主機
+
+停止更動網路。使用螢幕／鍵盤、IPMI 或雲端主控台，並檢查：
+
+```sh
+ip -br addr show vmbr0
+cat /etc/network/interfaces
+bridge link
+```
+
+如果你剛編輯過 `/etc/network/interfaces`，請還原備份並重新載入：
+
+```sh
+cp /etc/network/interfaces.bak.YYYY-MM-DD /etc/network/interfaces
+ifreload -a
+```
+
+如果問題只是暫時性的 `vmbr1` 造成的，請先確認沒有其他 VM 在使用它：
+
+```sh
+grep -R "vmbr1" /etc/pve/qemu-server
+```
+
+只有當該指令沒有任何輸出時才刪除它：
+
+```sh
+ip link set vmbr1 down
+ip link del vmbr1
+```
+
+### OpenWrt 沒有 WAN 位址
+
+```sh
+qm config 200
+qm terminal 200
+```
+
+在 OpenWrt 內，檢查 `ip link show`、`uci show network` 與 `logread`。確認 `net0` 在 `vmbr0` 上，且 `nic0` 為 up；不要在 `vmbr0` 上新增第二台 DHCP 伺服器。
+
+### 測試用戶端取不到 192.168.1.x 租約
+
+檢查 OpenWrt 的 `dhcp.lan`，以及 `dnsmasq` 是否正在執行；確認測試 VM 確實接在 `vmbr1` 上。不要為了「修正」實驗環境而更動 `vmbr0` 的位址或閘道。
+
+### 停止路由器 VM 後還能連到主機嗎？
+
+這就是復原關卡：`qm stop 200` 之後，從另一台機器開啟 `https://192.168.50.2:8006` 並以 SSH 連線。如果不行，表示你的管理路徑依賴 OpenWrt；請先修正再繼續。
+
+## E2 實驗紀錄（2026-10-20）
+
+- 環境：PVE 9.2.2，一張 Realtek RTL8111，`vmbr0 192.168.50.2/24`；OpenWrt 25.12.6 x86_64 VM 200，512MB／2 vCPU。
+- OpenWrt WAN `eth0` 透過 DHCP 從 `192.168.50.1` 取得 `192.168.50.77`；LAN `eth1` 為 `192.168.1.1/24`。
+- 內部 `vmbr1` 上的 netns 用戶端透過 DHCP 取得 `192.168.1.191`，以 `192.168.1.1` 作為預設路由，成功解析 `openwrt.org` 並取得 HTTP 200。
+- `qm stop 200` 之後，重新建立的 SSH 連線仍能連到 PVE 主機；`vmbr0` 仍為 `192.168.50.2/24`。
+- 未測試：實體 LAN 用戶端、雙網卡配置、長時間穩定性、PPPoE/IPv6 上游。這些都不在本次 E2 結果範圍內。
+
+## 來源與審閱
+
+- 本頁是 E2 實驗紀錄，不是單純的 E1 草稿；尚未經過獨立審閱，也未在實體 LAN 上測試。
+- 測試配方：`tests/recipes/pve-single-nic-25.12.md`。其中記錄了映像檔 SHA-256、`qm config 200` 與用戶端結果。
+- 單網卡不等於雙網卡：沒有第二張網卡或 VLAN 交換器時，不要把本頁改寫成「實體分離 WAN/LAN」的指南。
+
+<TestRecord
+  status="partial"
+  environment="Proxmox VE 9.2.2，單張 Realtek RTL8111；OpenWrt 25.12.6 VM 200；netns DHCP 用戶端"
+  recipe="tests/recipes/pve-single-nic-25.12.md"
+  result="WAN DHCP 192.168.50.77；LAN 192.168.1.1；用戶端 DHCP 192.168.1.191；DNS/HTTP 通過；qm stop 200 後主機仍可 SSH"
+  date="2026-10-20"
+/>
+
+<PageSources />

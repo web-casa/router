@@ -1,0 +1,38 @@
+---
+title: 下載 OpenWrt
+description: 一次就選對 OpenWrt 25.12.6 映像檔。先弄清楚你手上是什麼、比對確切硬體、驗證檔案；含 x86 映像檔挑選器與常見支援裝置。
+template: splash
+pageType: overview
+evidenceLevel: E1
+heroVariant: download
+aliases: ['openwrt 下載', 'openwrt 韌體下載', '該選哪個 openwrt 映像檔', 'openwrt 支援的裝置']
+hero:
+  title: 下載 OpenWrt，<em>一次就選對</em>
+  tagline: 先弄清楚你手上是什麼，比對確切硬體，再驗證檔案。三項檢查，不用猜。
+  actions:
+    - text: 開啟 Firmware Selector
+      link: https://firmware-selector.openwrt.org/
+      variant: primary
+    - text: x86 與虛擬機器
+      link: '#x86'
+      variant: minimal
+sources:
+  - label: OpenWrt Firmware Selector
+    url: https://firmware-selector.openwrt.org/
+  - label: OpenWrt 25.12.6 下載（targets）
+    url: https://downloads.openwrt.org/releases/25.12.6/targets/
+  - label: OpenWrt 25.12.6 服務版本
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: OpenWrt 25.12.0 發行公告
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: OpenWrt on x86
+    url: https://openwrt.org/docs/guide-user/installation/openwrt_x86
+sourceHash: '0f09e37493cbda71'
+---
+
+import DownloadGuide from '@components/download/DownloadGuide.astro';
+import PageSources from '@components/PageSources.astro';
+
+<DownloadGuide />
+
+<PageSources />

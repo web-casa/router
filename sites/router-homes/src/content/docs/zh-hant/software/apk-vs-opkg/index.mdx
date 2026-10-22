@@ -1,0 +1,178 @@
+---
+title: "25.12 apk 與 24.10 opkg：指令、套件格式與遷移邊界"
+description: 25.12 使用 apk，24.10 使用 opkg；比較套件格式、套件來源檔與更新/安裝/查詢指令，以及為什麼升級需要重新安裝套件而不是轉換套件。
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；apk 官方/TUNA 套件來源共 11220 個套件；已安裝 SQM；未執行 24.10 opkg'
+testRecipe: 'tests/recipes/apk-vs-opkg.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['apk vs opkg', 'openwrt apk', 'openwrt opkg', 'openwrt 套件管理員']
+symptoms: ['找不到 apk 指令', '找不到 opkg 指令', 'ipk 無法安裝', '升級後套件管理員改變']
+sources:
+  - label: OpenWrt apk 套件管理員
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: OpenWrt opkg 套件管理員
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg
+  - label: OpenWrt opkg 對照 apk 速查表
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: OpenWrt 25.12 版本說明
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+sourceHash: '6add07f476cef0f1'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## 一句話
+
+- **25.12 以上**：`apk`，套件為 `.apk`；
+- **24.10 及更早**：`opkg`，套件為 `.ipk`；
+- 兩者無法靠改名轉換；**不要把 `.ipk` 改名為 `.apk`**；
+- 升級到 25.12 後，請從 `apk` 套件來源重新安裝外掛；設定可以備份/還原。
+
+## 檢查你屬於哪一邊
+
+```sh
+cat /etc/openwrt_release
+command -v apk
+command -v opkg
+```
+
+本實驗：25.12.6，有 `apk`，沒有 `opkg`。
+
+## 比較
+
+| 項目 | 25.12 `apk` | 24.10 `opkg` |
+|---|---|---|
+| 格式 | `.apk` | `.ipk` |
+| 套件來源檔 | `/etc/apk/repositories.d/distfeeds.list` | `/etc/opkg/distfeeds.conf` |
+| 更新索引 | `apk update` | `opkg update` |
+| 安裝 | `apk add <pkg>` | `opkg install <pkg>` |
+| 移除 | `apk del <pkg>` | `opkg remove <pkg>` |
+| 搜尋 | `apk search <term>` | `opkg list \| grep <term>` |
+| 已安裝 | `apk list --installed` | `opkg list-installed` |
+| 套件資訊 | `apk info -a <pkg>` | `opkg info <pkg>` |
+| 清除快取 | `apk cache clean` | `opkg clean` |
+
+## 套件來源與架構
+
+25.12：
+
+```text
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/packages/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/packages/x86_64/base/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/kmods/<kernel-hash>/packages.adb
+```
+
+24.10：
+
+```text
+src/gz openwrt_core https://downloads.openwrt.org/releases/24.10.8/targets/x86/64/packages
+src/gz openwrt_base https://downloads.openwrt.org/releases/24.10.8/packages/x86_64/base
+```
+
+- `release`、`target`、`arch` 與 kmod 雜湊值必須相符；
+- 混用官方/ImmortalWrt/iStoreOS 套件來源可能破壞 ABI/簽章/名稱；
+- 中國鏡像站只改變主機/路徑前綴；不要更動 target/arch。
+
+## 常見操作
+
+<Step where="router-shell" title="在 25.12 上安裝套件" expected="更新、搜尋、安裝與驗證都使用 apk。">
+
+```sh
+apk update
+apk search -x sqm-scripts
+apk add sqm-scripts
+apk info -e sqm-scripts
+apk list --installed | wc -l
+```
+
+本實驗：官方/TUNA 都是 11220 個套件；已安裝 `sqm-scripts 1.7.2-r1`。
+
+</Step>
+
+<Step where="router-shell" title="24.10 上的對應做法" expected="指令與格式是 opkg/ipk；不要混用 apk。">
+
+```sh
+opkg update
+opkg list | grep sqm-scripts
+opkg install sqm-scripts
+opkg list-installed | grep sqm-scripts
+```
+
+這些是官方的對應指令，**此處未執行**（沒有 24.10 裝置）；請勿當作實測輸出呈現。
+
+</Step>
+
+## 升級到 25.12 時
+
+1. 備份 `/etc/config` 與套件清單（見 018）；
+2. 記錄 24.10 的 `opkg list-installed`；
+3. 升級/重新刷入 25.12（見 019）；
+4. 從 `apk` 套件來源重新安裝外掛；
+5. 還原設定，驗證 LuCI/服務/DNS；
+6. 不要把 `.ipk` 轉換成 `.apk`，也不要複製舊的套件目錄。
+
+本實驗的 25.12 sysupgrade 保留了設定，但套件從 239 個減少為 182 個；SQM/OpenClash 需要重新安裝。
+
+## 常見失敗
+
+### `apk: not found`
+
+- 韌體是 24.10 或更舊；請使用 `opkg`；
+- 「安裝 apk 套件管理員」不是解法；請先檢查版本。
+
+### `opkg: not found`
+
+- 韌體是 25.12 以上；請使用 `apk`；
+- 使用 `opkg` 的舊教學/腳本不能直接套用。
+
+### `.ipk` 無法安裝
+
+- 25.12 使用 `.apk`；
+- 改名不會改變格式；
+- 請找出對應版本/target/架構的 `.apk`，或自行重新建置。
+
+### 404/簽章/相依性錯誤
+
+- 版本/target/架構/kmod 雜湊值不符；
+- 混用套件來源；
+- 系統時間/憑證；
+- 不要習慣性地用 `--allow-untrusted` 繞過。
+
+### 升級後沒有 LuCI 選單
+
+- 安裝了主程式，但沒有 `luci-app-*`；
+- 舊外掛沒有重新安裝；
+- 瀏覽器快取/重新登入；
+- 見 017。
+
+## E2 實驗室測試（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200；`apk`；官方/TUNA 套件來源。
+- 官方/TUNA `apk update`：兩者都是 11220 個套件；`apk add sqm-scripts` 成功。
+- 25.12 `sysupgrade` 之後：套件從 239 個減少為 182 個；SQM/OpenClash 消失，需要重新安裝。
+- 未執行：24.10 `opkg` 的 update/install/list、真實的 24.10→25.12 遷移、跨架構套件。
+- 測試配方：`tests/recipes/apk-vs-opkg.md`。
+
+## 來源與審閱
+
+- 這是 E2 部分驗證：已測試 25.12 apk；24.10 opkg 是官方指令參考，此處未執行。
+- 不要把指令比較當成「遷移已驗證」；請先備份，並先在 VM 中測試。
+- 沒有獨立審閱者；結論僅限於這個 25.12 x86 環境。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；apk 官方/TUNA 套件來源共 11220 個套件；已安裝 SQM；未執行 24.10 opkg"
+  recipe="tests/recipes/apk-vs-opkg.md"
+  result="E2 部分驗證：已測試 25.12 apk 的 update/search/install 與鏡像站切換；25.12 sysupgrade 使套件從 239 個減少為 182 個；24.10 opkg 的指令/格式僅為文件說明，未執行"
+  date="2026-10-20"
+/>
+
+<PageSources />

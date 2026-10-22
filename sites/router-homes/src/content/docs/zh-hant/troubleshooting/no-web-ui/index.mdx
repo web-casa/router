@@ -1,0 +1,243 @@
+---
+title: "無法連到 LuCI：IP、連接埠、DHCP 與主控台復原"
+description: 從 LAN 連接埠與用戶端位址一路查到真正的管理 IP、uhttpd/SSH/防火牆，並保留主控台/failsafe 復原途徑，而不是盲目恢復原廠設定。
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；uhttpd 停止/復原、HTTP 80 檢查、SSH 保持可用'
+testRecipe: 'tests/recipes/troubleshooting-no-web-ui.md'
+aliases: ['openwrt cannot open luci', 'luci not loading', '192.168.1.1 not working', 'openwrt unreachable']
+symptoms: ['無法開啟 192.168.1.1', '登入頁面逾時', '變更 LAN 後失去連線', '沒有取得 DHCP 位址']
+sources:
+  - label: OpenWrt failsafe 與恢復原廠設定
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+  - label: OpenWrt LuCI 基本知識
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt 網路設定
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP 與 DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+sourceHash: 'bfd0c331078d3002'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
+
+## 預期結果
+
+- 判斷問題出在實體連線、用戶端位址、管理 IP、HTTP 服務，還是 SSH/防火牆。
+- 在不更動設定的前提下，判斷 LuCI 是否真的在監聽。
+- 以靜態用戶端位址、主控台或 failsafe 復原，而不是盲目恢復原廠設定。
+- 知道何時該停手、備份，或閱讀裝置文件。
+
+## 分流表
+
+| 症狀 | 先檢查 | 不要先做 |
+|---|---|---|
+| 沒有連線燈號 | 網路線、LAN 連接埠、電源 | 重新刷寫韌體 |
+| 用戶端取得 169.254.x.x | DHCP/網路線/LAN 連接埠 | 更改路由器 LAN |
+| ping 得通，網頁卻打不開 | 80/443、uhttpd、防火牆、HTTPS | 恢復原廠設定 |
+| ping 不通 | 用戶端子網路、管理 IP、VLAN/連接埠 | 一直更換 IP |
+| SSH 可用，LuCI 不行 | uhttpd/LuCI 套件/連接埠 | 更改網路設定 |
+| 主控台沒有輸出 | 序列埠設定、視訊輸出、電源 | 盲目短接針腳/刷寫 |
+
+## 第 1 層：實體連接埠與連線
+
+<Step where="client" title="使用 LAN 連接埠，而不是 WAN" expected="LAN 燈號亮起，且用戶端偵測到連線。">
+
+連接到標示為 **LAN** 的連接埠；WAN 連接埠通常不提供管理存取。換一條網路線和另一個 LAN 連接埠試試；檢查燈號與用戶端網卡的狀態。
+
+如果燈號始終不亮：在動韌體之前，先檢查電源、網路線和連接埠。
+
+</Step>
+
+## 第 2 層：用戶端位址與閘道
+
+<Step where="client" title="確認用戶端位於 LAN 子網路" expected="用戶端取得 192.168.1.x 或其他已知的 LAN 位址。">
+
+Linux：
+
+```sh
+ip addr show
+ip route
+```
+
+Windows：
+
+```powershell
+ipconfig /all
+```
+
+macOS：
+
+```sh
+ifconfig
+netstat -rn
+```
+
+`169.254.x.x` 位址代表 DHCP 失敗。先確認網路線/LAN，再設定臨時的靜態位址：
+
+- IP：`192.168.1.2`
+- 遮罩：`255.255.255.0`
+- 閘道：`192.168.1.1`
+
+僅在登入時使用；不要與路由器的 LAN 位址衝突。
+
+</Step>
+
+<Step where="client" title="ping 閘道" expected="有回應，或你知道管理 IP 不是 192.168.1.1。">
+
+```sh
+ping 192.168.1.1
+```
+
+- 有回應：進入第 3 層。
+- 沒有回應：檢查用戶端子網路、LAN 連接埠，以及預設位址是否被更改過。
+- 不要只憑 ping 失敗就斷定裝置已壞。
+
+</Step>
+
+## 第 3 層：管理 IP 是否被更改？
+
+<Step where="client" title="找出真正的 LAN 位址" expected="你至少有兩個候選位址並逐一測試。">
+
+常見來源：
+
+- 裝置標籤/說明書；
+- 儲存過的設定/螢幕截圖；
+- 上游路由器的 DHCP 租約表（如果能連上）；
+- 在主控台執行 `uci show network`；
+- 你自己更改過的 LAN 位址。
+
+在**你自己的子網路**上，檢查 ARP 快取：
+
+```sh
+ip neigh
+```
+
+不要大範圍掃描未知的網路，也不要憑掃描結果去猜測某個裝置。
+
+</Step>
+
+## 第 4 層：HTTP/HTTPS 與 SSH
+
+<Step where="client" title="區分「ping 得通但網頁打不開」與連線失敗" expected="你知道這是連接埠/服務/協定的問題。">
+
+```sh
+curl -v http://192.168.1.1/
+curl -k -v https://192.168.1.1/
+ssh root@192.168.1.1
+```
+
+- HTTP 和 HTTPS 都逾時：uhttpd/LuCI 沒有在監聽，或防火牆擋住了。
+- HTTP 404/重新導向：連接埠/路徑/HTTPS 設定。
+- SSH 可用：透過 SSH 除錯服務；不要更改 LAN。
+
+</Step>
+
+<Step where="router-shell" title="如果 SSH 可用，檢查 uhttpd 與連接埠" expected="你知道 LuCI 是否在執行，以及 80/443 是否在監聽。">
+
+```sh
+netstat -lnp | grep -E ':80|:443|:22'
+ps w | grep -E 'uhttpd|rpcd' | grep -v grep
+logread -e uhttpd | tail -30
+uci show uhttpd
+```
+
+如果 uhttpd 沒有在執行，請嘗試：
+
+```sh
+/etc/init.d/uhttpd restart
+```
+
+如果仍然失敗，請查看日誌與防火牆；不要反覆重新啟動整個網路。
+
+</Step>
+
+<Step where="router-shell" title="檢查防火牆是否擋住管理" expected="LAN 到路由器的 80/443/22 沒有被意外封鎖。">
+
+```sh
+uci show firewall
+logread | grep -i firewall | tail -20
+```
+
+如果你剛修改過防火牆區域，請還原備份或從主控台修正；沒有主控台存取時，不要繼續更動。
+
+</Step>
+
+## 第 5 層：本機主控台 / failsafe
+
+<Step where="console" title="從主控台確認系統仍在運作" expected="你看到登入提示或核心日誌。">
+
+使用序列埠/HDMI/鍵盤、IPMI 或雲端主控台。序列埠通常是 `115200 8N1`，但請確認你的裝置。如果沒有輸出，先檢查連接線/鮑率/電源。
+
+進入之後：
+
+```sh
+ip addr show
+ip route
+uci show network
+uci show dhcp
+logread | tail -50
+```
+
+</Step>
+
+<Step where="console" title="只在必要時使用 failsafe" expected="你可以在不恢復原廠設定的情況下還原 LAN/DHCP。">
+
+failsafe 按鍵時機因裝置而異；請依照 OpenWrt 裝置頁面/廠商說明書。進入之後，先檢視：
+
+```sh
+uci show network
+uci show dhcp
+```
+
+如果只是 LAN 位址錯了，把它改回來，驗證後再重新開機。如果不確定，請先記錄/備份設定；不要執行 `firstboot`。恢復原廠設定會清除所有設定。
+
+</Step>
+
+## 復原順序
+
+1. **什麼都不要改**：網路線/LAN 連接埠/用戶端靜態位址。
+2. **ping 得通、網頁打不開**：uhttpd/防火牆/HTTPS。
+3. **SSH 可用**：透過 SSH 除錯服務；不要更改 LAN。
+4. **SSH 不可用**：主控台/failsafe。
+5. **最後才恢復原廠設定**：確認沒有重要設定/備份，並了解你必須重新設定 WAN/LAN/Wi-Fi。
+
+## 常見的誤判
+
+- 把 WAN 連接埠當成管理連接埠。
+- 用戶端仍使用舊的子網路/靜態 IP。
+- 瀏覽器強制使用 HTTPS，而 LuCI 是 HTTP。
+- 因為 ping 得通就以為 LuCI 正常。
+- 更改了 LAN 位址，卻沒有更新 DHCP/閘道。
+- 防火牆規則擋住了 LAN 管理。
+- uhttpd 遺失/被移除，卻反覆重新啟動網路。
+
+## E2 實驗室測試（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200；LAN `192.168.1.2`；從 PVE 主機檢查 HTTP。
+- `/etc/init.d/uhttpd stop`：對 `http://192.168.1.2/` 執行 curl 回傳 `http=000`（連線失敗）；SSH 仍可使用。
+- `/etc/init.d/uhttpd start`：HTTP 回傳 `200`。
+- 未測試：防火牆丟棄封包、uhttpd 連接埠變更、缺少 LuCI 套件、真實的序列埠/failsafe 按鍵順序。
+- 測試配方：`tests/recipes/troubleshooting-no-web-ui.md`。
+
+## E2 狀態與來源
+
+- 這是 E2 部分測試：已測試 uhttpd 停止/復原與 SSH 保持可用；防火牆、連接埠與 failsafe 仍屬文件說明。
+- 先判斷是連線、位址、uhttpd 還是防火牆的問題；不要用恢復原廠設定來取代分層診斷。
+- 主控台/failsafe 的程序因裝置/韌體而異；請先閱讀裝置文件。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；uhttpd 停止/復原、HTTP 80 檢查、SSH 保持可用"
+  recipe="tests/recipes/troubleshooting-no-web-ui.md"
+  result="E2 部分測試：停止 uhttpd 後 HTTP 80 被拒絕，SSH 仍可使用；啟動後恢復 HTTP 200；防火牆/連接埠變更/failsafe 未測試"
+/>
+
+<PageSources />

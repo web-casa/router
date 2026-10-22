@@ -1,0 +1,230 @@
+---
+title: "WireGuard 家用遠端存取：伺服器、對等端、防火牆與通道驗證"
+description: 在 OpenWrt 25.12 上設定 WireGuard 伺服器、對等端與防火牆，驗證握手／通道 IP／HTTP；WAN 連接埠轉送、DDNS 與實際手機漫遊是另外的檢查項目。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200 + PVE netns 用戶端；wg0 10.10.0.1/24，UDP 51820；握手／ping／HTTP 通過；未測試 WAN 連接埠轉送／DDNS／手機漫遊'
+testRecipe: 'tests/recipes/wireguard-server-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt wireguard', 'openwrt wireguard 伺服器', 'wireguard 家用遠端存取', 'openwrt wg0']
+symptoms: ['wireguard 沒有握手', 'wg0 不存在', 'wireguard 無法連線', '通道 ping 失敗']
+sources:
+  - label: OpenWrt WireGuard 伺服器
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/server
+  - label: WireGuard 快速入門
+    url: https://www.wireguard.com/quickstart/
+  - label: OpenWrt 防火牆
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: WireGuard 協定
+    url: https://www.wireguard.com/protocol/
+sourceHash: '37c1b278e3300bba'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 + PVE netns" tested={true} evidence="E2" />
+
+## 範圍
+
+本頁驗證：
+
+- 在 OpenWrt 上建立 WireGuard 伺服器介面 `wg0`；
+- 新增一個用戶端對等端；
+- 把 `wg0` 放入 LAN 防火牆區域；
+- 握手、通道 IP ping，以及透過通道存取 LuCI。
+
+本頁**不**驗證：
+
+- 公網 WAN 的 UDP 連接埠轉送／防火牆；
+- DDNS／網域名稱；
+- 手機／Windows 用戶端漫遊；
+- 轉送／NAT 到整個 LAN。
+
+這些取決於部署環境；這項 LAN 測試無法取代它們。
+
+## 拓樸
+
+```text
+Client 192.168.1.251
+   │  vmbr5 (lab LAN)
+   ▼
+OpenWrt VM 200 192.168.1.2
+   wg0 10.10.0.1/24, UDP 51820
+   │
+   └── tunnel 10.10.0.0/24
+       client wg0 10.10.0.2/24
+```
+
+實際的家用遠端存取中，用戶端位於網際網路上；OpenWrt 的 WAN 需要轉送／允許 UDP 51820。本次實驗僅限 LAN 側。
+
+## 準備
+
+<Step where="router-shell" title="確認核心與工具" expected="wg 存在，且 wireguard 模組已載入。">
+
+```sh
+apk add wireguard-tools kmod-wireguard
+wg --version
+cat /proc/modules | grep wireguard
+```
+
+本次實驗：`wireguard-tools v1.0.20260223`；`wireguard` 模組已載入。
+
+</Step>
+
+<Step where="router-shell" title="產生伺服器金鑰（切勿貼到聊天室／儲存庫）" expected="私鑰留在裝置上；公鑰交給用戶端。">
+
+```sh
+umask 077
+wg genkey > /tmp/wg-server.key
+wg pubkey < /tmp/wg-server.key > /tmp/wg-server.pub
+cat /tmp/wg-server.pub   # only the public key goes to the client
+```
+
+用戶端也會產生自己的金鑰對；**切勿把它的私鑰傳給伺服器**。伺服器只需要用戶端的公鑰。
+
+</Step>
+
+## 設定伺服器
+
+<Step where="router-shell" title="建立 wg0 與對等端" expected="netifd 看到 proto=wireguard，且 wg0 已有位址。">
+
+```sh
+uci set network.wg0=interface
+uci set network.wg0.proto='wireguard'
+uci set network.wg0.private_key='<server-private-key>'
+uci set network.wg0.listen_port='51820'
+uci set network.wg0.addresses='10.10.0.1/24'
+uci set network.wg0.auto='1'
+
+uci set network.wg0_client=wireguard_wg0
+uci set network.wg0_client.public_key='<client-public-key>'
+uci set network.wg0_client.allowed_ips='10.10.0.2/32'
+uci set network.wg0_client.persistent_keepalive='25'
+
+uci commit network
+/etc/init.d/network restart
+```
+
+命名很重要：
+
+- 介面區段為 `wg0`，對等端類型為 `wireguard_wg0`；後綴必須一致；
+- 本次實驗中，把介面命名為 `wg` 會讓 netifd 回報 `proto: none` 且裝置 `wg0` 不存在；改名為 `wg0` 後恢復正常。**請使用 wg0。**
+
+驗證：
+
+```sh
+wg show
+ip -4 addr show wg0
+ubus call network.interface.wg0 status
+```
+
+</Step>
+
+<Step where="router-shell" title="防火牆：把 wg0 放入 LAN 區域" expected="可連到 UDP 51820，且通道 IP 之間可以互通。">
+
+```sh
+uci show firewall | grep -E "zone.*name|zone.*network"
+uci add_list firewall.@zone[0].network='wg0'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+本次實驗中 `@zone[0]` 是 LAN 區域；你的索引可能不同，請找出 `name='lan'` 的區段。
+
+把 `wg0` 加入 LAN 後，用戶端可以 ping `10.10.0.1` 並連到 LuCI。
+
+</Step>
+
+## 最小用戶端檢查
+
+用戶端設定請見 022。在伺服器上執行：
+
+```sh
+wg show
+```
+
+用戶端握手後，伺服器應顯示：
+
+```text
+peer: <client-public-key>
+  endpoint: 192.168.1.251:44421
+  allowed ips: 10.10.0.2/32
+  latest handshake: ...
+  transfer: ...
+```
+
+本次實驗的用戶端：
+
+- 3 秒前完成握手；
+- `transfer 124 B received, 180 B sent`；
+- ping `10.10.0.1` 4/4；
+- HTTP `http://10.10.0.1/` 回傳 LuCI。
+
+## 實際 WAN 仍需要什麼
+
+- 公網 IP／連接埠轉送：WAN UDP 51820 → OpenWrt；
+- WAN 輸入防火牆允許該 UDP；
+- DDNS／固定主機名稱；
+- 用戶端 `Endpoint` 使用公網位址，而不是 192.168.1.2；
+- 若要存取整個 LAN，伺服器對等端的 `allowed_ips` 與用戶端的 `AllowedIPs` 必須包含 LAN 前置詞，並有回程路由／NAT；
+- 不要把「通道 IP 能 ping 通」說成「整個家用 LAN 都連得到」。
+
+## 常見故障
+
+### wg0 不存在／proto none
+
+- 介面區段名稱與對等端類型後綴不一致；
+- 缺少 `wireguard-tools`／`kmod-wireguard`；
+- 未重新啟動網路；
+- 檢查 `wg show`、`ubus status`、`logread`。
+
+### 沒有握手
+
+- 用戶端／伺服器公鑰放反；
+- endpoint／連接埠錯誤；
+- 防火牆未允許 UDP；
+- 私鑰權限／內容錯誤；
+- WireGuard 的握手不依賴時鐘同步，但金鑰錯誤仍會失敗。
+
+### 通道 ping 失敗
+
+- `allowed_ips` 未包含對等端的通道 IP；
+- 介面沒有位址／處於 down 狀態；
+- 防火牆區域；
+- 用戶端路由把 endpoint 本身也導入通道（迴圈）。
+
+### 通道 IP 能 ping 通，但無法連到 LAN
+
+- 用戶端 AllowedIPs 缺少 LAN 前置詞；
+- 伺服器缺少轉送／NAT／回程路由；
+- 防火牆未允許轉送；
+- 不要把通道可用等同於 LAN 可用。
+
+## E2 實驗紀錄（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200；`wg0` `10.10.0.1/24`，UDP 51820；PVE netns 用戶端 `10.10.0.2/24`。
+- 伺服器：`wg show` 列出對等端，握手成功，傳輸量 1.47 KiB/1.90 KiB；`wg0` 為 up。
+- 用戶端：握手、通道 ping 4/4、HTTP 200（LuCI）。
+- 未測試：WAN 連接埠轉送／防火牆、DDNS、手機／Windows、LAN 轉送、NAT／回程路由。
+- 測試配方：`tests/recipes/wireguard-server-25.12.md`。
+
+## 來源與審閱
+
+- 這是 E2 部分驗證：已測試 LAN 側伺服器與通道；未測試真實 WAN／行動用戶端／LAN 轉送。
+- 私鑰留在裝置上；切勿放進儲存庫／螢幕截圖／聊天室。
+- 沒有獨立審閱者；結論僅限於此 VM／netns 環境。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200 + PVE netns 用戶端；wg0 10.10.0.1/24，UDP 51820；握手／ping／HTTP 通過；未測試 WAN 連接埠轉送／DDNS／手機漫遊"
+  recipe="tests/recipes/wireguard-server-25.12.md"
+  result="E2 部分驗證：伺服器 wg0 10.10.0.1/24（UDP 51820）；用戶端 10.10.0.2/24 完成握手，通道 ping 4/4，HTTP 200；WAN 連接埠轉送、DDNS、實際手機／漫遊與 LAN 轉送未測試"
+  date="2026-10-20"
+/>
+
+<PageSources />

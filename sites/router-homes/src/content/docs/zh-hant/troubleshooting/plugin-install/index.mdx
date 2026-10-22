@@ -1,0 +1,210 @@
+---
+title: "套件裝不起來：下載、架構、相依性、LuCI 與 postinst 分層排查"
+description: 依序檢查 apk 軟體源、套件格式、架構、相依性、LuCI 選單檔與 postinst 記錄，不要一律怪罪韌體。
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；apk；sqm-scripts 1.7.2 / luci-app-sqm'
+testRecipe: 'tests/recipes/plugin-install-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt 套件裝不起來', 'apk 安裝失敗', 'luci app 沒有顯示', 'apk 相依性衝突']
+symptoms: ['apk add 失敗', '沒有 LuCI 選單', '相依性不滿足', 'postinst 錯誤']
+sources:
+  - label: OpenWrt apk 套件管理員
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: OpenWrt opkg 轉 apk 速查表
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: OpenWrt LuCI
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt 套件格式
+    url: https://openwrt.org/docs/guide-user/additional-software/package-format
+sourceHash: '03807ef4db3c6db5'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## 完成後你能確認什麼
+
+- 分辨是軟體源裡沒有這個套件，還是套件存在但安裝失敗；
+- 找出是架構、ABI、相依性、LuCI 前端還是 postinst 失敗；
+- 了解為何主程式裝好了，LuCI 卻沒有選單；
+- 不需要重新刷韌體即可復原。
+
+## 第 0 層：記錄環境
+
+<Step where="router-shell" title="記錄韌體、架構、套件管理員與軟體源" expected="你知道該用 apk 還是 opkg，以及 release／target／arch。">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+command -v apk
+command -v opkg
+cat /etc/apk/repositories.d/distfeeds.list 2>/dev/null
+```
+
+25.12 使用 `apk`；24.10 使用 `opkg`。不要把 `.ipk` 改名成 `.apk`，也不要強制安裝其他架構的套件。
+
+</Step>
+
+## 第 1 層：下載與軟體源
+
+<Step where="router-shell" title="確認軟體源中有這個套件" expected="apk search／update 找得到它，或你確定它不存在。">
+
+```sh
+apk update
+apk search <package>
+apk info -e <package>
+```
+
+如果 `apk update` 失敗，先檢查 404／簽章／時間／憑證。如果 search 找不到，可能是軟體源過期、名稱錯誤，或該套件不在此 release／arch 中。
+
+</Step>
+
+<Step where="router-shell" title="安裝前先檢查格式與檢查碼" expected="來源可信，格式與架構相符。">
+
+- 25.12：`.apk`；24.10：`.ipk`；
+- 優先使用軟體源，而不是雲端硬碟／論壇上的「改包」；
+- 本機檔案請核對 SHA-256／簽章；
+- **不要習慣性使用 `--allow-untrusted`**；它會繞過信任檢查，也無法證明相容性。
+
+</Step>
+
+## 第 2 層：架構與 ABI
+
+<Step where="router-shell" title="核對套件架構，而不是檔名" expected="套件架構與 /etc/apk/arch 一致；kmod 也要與核心相符。">
+
+```sh
+cat /etc/apk/arch
+apk info -a <package> | grep -E "arch|depends|provides" | head
+```
+
+- `x86_64`、`aarch64_cortex-a53` 等不能互換；
+- 核心模組（kmod）必須與核心版本／ABI 相符；
+- 純腳本套件可能是 `any`／`noarch`，無法用來證明架構會被拒絕。
+
+> 本實驗下載了 aarch64 的 `sqm-scripts`，但它是 `sqm-scripts-any`（沒有特定架構的二進位檔），本機 `--allow-untrusted` 仍然取代成功。這**不能證明架構檢查已通過**。真正的拒絕測試需要含 ELF 的套件；本頁不將其標示為已驗證。
+
+</Step>
+
+## 第 3 層：相依性
+
+<Step where="router-shell" title="閱讀相依性樹與安裝輸出" expected="缺少的相依性有具體的套件名稱。">
+
+```sh
+apk add <package> 2>&1 | tail -20
+apk info -R <package> 2>/dev/null | head -20
+apk info -e <dependency>
+```
+
+常見情況：
+
+- 主程式裝好了，但缺少 `luci-app-*`；
+- `kmod-*` 與核心不相符；
+- 相依套件位於其他軟體源／版本；
+- 混用了官方／ImmortalWrt／iStoreOS 的軟體源。
+
+</Step>
+
+## 第 4 層：LuCI 選單
+
+<Step where="router-shell" title="主程式 ≠ LuCI 前端" expected="安裝 luci-app 後，選單與靜態檔案會出現。">
+
+```sh
+apk info -L <luci-app-name> | head -20
+ls -l /usr/share/luci/menu.d/ 2>/dev/null | grep <name>
+```
+
+本實驗：
+
+- 只裝 `sqm-scripts`：已安裝，但沒有 LuCI 選單；
+- 加裝 `luci-app-sqm`：出現 `/usr/share/luci/menu.d/luci-app-sqm.json` 與 `/www/luci-static/resources/view/network/sqm.js`；
+- 移除 `luci-app-sqm`：選單檔消失；重新安裝後恢復。
+
+如果選單仍未顯示：清除瀏覽器快取、登出再登入，檢查 `luci-base`／語言套件／rpcd；不要一開始就重新刷韌體。
+
+</Step>
+
+## 錄製示範（017 實驗）
+
+<TerminalCast
+  src="/casts/017-plugin-install.cast"
+  title="017 實驗：sqm-scripts → luci-app-sqm"
+  caption="真實 OpenWrt 25.12.6 VM 操作記錄：安裝 sqm-scripts（沒有 LuCI 選單），加裝 luci-app-sqm（選單檔出現），移除（選單消失），重新安裝（恢復）。播放器只是補充，以本頁的程式碼區塊為準。"
+/>
+
+## 第 5 層：postinst／設定腳本
+
+<Step where="router-shell" title="套件已安裝，但服務／設定沒有生效" expected="你知道 postinst 是否失敗，以及它更動了什麼。">
+
+```sh
+logread | tail -50
+apk info -L <package> | head -20
+ls /etc/uci-defaults/ 2>/dev/null | tail
+```
+
+- postinst 失敗不一定會回復套件安裝；
+- 檢查 `/etc/uci-defaults`、`/etc/init.d/<service>`、`/etc/config/<service>`；
+- 不要為了重跑 postinst 而反覆強制重新安裝；先閱讀記錄／腳本。
+
+</Step>
+
+## 第 6 層：復原
+
+<Step where="router-shell" title="解除安裝／還原軟體源／重新啟動，而不是重新刷機" expected="回到先前的狀態，或至少能繼續除錯。">
+
+```sh
+apk del <package>
+# if feeds were changed:
+cp /etc/apk/repositories.d/distfeeds.list.bak.YYYY-MM-DD /etc/apk/repositories.d/distfeeds.list
+apk update
+reboot
+```
+
+如果套件讓管理功能無法使用，請先停止服務／還原設定備份；重新刷機是最後手段。
+
+</Step>
+
+## 常見失敗
+
+| 症狀 | 較可能的原因 | 先檢查 |
+|---|---|---|
+| `apk update` 404 | release／target／arch／鏡像路徑錯誤 | 軟體源檔案 + `curl -I` |
+| 找不到套件 | 名稱／軟體源／版本錯誤 | `apk search` |
+| 已下載但無法安裝 | 架構／相依性／簽章 | `apk info -a`、安裝輸出 |
+| 已安裝但沒有選單 | 只有主程式，沒有 `luci-app-*` | `apk info -L` |
+| 選單存在但打不開 | LuCI／語言／rpcd／快取 | 瀏覽器主控台、`logread` |
+| postinst 錯誤 | 腳本／權限／相依性／設定 | `logread`、`/etc/uci-defaults` |
+| 安裝後無法上網 | 服務更動了 DNS／防火牆／介面 | 停止服務、還原備份 |
+
+## E2 實驗記錄（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200；x86_64；apk；為求速度使用 TUNA 鏡像（本頁並不要求）。
+- `sqm-scripts 1.7.2-r1`：已安裝；沒有 LuCI 選單／控制器。
+- `luci-app-sqm`：已安裝；出現 `/usr/share/luci/menu.d/luci-app-sqm.json`；`/www/luci-static/resources/view/network/sqm.js` 存在。
+- `apk del luci-app-sqm`：選單檔消失；重新安裝後恢復。
+- aarch64 `sqm-scripts`：套件為 `sqm-scripts-any`（noarch）；本機 `--allow-untrusted` 接受了它；**這不是架構拒絕測試**。
+- 未做破壞性重現：postinst 失敗、kmod ABI 不符、真正針對特定架構的拒絕。
+
+## E2 狀態與來源
+
+- 本頁為 E2 部分驗證：已測試安裝／相依性／LuCI 選單／移除後重新安裝；架構拒絕與 postinst 失敗未完整重現。
+- 重現配方：`tests/recipes/plugin-install-25.12.md`。
+- 不要把本頁解讀為「所有套件都能安裝」；請針對每個套件核對 release／target／arch。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；apk；sqm-scripts 1.7.2 / luci-app-sqm"
+  recipe="tests/recipes/plugin-install-25.12.md"
+  result="E2 部分驗證：sqm-scripts 已安裝但沒有 LuCI 選單；luci-app-sqm 新增了 /usr/share/luci/menu.d/luci-app-sqm.json；移除後選單檔消失，重新安裝後恢復；架構／postinst 失敗未做破壞性重現"
+  date="2026-10-20"
+/>
+
+<PageSources />

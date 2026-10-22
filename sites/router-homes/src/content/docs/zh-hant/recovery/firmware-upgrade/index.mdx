@@ -1,0 +1,199 @@
+---
+title: "韌體升級：保留設定、重建套件、驗證 DNS 與管理功能"
+description: 升級前備份設定與套件清單，升級後驗證 LAN/HTTP/SSH、DNS 與套件是否留存；區分 sysupgrade、保留設定與還原設定這幾條途徑。
+pageType: recovery
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；同版本 sysupgrade；保留設定；套件 239→182；SQM/OpenClash 遺失；DNS/HTTP 正常'
+testRecipe: 'tests/recipes/firmware-upgrade-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt 升級', 'sysupgrade 保留設定', 'openwrt 升級後套件不見', 'openwrt 韌體升級']
+symptoms: ['升級後無法上網', '升級後套件遺失', '升級後 DNS 失效', 'sysupgrade 失敗']
+sources:
+  - label: OpenWrt sysupgrade
+    url: https://openwrt.org/docs/guide-user/installation/generic.backup
+  - label: OpenWrt 備份與還原
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+  - label: OpenWrt attended sysupgrade
+    url: https://openwrt.org/docs/guide-user/installation/attended.sysupgrade
+  - label: OpenWrt 套件管理員
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+sourceHash: '012dc7ede32ddb47'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## 升級不只是「換個韌體檔」
+
+請分開看四件事：
+
+1. **韌體**是否刷寫成功並能開機；
+2. **設定**是否保留／還原；
+3. **套件／外掛**是否仍在，或必須重新安裝；
+4. **管理功能／DNS／WAN** 是否恢復。
+
+保留設定不代表保留套件。保留某個應用程式的設定，也不代表保留它的二進位檔。
+
+## 升級前
+
+<Step where="router-shell" title="記錄 release、target、套件清單並備份" expected="你可以還原，並且知道哪些東西不見了。">
+
+```sh
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+apk list --installed > /tmp/packages-$(date +%F).txt
+wc -l /tmp/packages-$(date +%F).txt
+sysupgrade -b /tmp/pre-upgrade-$(date +%F).tar.gz
+sha256sum /tmp/pre-upgrade-$(date +%F).tar.gz
+```
+
+將設定存檔複製到裝置外；若是 VM，也請建立 PVE 快照／備份。不要只留在 `/tmp`。
+
+</Step>
+
+<Step where="router-shell" title="驗證映像檔與檢查碼" expected="映像檔符合 release／target／arch，且檢查碼有效。">
+
+```sh
+wget -O /tmp/openwrt.img.gz <official-image-url>
+sha256sum /tmp/openwrt.img.gz
+# compare with the matching line in official sha256sums
+gzip -dkf /tmp/openwrt.img.gz
+ls -lh /tmp/openwrt.img
+```
+
+本實驗使用 25.12.6 x86/64 combined ext4 映像檔；`.img.gz` 的 SHA-256 相符，之後解壓縮再交給 `sysupgrade`。
+
+</Step>
+
+<Step where="router-shell" title="保留主控台與還原途徑" expected="升級中斷／失敗時可以復原。">
+
+- 實體裝置：序列埠／HDMI、failsafe 按鍵、舊版韌體；
+- PVE：升級前建立快照，並確認 `qm rollback` 可用；
+- 記錄 LAN IP、DHCP、WAN、DNS、管理連接埠；
+- 升級期間不要斷電或拔除磁碟。
+
+</Step>
+
+## 升級命令
+
+預設（保留設定）：
+
+```sh
+sysupgrade -v /tmp/openwrt.img
+```
+
+選項：
+
+- `-n`：不保留設定（全新安裝）；
+- `-f <backup.tar.gz>`：升級時還原設定；
+- `-c`/`-o`：保留更多變更過的檔案；邊界較為複雜；
+- 除非完全了解後果，否則不要用 `-F` 忽略相容性檢查。
+
+升級會關閉 SSH／網頁連線；請等待重新啟動，不要因為連線失敗就切斷電源。
+
+## 升級後驗證
+
+<Step where="client" title="管理入口" expected="至少各檢查一次 LAN IP、HTTP 與 SSH。">
+
+```sh
+ping -c 2 192.168.1.2
+curl -sSI --max-time 5 http://192.168.1.2/ | head -3
+ssh root@192.168.1.2 'cat /etc/openwrt_release'
+```
+
+本實驗保留了 LAN `192.168.1.2/24`；HTTP 200，SSH 正常。
+
+</Step>
+
+<Step where="router-shell" title="設定與 DNS／WAN" expected="設定被保留，且 DNS／WAN 確實可用。">
+
+```sh
+uci show network.lan.ipaddr
+uci show dhcp.lan
+ip route
+nslookup openwrt.org 127.0.0.1
+logread | grep -Ei 'dnsmasq|netifd|dhcp' | tail -30
+```
+
+本實驗：升級後 DNS 與 HTTP 正常；WAN 設定被保留。仍須重新驗證用戶端的 DHCP 租約與真實的網際網路連線，而不是只看路由器本身。
+
+</Step>
+
+<Step where="router-shell" title="套件與外掛" expected="你知道遺失了什麼，並依清單重新安裝。">
+
+```sh
+apk list --installed | wc -l
+for p in sqm-scripts luci-app-sqm luci-app-openclash; do
+  apk info -e "$p" && echo "$p installed" || echo "$p MISSING"
+done
+```
+
+本實驗：升級前 239 個套件，升級後 182 個；`sqm-scripts`、`luci-app-sqm`、`luci-app-openclash` 全部不見。設定可能還在，但二進位檔必須重新安裝。
+
+逐一重新安裝：
+
+```sh
+apk update
+apk add sqm-scripts luci-app-sqm
+# verify menu/service before the next package
+```
+
+不要一次還原所有外掛；請先恢復管理功能／DNS／基本網路。
+
+</Step>
+
+## 重建順序
+
+1. 基本網路：network/dhcp/firewall；
+2. DNS：dnsmasq，需要時再裝 AGH；
+3. 管理：luci/uhttpd；
+4. 代理／流量整形：OpenClash、SQM；
+5. 最後：規則／訂閱／效能調校。
+
+每安裝一個套件都要檢查：
+
+- 是否已安裝；
+- LuCI 選單／控制器是否存在；
+- 服務是否啟動；
+- DNS／預設路由是否被更動；
+- 停用它後是否恢復基本網路。
+
+## 還原
+
+- 實體裝置：保留舊版韌體／復原模式；
+- PVE：升級前建立快照／`vzdump`，失敗時還原整台 VM；
+- 設定：用 `sysupgrade -r` 還原存檔；
+- 不要用「再刷一次」來取代診斷失敗原因。
+
+本實驗使用快照 `pre-019`；記錄結果後已還原到升級前的狀態。本頁記錄的是實際的升級執行結果。
+
+## E2 實驗記錄（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200；升級前後版本相同（重新刷機，不是跨版本）。
+- 升級前：239 個套件；已安裝 `sqm-scripts`、`luci-app-sqm`、`luci-app-openclash`；LAN `.2`，DHCP 設為忽略。
+- 執行 `sysupgrade -v /tmp/openwrt.img` 之後：裝置重新啟動；保留了 LAN `.2` 與 DHCP 忽略設定；HTTP 200、SSH 與 DNS 正常。
+- 套件：239 → 182；SQM／OpenClash 遺失；設定可能仍在，但二進位檔必須重新安裝。
+- 未完成：跨版本升級、SQM／OpenClash 重新安裝驗證、真實 Wi-Fi／PPPoE、斷電復原。
+- 重現配方：`tests/recipes/firmware-upgrade-25.12.md`。
+
+## 來源與複核
+
+- 本頁為 E2 部分驗證：已測試同版本 sysupgrade 的設定保留、管理功能／DNS 與套件遺失；跨版本與外掛重建未完成。
+- 不要從同版本的結果推論跨 release 的行為；請閱讀發行說明、先備份並在 VM 中測試。
+- 沒有獨立審閱者；結論僅限於此 VM 環境。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；同版本 sysupgrade；保留設定；套件 239→182；SQM/OpenClash 遺失；DNS/HTTP 正常"
+  recipe="tests/recipes/firmware-upgrade-25.12.md"
+  result="E2 部分驗證：同版本 sysupgrade 後，LAN／DHCP 設定被保留，HTTP／SSH／DNS 正常；套件由 239 降為 182，SQM／OpenClash 消失；未做跨版本升級；SQM 重新安裝未完成；快照已還原"
+  date="2026-10-20"
+/>
+
+<PageSources />

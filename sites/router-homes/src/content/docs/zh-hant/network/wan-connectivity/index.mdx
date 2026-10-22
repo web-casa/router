@@ -1,0 +1,275 @@
+---
+title: "主路由器連線：分別驗證 WAN DHCP 與 PPPoE"
+description: 逐步驗證 WAN DHCP 用戶端、閘道/DNS、LAN 用戶端與 NAT，再了解 PPPoE 實際需要什麼。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'WAN DHCP E2：OpenWrt 25.12.6 x86 VM 200，WAN 192.168.50.166/24，LAN 192.168.10.1；PPPoE 未測試'
+testRecipe: 'tests/recipes/wan-dhcp-pppoe-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt wan dhcp', 'openwrt pppoe', 'openwrt 主路由器上網', 'wan 埠無法上網']
+symptoms: ['WAN 沒有位址', 'PPPoE 驗證失敗', 'LAN 有位址但無法上網']
+sources:
+  - label: OpenWrt 網路設定
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt WAN 介面協定
+    url: https://openwrt.org/docs/guide-user/network/wan/wan_interface_protocols
+  - label: OpenWrt PPPoE / ISP 設定
+    url: https://openwrt.org/docs/guide-user/network/wan/isp-configurations
+  - label: OpenWrt 防火牆
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: '92abdcdd7cb6f92a'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 + 實際 ISP 線路（PPPoE 待測）" tested={true} evidence="E2" />
+
+## 預期結果
+
+- 判斷 WAN 使用 DHCP 還是 PPPoE，以及該檢查哪個狀態；
+- 驗證 WAN 位址/閘道/DNS，而不是只相信「已連線」；
+- 驗證 LAN 用戶端的位址、閘道與 DNS；
+- 判斷「WAN 正常、LAN 不通」是轉送/NAT 問題還是 DNS 問題；
+- 了解 PPPoE 需要什麼，以及為什麼沒有實際線路就不能稱為已測試。
+
+## 拓撲與假設
+
+```text
+Upstream router/ONT 192.168.50.1
+        │
+   WAN eth1 (DHCP 192.168.50.166/24)
+        │
+   OpenWrt VM 200
+        │
+   LAN br-lan 192.168.10.1/24
+        │
+   LAN client 192.168.10.191/24
+```
+
+- WAN 與 LAN 必須位於不同子網路；不要與上游重疊。
+- 主路由器必須執行 NAT/轉送；旁路/AP 的驗證方式不同。
+- 請保留主控台存取；變更 WAN 時，不要只依賴單一網頁連線。
+
+## 辨識 WAN 協定
+
+<Step where="router-shell" title="讀取目前的 WAN/LAN 設定" expected="你知道 WAN 是 dhcp、pppoe 還是 static。">
+
+```sh
+uci show network.wan
+uci show network.wan6 2>/dev/null
+uci show network.lan
+ip -4 addr show
+ip route
+```
+
+WAN 的 `proto` 決定要檢查什麼：`dhcp` → udhcpc，`pppoe` → pppd/pppoe-wan。
+
+</Step>
+
+## WAN DHCP
+
+<Step where="luci" title="將 WAN 設為 DHCP 用戶端" expected="WAN 取得位址、閘道與 DNS。">
+
+開啟 **網路 → 介面 → WAN → 編輯**：
+
+1. 協定：`DHCP 用戶端`；
+2. 儲存並套用；
+3. 在介面頁面確認 WAN 有 IPv4 位址，而不只是顯示「已連線」。
+
+CLI 對應做法：
+
+```sh
+uci set network.wan.proto='dhcp'
+uci commit network
+/etc/init.d/network reload
+```
+
+</Step>
+
+<Step where="router-shell" title="驗證 WAN 位址/閘道/DNS" expected="WAN 有位址，預設路由指向上游，且 DNS 可用。">
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+cat /tmp/resolv.conf.d/resolv.conf.auto
+nslookup openwrt.org 192.168.50.1
+```
+
+本次實驗取得：
+
+- WAN `192.168.50.166/24`；
+- 閘道/DNS `192.168.50.1`；
+- WAN 裝置 `eth1`。
+
+若 `ubus` 顯示 `up: false` 或沒有 `ipv4-address`，請先檢查 `logread -e udhcpc`，再去動 LAN。
+
+</Step>
+
+<Step where="client" title="驗證 LAN 用戶端" expected="用戶端取得 LAN 位址、閘道與 DNS。">
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.10.1
+```
+
+本次實驗中，LAN 的 DHCP 用戶端取得 `192.168.10.191/24`，閘道 `192.168.10.1`。
+
+測試路由器以外的連線：
+
+```sh
+ping -c 3 1.1.1.1
+nslookup openwrt.org
+```
+
+> 本次 E2 測試重新檢查了 WAN DHCP 與 LAN DHCP；LAN 用戶端經 NAT/DNS 連到公共網際網路的完整路徑並未重新執行，因此「用戶端可以瀏覽網頁」並未標示為已測試。
+
+</Step>
+
+<Step where="router-shell" title="WAN 正常但 LAN 不通" expected="區分轉送/NAT 與 DNS。">
+
+```sh
+uci show firewall
+nft list ruleset 2>/dev/null | head -80
+logread | grep -i firewall | tail -20
+```
+
+檢查：
+
+- LAN/WAN 是否位於正確的防火牆區域；
+- WAN 區域是否啟用 masquerade；
+- 轉送是否允許 LAN→WAN；
+- 用戶端的閘道/DNS 是否指向 OpenWrt；
+- 是否有第二個 DHCP 或子網路衝突。
+
+</Step>
+
+## PPPoE（E1，需要實際線路）
+
+<Step where="client" title="確認你擁有哪些資訊" expected="帳號、密碼、VLAN/服務名稱皆已取得，且來源合法。">
+
+PPPoE 通常需要：
+
+- ISP 帳號/密碼（切勿貼到聊天、程式庫或螢幕截圖）；
+- 部分地區需要 VLAN ID；
+- 部分地區需要服務名稱/AC 名稱；
+- ONT 是否已經撥號（橋接與路由模式）；
+- MTU/MSS 與 IPv6 的需求。
+
+沒有這些資訊時，不要稱 PPPoE 已測試；切勿使用他人的帳號測試。
+
+</Step>
+
+<Step where="luci" title="在 LuCI 設定 PPPoE（範例，不含真實密碼）" expected="WAN 協定變為 PPPoE；憑證只保留在裝置上。">
+
+**網路 → 介面 → WAN → 編輯 → 協定：PPPoE**：
+
+- 使用者名稱/密碼：你的 ISP 憑證；
+- 如有需要，在裝置/介面層設定 VLAN；
+- Keepalive 可先從 `5 3` 開始；
+- 儲存並套用。
+
+CLI 的寫法（不要把真實密碼放進 shell 歷史記錄或程式庫）：
+
+```sh
+uci set network.wan.proto='pppoe'
+uci set network.wan.username='<your-account>'
+uci set network.wan.password='<your-password>'
+uci set network.wan.keepalive='5 3'
+uci commit network
+/etc/init.d/network reload
+```
+
+</Step>
+
+<Step where="router-shell" title="驗證 PPPoE 狀態" expected="pppoe-wan 有位址、預設路由與 DNS。">
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show pppoe-wan
+ip route
+logread | grep -Ei 'pppd|pppoe' | tail -30
+```
+
+檢查：
+
+- `pppoe-wan` 上的 IPv4；
+- 預設路由經由 `pppoe-wan`；
+- DNS 可用；
+- MTU 約為 1492（PPPoE 常見值）；
+- 記錄中的驗證失敗/逾時/服務名稱錯誤。
+
+本頁沒有真實的 ISP 帳號，因此 **PPPoE 維持 E1**，也不宣稱「撥號成功」。
+
+</Step>
+
+## 常見失敗
+
+### WAN DHCP 取不到位址
+
+- 接錯連接埠（WAN 與 LAN）；
+- 上游 DHCP 已停用；
+- 上游的 MAC 綁定/驗證；
+- 需要 VLAN；
+- 檢查 `logread -e udhcpc` 中的 discover/offer；
+- 不要用靜態 IP 去猜測上游子網路。
+
+### PPPoE 驗證失敗
+
+- 帳號/密碼錯誤（大小寫/後綴）；
+- 需要 VLAN/服務名稱；
+- ONT 仍在撥號（重複撥號）；
+- 帳號綁定 MAC/連接埠；
+- 反覆重試可能觸發 ISP 的限制；請閱讀記錄，不要狂按重試。
+
+### WAN 有位址，LAN 卻無法上網
+
+- 防火牆區域/轉送/masquerade；
+- 用戶端的閘道/DNS；
+- 上游只允許一個裝置/MAC；
+- 子網路衝突/雙重 NAT；
+- IPv6 與 IPv4 的差異。
+
+### DNS 失敗
+
+- 測試 WAN 端的 DNS（`nslookup ... 192.168.50.1`）；
+- 再測試路由器本身（`nslookup ... 127.0.0.1`）；
+- 然後測試 LAN 用戶端（`cat /etc/resolv.conf`）；
+- 不要把每一次 DNS 失敗都歸咎於 WAN。
+
+## E2/E1 記錄
+
+### WAN DHCP（E2）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200；WAN `eth1`；上游 `192.168.50.1`。
+- 結果：WAN `192.168.50.166/24`，閘道/DNS `192.168.50.1`；LAN `192.168.10.1/24`。
+- LAN DHCP：netns 用戶端 `192.168.10.191/24`，閘道 `192.168.10.1`。
+- 未重新執行：LAN 用戶端 → 公共網際網路的 NAT/DNS 端對端、IPv6、實體 WAN。
+
+### PPPoE（E1）
+
+- 沒有真實的 ISP 帳號/線路；沒有撥號、驗證、MTU 或 DNS 驗證。
+- 讀者必須使用自己合法的帳號與裝置/ISP 文件測試；切勿公開憑證。
+
+## 來源與審閱
+
+- WAN DHCP 為 E2；PPPoE 為 E1。不要把它們合併成「主路由器已完整測試」。
+- 測試配方：`tests/recipes/wan-dhcp-pppoe-25.12.md`。
+- 沒有獨立審閱者；結論僅限於這個 VM/上游環境。
+
+<TestRecord
+  status="partial"
+  environment="WAN DHCP E2：OpenWrt 25.12.6 x86 VM 200，WAN 192.168.50.166/24，LAN 192.168.10.1；PPPoE 未測試"
+  recipe="tests/recipes/wan-dhcp-pppoe-25.12.md"
+  result="WAN DHCP 取得 192.168.50.166/24，閘道/DNS 為 192.168.50.1；LAN DHCP 用戶端取得 192.168.10.191/24；LAN 用戶端 NAT/DNS 端對端未重新執行；沒有真實帳號/線路，PPPoE 未測試"
+  date="2026-10-20"
+/>
+
+<PageSources />

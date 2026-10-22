@@ -1,0 +1,247 @@
+---
+title: "下載或上傳時遊戲、會議變卡：SQM 與 CAKE 如何設定與測試"
+description: 先判斷是否為 bufferbloat，再用 SQM/CAKE 對 WAN 流量整形，並以前後延遲數據驗證；虛擬網卡無法代表真實線路。
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；sqm-scripts 1.7.2 + luci-app-sqm；WAN eth1 DHCP；已掛載 CAKE qdisc；無真實線路效能資料'
+testRecipe: 'tests/recipes/sqm-25.12.md'
+aliases: ['openwrt sqm', 'openwrt cake', 'sqm 設定', 'bufferbloat']
+symptoms: ['下載時遊戲延遲', '視訊會議卡頓', '延遲暴增', '上傳時瀏覽變慢']
+sources:
+  - label: OpenWrt SQM 文件
+    url: https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm
+  - label: OpenWrt SQM scripts 套件
+    url: https://openwrt.org/packages/pkgdata/sqm-scripts
+  - label: CAKE qdisc 文件
+    url: https://www.bufferbloat.net/projects/codel/wiki/Cake/
+  - label: Bufferbloat 專案
+    url: https://www.bufferbloat.net/projects/bloat/wiki/Introduction/
+sourceHash: '59a725ea59a5c246'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
+
+## 預期成果
+
+- 判斷「下載/上傳時變卡」是否為 bufferbloat，而不是 Wi-Fi、光纖數據機（ONT）或 ISP 壅塞。
+- 在 OpenWrt 25.12 上安裝並設定 `sqm-scripts` 與 CAKE。
+- 記錄閒置與負載時的延遲、遺失率與吞吐量，而不是宣稱「感覺變快了」。
+- 知道何時 SQM 是錯誤的工具，以及如何快速關閉。
+
+## 適用環境
+
+- 使用 `apk` 的 OpenWrt 25.12.6；`sqm-scripts 1.7.2`；可選用 `luci-app-sqm`。
+- 路由器是**主要的 NAT 閘道**，且 WAN 流量會經過它。若為 AP/旁路路由器，SQM 可能看不到主要流量。
+- CAKE 會耗用 CPU；在千兆線路上，加入整形前請先檢查單核心使用率。
+- 本頁為 E2 partial：已測試安裝與 CAKE 掛載/停止。吞吐量/延遲的結論需要真實 WAN，屬於 E3。
+
+## 是 bufferbloat 嗎？
+
+典型徵兆：
+
+- 閒置時 ping 正常，但一開始下載/上傳延遲就暴增；遊戲跳 ping、通話卡頓。
+- 限制下載/上傳速率後，延遲會再次下降。
+- 有線與 Wi-Fi 用戶端都會發生，表示問題在 WAN 佇列。
+
+不是 bufferbloat 的情況：
+
+- 只有 Wi-Fi 的某個房間/用戶端異常：檢查訊號、干擾、漫遊。
+- 即使閒置也有高延遲/遺失：檢查 ONT、ISP、線路。
+- 路由器 CPU 已經飽和；SQM 可能讓情況更糟。
+
+## 關鍵參數
+
+| 參數 | 意義 | 常見錯誤 |
+|---|---|---|
+| `interface` | 要整形的介面，通常為 `wan` | 使用 `eth0`/`br-lan`，導致流量繞過整形 |
+| `download`/`upload` | 整形速率（kbit/s） | 直接使用方案標稱速率，導致佇列仍然塞滿 |
+| `qdisc` | `cake` 或 `fq_codel` | 啟用了 SQM 卻仍使用預設 qdisc |
+| `script` | `piece_of_cake.qos` / `simplest.qos` | 選錯 script，選項不會生效 |
+| `linklayer`/`overhead` | 鏈路層額外負擔 | 在 PPPoE/VLAN 上照抄乙太網路的數值 |
+| CPU | CAKE 的運算成本 | 在 CPU 無法負荷時於千兆線路上使用 CAKE |
+
+先從實測吞吐量的 **85%–95%** 開始，再依負載延遲調整。不要把「100M 方案」直接填成 100000。
+
+## 變更任何設定之前
+
+<Step where="router-shell" title="記錄 WAN、CPU 與目前的 qdisc" expected="你知道要變更哪個介面，以及 SQM 是否已在運作。">
+
+```sh
+ip -br link
+ip -br addr
+uci show network | grep -E "wan|device"
+uci show sqm 2>/dev/null || echo "sqm not installed"
+top -bn1 | head -15
+```
+
+記下 WAN 邏輯介面、實體裝置、方案/實測速率與 CPU 型號。保留 LuCI/SSH 存取。
+
+</Step>
+
+<Step where="router-shell" title="取得閒置基準值" expected="已記錄閒置時的延遲/遺失率，供日後比較。">
+
+```sh
+ping -c 20 1.1.1.1
+ping -c 20 192.168.50.1
+```
+
+若有 `irtt`/`flent` 請優先使用；否則記錄 min/avg/max/mdev 與遺失率。
+
+</Step>
+
+## 最小步驟
+
+<Step where="router-shell" title="安裝 SQM" expected="已安裝 sqm-scripts 與 LuCI 應用程式。">
+
+```sh
+apk update
+apk add sqm-scripts luci-app-sqm
+```
+
+單獨安裝 `luci-app-sqm` 不會裝上 scripts；請用 `apk info -e sqm-scripts` 確認。
+
+</Step>
+
+<Step where="luci" title="在 LuCI 中設定 SQM" expected="WAN 使用 cake/piece_of_cake，且可啟用/停用。">
+
+開啟 **網路 → SQM QoS**：
+
+1. 啟用。
+2. 選擇 `wan`（不是 `br-lan`）。
+3. 將下載/上傳設為實測吞吐量的 85%–95%。
+4. 選擇 `cake` 與 `piece_of_cake.qos`。
+5. 選擇實際的鏈路層（在 PPPoE/VLAN 上不要照抄乙太網路的數值）。
+6. 儲存並套用。
+
+先從保守值開始；延遲改善後再提高速率。
+
+</Step>
+
+<Step where="router-shell" title="等效的命令列做法（先確認區段名稱）" expected="uci show sqm 顯示你所變更的佇列。">
+
+```sh
+uci show sqm
+```
+
+區段名稱可能不是 `@queue[0]`；請使用實際名稱。範例：
+
+```sh
+uci set sqm.@queue[0].enabled='1'
+uci set sqm.@queue[0].interface='wan'
+uci set sqm.@queue[0].download='90000'
+uci set sqm.@queue[0].upload='18000'
+uci set sqm.@queue[0].qdisc='cake'
+uci set sqm.@queue[0].script='piece_of_cake.qos'
+uci set sqm.@queue[0].linklayer='ethernet'
+uci set sqm.@queue[0].overhead='0'
+uci commit sqm
+/etc/init.d/sqm restart
+```
+
+這些數字只是範例，不是你的線路參數；請自行確認 `linklayer`/`overhead`。
+
+</Step>
+
+<Step where="router-shell" title="確認 qdisc 已掛載" expected="wan 上出現 cake/fq_codel，且記錄檔正常。">
+
+```sh
+tc -s qdisc show dev wan
+tc -s qdisc show | grep -E "cake|fq_codel|ifb"
+logread -e sqm | tail -30
+```
+
+若只看到 `noqueue`/`pfifo_fast`，表示 SQM 並未啟用；請檢查介面與 `/etc/init.d/sqm` 的記錄。
+
+</Step>
+
+## 負載下的驗證
+
+<Step where="client" title="測量下載/上傳時的延遲" expected="你擁有前後對照的數據，而不是感覺。">
+
+在另一個終端機讓線路飽和的同時，持續執行 ping：
+
+```sh
+# terminal A
+ping -i 0.2 1.1.1.1
+
+# terminal B: use a trusted speed/download tool to saturate the line
+```
+
+記錄：
+
+- 閒置與負載時的 min/avg/max/mdev；
+- 遺失率；
+- 吞吐量是否大幅下降；
+- 路由器是否有某個 CPU 核心已飽和。
+
+沒有這些數據，就不要寫「SQM 降低了延遲」。
+
+</Step>
+
+## 失敗分支與復原
+
+### SQM 無法啟動 / 沒有 qdisc
+
+```sh
+logread -e sqm | tail -50
+tc -s qdisc show dev wan
+uci show sqm
+```
+
+常見原因：介面錯誤、缺少 `sqm-scripts`、不支援的 qdisc/script 組合、`tc` 錯誤。除錯前請先停用 SQM 並還原先前的狀態。
+
+### 吞吐量暴跌 / CPU 飽和
+
+- 速率設得太低：從實測值開始逐步調高。
+- CAKE 對較弱的 CPU 負擔過重：改用 `fq_codel` 或降低速率。
+- 鏈路額外負擔錯誤：針對 PPPoE/VLAN 修正。
+- 停用 SQM 並確認吞吐量恢復。
+
+### 沒有效果
+
+- 流量繞過路由器（AP/旁路/交換器）。
+- 瓶頸在 Wi-Fi 或 ISP 壅塞。
+- 只整形了下載；上傳仍然壅塞。
+- 你測的是閒置延遲，而不是負載延遲。
+
+### 快速停用
+
+```sh
+uci set sqm.@queue[0].enabled='0'
+uci commit sqm
+/etc/init.d/sqm restart
+```
+
+或還原先前備份的 `/etc/config/sqm`。
+
+## E2 實驗室實測（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200；WAN `eth1` DHCP `192.168.50.158/24`；`sqm-scripts 1.7.2-r1`、`luci-app-sqm`。
+- 設定：`eth1`，下載 `100000 Kbps`，上傳 `20000 Kbps`，`piece_of_cake.qos`，`cake`。
+- 啟動：`SQM: ... started on eth1 successfully`；`tc -s qdisc show dev eth1` 顯示 `qdisc cake ... bandwidth 20Mbit`。
+- 停止：`SQM: Stopping SQM on eth1`；qdisc 恢復為 `fq_codel`。
+- **請勿**用這些 VM 數字宣稱延遲降低/體驗變好；沒有真實線路、負載延遲或吞吐量的比較。
+- 未測試：真實寬頻 bufferbloat 前後比較、CPU 單核心使用率、PPPoE/VLAN overhead、Wi-Fi 瓶頸。
+- Recipe：`tests/recipes/sqm-25.12.md`。
+
+## E2 狀態與來源
+
+- 這是 E2 partial：已測試安裝、CAKE 掛載/停止與復原；真實線路效能仍屬 E3 範圍。
+- VM 只能證明命令/qdisc 掛載，無法代表家用寬頻。請勿用 VM 數字宣稱「有效」。
+- 在真實環境中，請先記錄線路/CPU/qdisc、閒置/負載延遲與吞吐量，再決定是否保留 SQM。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；sqm-scripts 1.7.2 + luci-app-sqm；WAN eth1 DHCP；已掛載 CAKE qdisc；無真實線路效能資料"
+  recipe="tests/recipes/sqm-25.12.md"
+  result="E2 partial：SQM 以 piece_of_cake.qos 在 eth1 上以 100/20 Mbit 啟動；tc 顯示 cake 20Mbit；停止後恢復為 fq_codel；無真實線路吞吐量/延遲資料"
+/>
+
+<PageSources />

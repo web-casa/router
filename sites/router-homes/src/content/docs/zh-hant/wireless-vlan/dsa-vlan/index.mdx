@@ -1,0 +1,154 @@
+---
+title: "DSA VLAN：連接埠、PVID、tagged/untagged 與回復"
+description: 在 DSA 架構下以 bridge-vlan 設定連接埠 VLAN，了解 tagged/untagged、PVID 與 trunk，保留管理連接埠並一次只修改一個連接埠。僅為文件整理；未在真實交換硬體上驗證。
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: '依據 OpenWrt 25.12 DSA/VLAN 文件整理；未在真實多連接埠 DSA 硬體/交換器上驗證'
+testRecipe: 'tests/recipes/dsa-vlan-25.12.md'
+aliases: ['openwrt dsa vlan', 'openwrt vlan 設定', 'bridge-vlan', 'openwrt tagged untagged']
+symptoms: ['VLAN 不通', '修改 VLAN 後失去連線', '無法辨識 trunk', '連接埠 PVID 錯誤']
+sources:
+  - label: OpenWrt DSA 入門教學
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+  - label: OpenWrt VLAN 設定
+    url: https://openwrt.org/docs/guide-user/network/vlan/switch_configuration
+  - label: OpenWrt 網路設定
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt 防火牆
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: 'ffd770023be30d71'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="DSA 多連接埠裝置（未實測）" tested={false} evidence="E1" />
+
+> **狀態**：E1 文件。VLAN 設定取決於確切的 DSA 連接埠名稱、CPU 連接埠與交換器對端；沒有真實硬體時，請勿將此範例視為已驗證。
+
+## DSA 與 swconfig 的差異
+
+- 較舊的裝置常使用 `swconfig`：`switch0`、連接埠 0/1/2；
+- DSA 會把每個連接埠呈現為 `lan1`、`lan2`、`wan` 等；
+- 現代 OpenWrt 使用 **bridge VLAN filtering**（橋接 VLAN 篩選），而不是 `swconfig` 的 `vid/ports` 語法；
+- 連接埠名稱因裝置而異：`ip -d link show`、`ls /sys/class/net`。
+
+## 修改前先記錄
+
+<Step where="router-shell" title="確認 DSA、連接埠名稱與管理入口" expected="知道哪個連接埠是 LAN/WAN，以及你從哪裡管理裝置。">
+
+```sh
+ip -d link show
+ls /sys/class/net
+uci show network
+uci show firewall | grep -E 'zone.*name|zone.*network'
+bridge vlan show
+```
+
+- `br-lan` 是否已經有 `bridge-vlan`？
+- 哪個實體連接埠承載管理流量？
+- 交換器對端是否已設定為 trunk/tagged？
+- 先備份：`cp /etc/config/network /etc/config/network.bak.$(date +%F)`。
+
+</Step>
+
+## bridge-vlan 範例
+
+假設 DSA 連接埠為 `lan1`、`lan2`、`lan3`；讓 `lan1` 成為 trunk（VLAN 1 + 20 tagged），`lan2/lan3` 為 VLAN 1 的 access：
+
+```uci
+config device
+    option name 'br-lan'
+    option type 'bridge'
+    list ports 'lan1'
+    list ports 'lan2'
+    list ports 'lan3'
+
+config bridge-vlan
+    option device 'br-lan'
+    option vlan '1'
+    list ports 'lan1:u*'
+    list ports 'lan2:u*'
+    list ports 'lan3:u*'
+
+config bridge-vlan
+    option device 'br-lan'
+    option vlan '20'
+    list ports 'lan1:t'
+```
+
+重點：
+
+- `u*`：untagged，且為該連接埠在此 VLAN 的 PVID；
+- `t`：tagged，透過 trunk 傳送；
+- access 連接埠通常只有一個 untagged PVID；
+- 交換器之間的 trunk，兩端都必須是 tagged，並允許相同的 VLAN；
+- 不要讓舊的 `swconfig` 設定與此並存。
+
+> 請依你的裝置替換連接埠名稱/CPU 連接埠；若不確定，請先在備用連接埠/裝置上測試。
+
+## 套用並驗證
+
+```sh
+uci commit network
+/etc/init.d/network reload
+bridge vlan show
+ip -d link show br-lan
+```
+
+驗證：
+
+- 管理介面仍能連到 LuCI/SSH；
+- access 用戶端能從正確的 VLAN 取得 DHCP；
+- trunk 對端能看到 tagged 的 VLAN；
+- `bridge vlan show` 與 PVID/tagged 的設計一致。
+
+## 失去連線後的回復
+
+1. 使用主控台/序列埠；不要只依賴網路；
+2. 還原 `/etc/config/network.bak.*`；
+3. 或暫時把管理連接埠改回 untagged VLAN 1；
+4. 重新啟動網路並確認可以管理；
+5. 一次只新增一個連接埠的 VLAN。
+
+## 常見故障
+
+### 立刻失去連線
+
+- 管理連接埠被改成 tagged 或 PVID 錯誤；
+- trunk 對端不允許該 VLAN；
+- CPU/上行連接埠被一次全部改動；
+- 透過主控台回復；不要盲目恢復原廠設定。
+
+### 無法連到 VLAN 20
+
+- 兩端的 tagged/untagged 不一致；
+- 未設定 PVID；
+- 該 VLAN 沒有介面/DHCP/防火牆；
+- 交換器上未建立/未允許該 VLAN。
+
+### 有位址但無法上網
+
+- 訪客/服務 VLAN 缺少 DHCP/DNS；
+- 防火牆區域/轉送不一致；
+- 缺少 NAT/回程路由；
+- VLAN 連通性不等於路由/NAT。
+
+## E1 狀態
+
+- 僅為文件；未在真實 DSA 硬體/交換器上驗證；不宣稱「已設定成功」。
+- 真實測試需要多連接埠 DSA 裝置、可管理的交換器、主控台存取、回復用設定，以及至少兩個用戶端。
+- 只有在記錄裝置型號、連接埠名稱、交換器設定與故障回復之後，才能升級為 E2。
+
+<TestRecord
+  status="planned"
+  environment="依據 OpenWrt 25.12 DSA/VLAN 文件整理；未在真實多連接埠 DSA 硬體/交換器上驗證"
+  recipe="tests/recipes/dsa-vlan-25.12.md"
+  result="E1：已記載 DSA 連接埠、bridge-vlan、tagged/untagged/PVID 與回復；未在真實硬體上驗證，也不宣稱「可以運作」"
+/>
+
+<PageSources />

@@ -1,0 +1,216 @@
+---
+title: "IPv6 基礎：驗證 ULA、RA/SLAAC、PD 與 DNS"
+description: 分辨 link-local、ULA、GUA、PD、RA、SLAAC 與 DHCPv6；先驗證 LAN 的 ULA/RA，再確認上游是否委派 GUA/PD，最後檢查 DNS／防火牆。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；LAN ULA fd2f:385b:7d0a::/48；RA/SLAAC 用戶端取得 /64；無上游 GUA/PD'
+testRecipe: 'tests/recipes/ipv6-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt ipv6', 'openwrt ipv6 設定', 'openwrt slaac', 'openwrt pd']
+symptoms: ['只有 fe80 位址', '沒有公用 IPv6', 'RA 無作用', 'IPv6 DNS 失敗']
+sources:
+  - label: OpenWrt IPv6 設定
+    url: https://openwrt.org/docs/guide-user/network/ipv6/configuration
+  - label: OpenWrt DHCP 與 DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt 防火牆
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: IPv6 RA/SLAAC 概觀
+    url: https://www.rfc-editor.org/rfc/rfc4862
+sourceHash: 'a51aaeb75df7ffe7'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## 五個位址／機制名詞
+
+| 名稱 | 範例／角色 | 常見誤解 |
+|---|---|---|
+| link-local | `fe80::/10` | 每張網卡都有；不是公用位址 |
+| ULA | 位於 `fd00::/8` 內 | 無法直接在網際網路上路由 |
+| GUA | `2000::/3` 公用位址 | 需要上游 PD／配發 |
+| RA | 路由器通告前置詞／閘道／DNS | 沒有 RA 就沒有 SLAAC |
+| SLAAC | 用戶端依 RA 前置詞自行產生位址 | 不是 DHCPv6 |
+| DHCPv6 | 伺服器配發位址／前置詞／DNS | 與 IPv4 DHCP 不同 |
+| PD | 上游把前置詞委派給路由器 | 沒有 PD 就沒有 LAN GUA |
+
+## 目前狀態
+
+<Step where="router-shell" title="檢查位址、路由與 UCI" expected="知道目前只有 link-local、ULA，還是已有 GUA。">
+
+```sh
+ip -6 addr show
+ip -6 route
+uci show network.lan
+uci show dhcp.lan
+uci show network.globals
+logread -e odhcpd | tail -30
+```
+
+本次實驗：`br-lan` 有 ULA `fd2f:385b:7d0a::1/60` 與 link-local；沒有預設 IPv6 路由，也沒有 GUA。
+
+</Step>
+
+## LAN：ULA + RA/SLAAC
+
+<Step where="router-shell" title="確認 LAN 前置詞與 RA 服務" expected="LAN 有 ULA 前置詞，且 odhcpd 正在發送 RA。">
+
+```sh
+uci show network.globals.ula_prefix
+uci show network.lan.ip6assign
+uci show dhcp.lan.ra
+uci show dhcp.lan.ra_slaac
+uci show dhcp.lan.dhcpv6
+ps | grep [o]dhcpd
+```
+
+本次實驗：
+
+```text
+network.globals.ula_prefix='fd2f:385b:7d0a::/48'
+network.lan.ip6assign='60'
+dhcp.lan.ra='server'
+dhcp.lan.ra_slaac='1'
+dhcp.lan.dhcpv6='server'
+```
+
+`ip6assign='60'` 會從 ULA 的 `/48` 中取出 `/60` 給 LAN；用戶端通常取得 `/64`。
+
+</Step>
+
+<Step where="client" title="讓用戶端透過 RA 取得位址" expected="用戶端取得 ULA，並能 ping 路由器的 IPv6。">
+
+Linux 範例（`accept_ra=2` 僅用於此 netns；一般用戶端通常維持預設值）：
+
+```sh
+sysctl -w net.ipv6.conf.eth0.accept_ra=2
+ip -6 addr show eth0
+ip -6 route
+ping -6 -c 2 <router-ULA>
+```
+
+本次實驗中 netns 用戶端取得：
+
+```text
+fd2f:385b:7d0a:0:5088:71ff:fed4:32d2/64  scope global dynamic
+fe80::5088:71ff:fed4:32d2/64             scope link
+```
+
+並成功 ping 到 `fd2f:385b:7d0a::1`。該用戶端只有 `fd2f:385b:7d0a::/64`，沒有預設 IPv6 路由（沒有上游）。
+
+</Step>
+
+## WAN：GUA 與 PD
+
+<Step where="router-shell" title="檢查 WAN6／上游是否提供前置詞" expected="取得 GUA 與預設路由，或明確得知上游「沒有 IPv6」。">
+
+```sh
+uci show network.wan6 2>/dev/null
+ubus call network.interface.wan6 status 2>/dev/null
+ip -6 route
+ip -6 addr show eth1
+logread | grep -Ei 'odhcp6c|dhcpv6|pd' | tail -30
+```
+
+典型的主路由器設定：
+
+```sh
+uci set network.wan6=interface
+uci set network.wan6.device='eth1'
+uci set network.wan6.proto='dhcpv6'
+uci commit network
+/etc/init.d/network reload
+```
+
+- 上游必須支援 IPv6／PD；部分 ONT／ISP 只給 `/64` 或完全不給；
+- 沒有 PD 時，不要在 LAN 上自行編造「公用前置詞」；
+- 本次實驗沒有上游 IPv6，因此未驗證 GUA／PD；只驗證了 ULA／RA／SLAAC。
+
+</Step>
+
+## DNS 與防火牆
+
+<Step where="router-shell" title="分別測試 AAAA 與 IPv6 DNS" expected="知道問題是「沒有 AAAA」還是「DNS 沒有走 IPv6」。">
+
+```sh
+nslookup -type=AAAA openwrt.org 127.0.0.1
+nslookup -type=AAAA openwrt.org <router-ULA>
+cat /tmp/resolv.conf.d/resolv.conf.auto
+```
+
+- 即使 DNS 走 IPv4，AAAA 也能解析；
+- 用戶端的 DNS 可能來自 RA／DHCPv6，也可能是手動設定；
+- 不要為了「IPv6 可用」就把所有 DNS 改成 IPv6；請保留 IPv4／IPv6 的後備機制。
+
+防火牆：
+
+```sh
+uci show firewall
+nft list ruleset 2>/dev/null | head -80
+```
+
+- 允許 ICMPv6／ND／RA（否則 IPv6 會壞）；
+- 允許 LAN→WAN 的 IPv6 轉送；
+- 不要為了「測試連線」而停用 IPv6 防火牆；那會讓 LAN 暴露在外。
+
+</Step>
+
+## 常見故障
+
+### 只有 fe80 位址
+
+- LAN 沒有 ULA 前置詞／`ip6assign`；
+- odhcpd 未執行／RA 被擋；
+- 用戶端 `accept_ra=0`；
+- 交換器／AP 擋住多播／ICMPv6。
+
+### 有 ULA 但沒有 GUA
+
+- 上游沒有 IPv6／PD；
+- `wan6` 未設定／未收到前置詞；
+- ISP 只給 `/64`，無法再分給 LAN；
+- relay／ND proxy 情境不同；不要硬套。
+
+### 有位址但無法上網
+
+- 沒有預設 IPv6 路由；
+- 防火牆轉送／ICMPv6；
+- DNS 只走 IPv4；
+- 上游路由／前置詞無效。
+
+### 啟用 IPv6 後 IPv4 變慢或壞掉
+
+- DNS 偏好／雙堆疊後備機制；
+- 用戶端隱私位址／RA 參數；
+- 先確保 IPv4 正常；IPv6 逐步加入。
+
+## E2 實驗紀錄（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200；LAN `192.168.1.2/24` + ULA `fd2f:385b:7d0a::1/60`。
+- ULA 前置詞 `fd2f:385b:7d0a::/48`；`ip6assign=60`；`ra=server`、`ra_slaac=1`、`dhcpv6=server`；odhcpd 執行中。
+- 用戶端：SLAAC 取得 `fd2f:385b:7d0a:0:5088:71ff:fed4:32d2/64`；成功 ping 路由器的 ULA。
+- 沒有上游 IPv6／GUA／PD；WAN6、真實 ISP、DHCPv6 用戶端與 IPv6 防火牆／NAT 未測試。
+- 測試配方：`tests/recipes/ipv6-25.12.md`。
+
+## 來源與審閱
+
+- 這是 E2 部分驗證：已測試 LAN 的 ULA／RA／SLAAC；未測試 WAN 的 GUA／PD 與真實 ISP。
+- 沒有獨立審閱者；結論僅限於此 VM／netns 環境。
+- 不要把「LAN 有 ULA」說成「IPv6 網際網路可用」；ULA 僅限內部使用。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；LAN ULA fd2f:385b:7d0a::/48；RA/SLAAC 用戶端取得 /64；無上游 GUA/PD"
+  recipe="tests/recipes/ipv6-25.12.md"
+  result="E2 部分驗證：LAN 有 ULA fd2f:385b:7d0a::1/60，RA/SLAAC 用戶端取得 fd2f:385b:7d0a:0:.../64 並能 ping 路由器；無上游 GUA/PD，WAN IPv6 未測試"
+  date="2026-10-20"
+/>
+
+<PageSources />

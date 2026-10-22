@@ -1,0 +1,65 @@
+---
+title: "OpenWrt 25.12：自 24.10 以來的變更與升級時機"
+description: "OpenWrt 25.12「Dave’s Guitar」改用 apk，所有 target 都升級到 Linux 6.12，支援超過 2200 款裝置。本文說明有哪些變更，以及升級前該檢查什麼。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt 25.12", "openwrt 25.12 release", "what is new in openwrt 25.12"]
+sources:
+  - label: "OpenWrt 25.12.0 發行公告"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: "OpenWrt 25.12.6 服務版本"
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: "OpenWrt 25.12.0 發行說明"
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: "OpenWrt 24.10.0 發行公告"
+    url: https://forum.openwrt.org/t/openwrt-24-10-0-first-stable-release/223845
+sourceHash: 'bf464024aeedffe3'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="openwrt-25-12" />
+
+## 一句話說明
+
+OpenWrt 25.12 是目前的穩定系列。25.12.0 映像檔的日期為 2026-03-03，25.12.6（2026-10-18）是撰寫本文時的最新服務版本。
+
+## 自 24.10 以來的變更
+
+- **套件管理員。** apk 取代了 opkg。套件名稱幾乎沒變，但命令列參數不同。請參閱 [apk 取代 opkg](/zh-hant/features/apk/)。
+- **核心。** 所有 target 都執行 Linux 6.12：25.12.0 為 6.12.71，25.12.6 為 6.12.112。24.10 使用的是 6.6。請參閱[核心與工具鏈](/zh-hant/features/kernel-toolchain/)。
+- **工具鏈。** GCC 14.3.0、binutils 2.44、musl 1.2.5、glibc 2.41。
+- **升級。** 預設安裝 attended sysupgrade 的 LuCI 應用程式。在快閃記憶體較大的裝置上，也會包含 `owut`。
+- **底層。** Wi-Fi 腳本改用 ucode 重寫，shell 歷史記錄現在存放在以 RAM 為基礎的檔案系統中。
+- **硬體。** 支援超過 2200 款裝置，其中超過 180 款為新增。新的 target 包括 siflower、sunxi/arm926ejs 與 microchipsw/lan969x。
+
+此版本為紀念 Dave Täht 而命名為「Dave’s Guitar」，自 24.10 以來共有超過 4700 次提交。
+
+## 該升級嗎？
+
+- **使用 24.10：** 25.12.0 公告指出，24.10 在 2026 年 9 月之後不再有安全性更新。請規劃升級。
+- **使用 23.05：** 官方不支援以 sysupgrade 從 23.05 直接升級到 25.12。選擇升級路徑前，請先閱讀發行說明。
+- **使用原廠或第三方韌體：** 請先用[這是哪一種 OpenWrt？](/zh-hant/getting-started/which-openwrt/)確認你實際執行的是什麼。
+
+任何升級之前，請先備份，並保留一條連到路由器的有線路徑。[韌體升級](/zh-hant/recovery/firmware-upgrade/)會帶你走完整個流程。
+
+## 在你的路由器上查看
+
+這些指令只會讀取資料：
+
+```sh
+cat /etc/openwrt_release
+uname -r
+```
+
+`DISTRIB_RELEASE` 會顯示版本，`uname -r` 會顯示核心版本。
+
+## 相關指南
+
+- [韌體升級](/zh-hant/recovery/firmware-upgrade/)
+- [備份與還原](/zh-hant/recovery/backup-restore/)
+- [apk 與 opkg](/zh-hant/software/apk-vs-opkg/)
+
+<PageSources />

@@ -1,0 +1,193 @@
+---
+title: "訪客 Wi-Fi：獨立 SSID、VLAN、DHCP 與隔離"
+description: 以獨立的 SSID／子網路／DHCP／防火牆區域隔離訪客，只允許上網，並阻擋存取主 LAN。Wi-Fi 與 VLAN 尚未在實體硬體上驗證。
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: '依據 OpenWrt 25.12 的 Wi-Fi／VLAN／防火牆文件編寫；未在實際無線或交換器硬體上驗證'
+testRecipe: 'tests/recipes/guest-wifi-25.12.md'
+aliases: ['openwrt 訪客 wifi', 'openwrt 訪客網路', 'openwrt wifi 隔離', 'openwrt guest wi-fi']
+symptoms: ['訪客可以存取 LAN', '訪客無法上網', '訪客 Wi-Fi 取不到位址', 'VLAN 隔離失效']
+sources:
+  - label: OpenWrt 訪客 Wi-Fi
+    url: https://openwrt.org/docs/guide-user/network/wifi/guestwifi/guest-wlan
+  - label: OpenWrt Wi-Fi 設定
+    url: https://openwrt.org/docs/guide-user/network/wifi/basic
+  - label: OpenWrt 防火牆區域
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt DSA VLAN
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+sourceHash: 'b918dd049823d2a8'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="Wireless + DSA device (untested)" tested={false} evidence="E1" />
+
+> **狀態**：E1 文件。訪客隔離涉及 Wi-Fi、VLAN、DHCP 與防火牆；沒有實體無線硬體，就不要宣稱「已隔離」。
+
+## 目標
+
+- 訪客使用獨立的 SSID；
+- 訪客取得獨立的子網路；
+- 訪客可以上網，但不能存取主 LAN／管理介面；
+- 主 LAN 不能主動存取訪客（依政策而定）；
+- 可以快速停用訪客。
+
+## 方案
+
+| 方案 | 隔離程度 | 需求 |
+|---|---|---|
+| 同一橋接 + 獨立 SSID／區域 | 中 | 多個 SSID；防火牆 |
+| 獨立 VLAN + SSID | 較強 | DSA／交換器 VLAN；AP 標記 tag |
+| 獨立 AP／實體隔離 | 最強 | 獨立裝置／連接埠 |
+
+本頁涵蓋「獨立 SSID + 訪客區域」，以及 VLAN 如何加強隔離；VLAN 細節請見 023。
+
+## 1. 建立訪客子網路
+
+```sh
+uci set network.guest=interface
+uci set network.guest.proto='static'
+uci set network.guest.device='br-guest'
+uci set network.guest.ipaddr='192.168.50.1/24'
+uci set network.guest.ip6assign='60'
+uci commit network
+```
+
+`br-guest` 可以是獨立的橋接（加入無線介面）或 VLAN 介面；不要把它併入 `br-lan` 後只靠防火牆隔離。
+
+## 2. 訪客的 DHCP／DNS
+
+```sh
+uci set dhcp.guest=dhcp
+uci set dhcp.guest.interface='guest'
+uci set dhcp.guest.start='100'
+uci set dhcp.guest.limit='100'
+uci set dhcp.guest.leasetime='1h'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+```
+
+如果訪客使用 VLAN，請把 DHCP 綁定到該介面；不要發放主 LAN 的位址池。
+
+## 3. 防火牆：只允許上網
+
+```sh
+uci add firewall zone
+uci set firewall.@zone[-1].name='guest'
+uci set firewall.@zone[-1].input='REJECT'
+uci set firewall.@zone[-1].output='ACCEPT'
+uci set firewall.@zone[-1].forward='REJECT'
+uci add_list firewall.@zone[-1].network='guest'
+uci commit firewall
+
+uci add firewall forwarding
+uci set firewall.@forwarding[-1].src='guest'
+uci set firewall.@forwarding[-1].dest='wan'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+重點：
+
+- **不要**新增 guest→lan 的轉送；
+- 允許 guest→wan 轉送；NAT 取決於 wan 區域的 masquerade；
+- 如果 DHCP／DNS 被 input REJECT 擋住，請新增 guest→路由器 53/67 的規則，而不是把 input 改成 ACCEPT；
+- 主 LAN 預設不能主動存取訪客；如需列印／投放，請另外開放。
+
+## 4. 新增訪客 SSID
+
+```sh
+uci set wireless.guest=wifi-iface
+uci set wireless.guest.device='radio0'
+uci set wireless.guest.network='guest'
+uci set wireless.guest.mode='ap'
+uci set wireless.guest.ssid='OpenWrt-Guest'
+uci set wireless.guest.encryption='psk2'
+uci set wireless.guest.key='<guest-password>'
+uci set wireless.guest.isolate='1'
+uci commit wireless
+wifi reload
+```
+
+- `network='guest'` 必須與訪客介面一致；
+- `isolate='1'` 隔離的是無線用戶端之間，不是主 LAN；LAN 隔離仍需防火牆／VLAN；
+- 依裝置調整 2.4/5G、頻道與頻寬；
+- 多台 AP：使用相同的 SSID／密碼／安全性設定，頻道錯開。
+
+## 5. 如果使用 VLAN
+
+- 在 DSA／交換器上建立專用的訪客 VLAN（例如 20）；
+- 把訪客 SSID 橋接到該 VLAN；
+- 在兩端的 trunk 上標記 tag 並允許 VLAN 20；
+- 把訪客介面／DHCP 綁定到 VLAN 20；
+- 不要把訪客 VLAN 設成管理 VLAN 上的 untagged PVID。
+
+`bridge-vlan` 語法請見 023。
+
+## 驗證（需要硬體）
+
+```sh
+iwinfo
+ip -4 addr show
+bridge vlan show
+```
+
+用戶端：
+
+- 連上 `OpenWrt-Guest`，取得 `192.168.50.x`；
+- 可以上網／解析 DNS；
+- **不能**存取主 LAN `192.168.1.0/24`、LuCI 管理介面、NAS／印表機；
+- 主 LAN 不能主動存取訪客（依政策而定）；
+- 停用訪客 SSID 不會影響主 LAN。
+
+沒有無線／VLAN 硬體時，以上都不算「已驗證」。
+
+## 常見故障
+
+### 訪客可以存取主 LAN
+
+- 沒有獨立區域／轉送；
+- 訪客與 lan 共用同一個橋接；
+- 防火牆規則／順序／區域設定錯誤；
+- VLAN 沒有隔離，只是換了 SSID。
+
+### 訪客取不到位址
+
+- DHCP 沒有綁定到訪客介面；
+- 訪客介面處於 down 狀態；
+- VLAN tag／PVID 錯誤；
+- 防火牆擋住 DHCP／DNS。
+
+### 訪客無法上網
+
+- 沒有 guest→wan 轉送；
+- WAN masquerade／NAT；
+- 未允許 DNS；
+- 上游路由。
+
+### 停用訪客後主 LAN 也壞了
+
+- 訪客與 lan 共用橋接／VLAN；
+- 管理連接埠的 PVID／tag 被改動；
+- 透過主控台復原；不要恢復原廠設定。
+
+## E1 狀態
+
+- 僅為文件；尚未在實際無線／DSA 硬體上驗證；不宣稱「訪客隔離已生效」。
+- 真正的 E2 需要：支援多個 SSID 的 AP、支援 VLAN 的交換器／DSA 裝置、兩台用戶端、主控台與回復用設定檔。
+- 測試後，請記錄裝置型號、VLAN／SSID、防火牆區域、DHCP 與隔離結果。
+
+<TestRecord
+  status="planned"
+  environment="依據 OpenWrt 25.12 的 Wi-Fi／VLAN／防火牆文件編寫；未在實際無線或交換器硬體上驗證"
+  recipe="tests/recipes/guest-wifi-25.12.md"
+  result="E1：已記載獨立 SSID／子網路／DHCP／防火牆區域、隔離與 VLAN 做法；未在實際無線／交換器硬體上驗證"
+/>
+
+<PageSources />

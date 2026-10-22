@@ -1,0 +1,53 @@
+---
+title: "UCI：OpenWrt 如何把所有設定放在 /etc/config"
+description: "UCI 是 OpenWrt 背後的設定系統。說明設定檔的位置、變更如何暫存與提交，以及它與 LuCI 的關係。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt uci", "uci commit", "openwrt /etc/config"]
+sources:
+  - label: "OpenWrt UCI"
+    url: https://openwrt.org/docs/guide-user/base-system/uci
+  - label: "LuCI 基礎"
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+sourceHash: 'af6a6bb6c4e60fdd'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="uci" />
+
+## 一句話說明
+
+UCI（Unified Configuration Interface，統一設定介面）把 OpenWrt 各項服務的設定以純文字檔存放在 `/etc/config/` 底下。LuCI 與 `uci` 指令編輯的都是同一批檔案。
+
+## 運作方式
+
+- 每個子系統一個檔案，例如 `network`、`wireless`、`dhcp`、`firewall` 和 `system`。
+- `uci set`、`uci add`、`uci rename` 和 `uci delete` 會先暫存。`uci commit` 再一次把它們寫入快閃記憶體。
+- 已提交的變更要等服務透過其 init 腳本重新載入或重新啟動後才會生效。官方範例是先修改 uhttpd 的連接埠、提交，再執行 `/etc/init.d/uhttpd restart`。
+- LuCI 只是前端：它的頁面透過 API 讀寫同一批 UCI 檔案。
+
+## 在你的路由器上查看
+
+以下指令只會讀取：
+
+```sh
+uci show network.lan
+uci get network.lan.ipaddr
+uci export dhcp
+```
+
+## 注意事項
+
+- 提交後卻沒有重新載入的變更還沒有生效。它會在下次服務重新啟動或重新開機時才生效，那時你可能早已忘了這件事。
+- 手動編輯前，先把 `/etc/config` 複製到安全的地方。完整備份請見[備份與還原](/zh-hant/recovery/backup-restore/)。
+
+## 相關指南
+
+- [LAN 位址](/zh-hant/network/lan-address/)
+- [DNS](/zh-hant/network/dns/)
+- [備份與還原](/zh-hant/recovery/backup-restore/)
+
+<PageSources />

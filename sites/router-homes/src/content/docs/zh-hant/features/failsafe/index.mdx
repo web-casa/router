@@ -1,0 +1,58 @@
+---
+title: "Failsafe 模式與 sysupgrade：OpenWrt 內建的復原方式"
+description: "Failsafe 會以最精簡的設定在 192.168.1.1 啟動 OpenWrt，讓你修復系統；除非另行指定，sysupgrade 會保留你的設定。兩者的運作方式。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt failsafe", "openwrt 復原模式", "sysupgrade 保留設定"]
+sources:
+  - label: "OpenWrt failsafe 與恢復原廠設定"
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+  - label: "sysupgrade 原始碼（OpenWrt 25.12）"
+    url: https://github.com/openwrt/openwrt/blob/openwrt-25.12/package/base-files/files/sbin/sysupgrade
+  - label: "OpenWrt 備份與還原"
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+sourceHash: '9ab880000b82bb47'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="failsafe" />
+
+## 一句話
+
+Failsafe 模式會以最精簡、已知的設定在 `192.168.1.1` 啟動 OpenWrt，讓你修復損壞的設定。sysupgrade 會替換韌體，並在你沒有另行指示時保留設定。
+
+## Failsafe 模式
+
+- **如何進入：**開機時有 2–4 秒的時間窗口。此時按下裝置上幾乎任何按鈕，或在序列主控台按 `f` 再按 Enter。
+- **你會得到什麼：**路由器會以 `192.168.1.1/24` 啟動，DHCP 與無線關閉，只執行必要的服務。請為你的電腦設定該子網路的靜態位址，再透過 SSH 連線。
+- **你可以做什麼：**執行 `mount_root` 掛載 overlay 並修復檔案，或用 `firstboot && reboot` 重設所有設定。
+- Failsafe 需要 SquashFS 映像檔。
+
+## sysupgrade
+
+- 預設會保留設定。`-n` 則不保留設定直接刷入。
+- `sysupgrade -b <file>` 會將 `sysupgrade.conf` 所列檔案寫成 `.tar.gz` 備份。`-r <file>` 還原備份，`-l` 列出將會儲存的項目。
+
+## 在你的路由器上查看
+
+這個指令只讀取：
+
+```sh
+sysupgrade -l | head
+```
+
+## 注意事項
+
+- 恢復原廠設定會清除所有設定，請先備份。
+- Failsafe 不提供 DHCP。若電腦沒有設定靜態 IP，看起來就像路由器已經當機。
+
+## 相關指南
+
+- [進不去 LuCI](/zh-hant/troubleshooting/no-web-ui/)
+- [備份與還原](/zh-hant/recovery/backup-restore/)
+- [韌體升級](/zh-hant/recovery/firmware-upgrade/)
+
+<PageSources />

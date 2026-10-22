@@ -1,0 +1,241 @@
+---
+title: "修改 LAN 位址並重新進入管理介面：新舊網段、DHCP 與復原"
+description: 將 OpenWrt LAN 從 192.168.1.1 改到 192.168.10.1，驗證舊位址失效、新位址可進入，並保留 DHCP 與主控台的還原途徑。
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；LAN 192.168.1.1→192.168.10.1；重新啟動後驗證 DHCP 租約'
+testRecipe: 'tests/recipes/lan-address-change-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt 修改 lan ip', 'openwrt 改 lan 後進不去 luci', 'lan ip 修改', 'dhcp 新網段']
+symptoms: ['修改 LAN 後失去連線', '舊位址打不開', '用戶端沒有網路']
+sources:
+  - label: OpenWrt 網路設定
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP 與 DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt LuCI 網路
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt 故障安全模式
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+sourceHash: '1c7601a56e42e0af'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import lanEdit from '@assets/screenshots/luci/lan-edit-192-168-10.webp';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## 完成後你能確認什麼
+
+- 選一個不與 WAN／上游／VPN 重疊的新 LAN 網段；
+- 了解舊位址為何會立刻失效，以及如何進入新位址；
+- 把用戶端與管理電腦切換到新網段；
+- 一併更新 DHCP 範圍、閘道與 DNS；
+- 出錯時，用新位址、主控台或備份復原。
+
+## 選擇新網段
+
+- 使用 RFC1918 私有網段：`192.168.10.0/24`、`10.10.0.0/24` 等；
+- 不要與 WAN 上游、VPN 或其他 LAN／VLAN 重疊；
+- 如果上游光纖數據機（ONT）或主路由器已使用 `192.168.1.0/24`，就避免使用它；
+- 新閘道：`192.168.10.1`；DHCP 位址池：`192.168.10.100–199`；
+- 記錄舊位址、舊閘道與舊 DHCP 範圍。
+
+本頁使用 `192.168.1.1/24 → 192.168.10.1/24`。
+
+## 變更前
+
+<Step where="router-shell" title="記錄並備份 LAN／DHCP" expected="可以還原舊位址與 DHCP 範圍。">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+ip -4 addr show br-lan
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+確認你能進入 LuCI／SSH；最好也備妥序列埠／主控台或 PVE 主控台。修改 LAN 時，不要只依賴單一網頁連線。
+
+</Step>
+
+## 修改 LAN
+
+<Step where="luci" title="在 LuCI 修改 IPv4 位址" expected="LAN 使用新網段，DHCP 範圍隨之更新。">
+
+開啟 **網路 → 介面 → LAN → 編輯**：
+
+1. 協定維持 `靜態位址`。
+2. 將 IPv4 位址設為 `192.168.10.1/24`。
+3. IPv4 閘道留空（LAN 不是 WAN 閘道）。
+4. 在 **DHCP 伺服器** 中，設定 Start `100`、Limit `100`、租約時間 `12h`。
+5. 按 儲存並套用。
+
+<Figure src={lanEdit} alt="LuCI LAN 編輯對話框，IPv4 位址為 192.168.10.1/24" caption="LAN 編輯頁面範例。MAC／IPv6 已遮蔽；請使用你自己的網段，不要照抄此範例。" />
+
+</Step>
+
+<Step where="router-shell" title="等效的命令列做法" expected="uci 中 network.lan 與 dhcp.lan 都是新網段。">
+
+```sh
+uci set network.lan.ipaddr='192.168.10.1/24'
+uci commit network
+
+uci set dhcp.lan.start='100'
+uci set dhcp.lan.limit='100'
+uci set dhcp.lan.leasetime='12h'
+uci commit dhcp
+
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+`network reload` 會讓舊位址上的 SSH／網頁連線立即中斷，這是預期行為。命令可能以逾時／連線中斷結束，並不代表失敗。
+
+第一次執行時，只做 `network reload` + `dnsmasq restart` 並未讓 DHCP 用戶端取得租約；**重新啟動 OpenWrt 後**，同一個用戶端取得了 `192.168.10.191/24`。如果 DHCP 沒有發出租約，請安排一次重新啟動，而不是只反覆重新啟動 dnsmasq。
+
+</Step>
+
+## 重新進入
+
+<Step where="client" title="切換到新網段" expected="新位址可開啟 LuCI／SSH；舊位址不再回應。">
+
+- 為管理電腦暫時設定靜態 `192.168.10.2/24`，閘道 `192.168.10.1`；
+- 或釋放／更新 DHCP，讓用戶端取得 `192.168.10.x`；
+- 開啟 `http://192.168.10.1/`；
+- 舊的 `192.168.1.1` 應該逾時，而不是開啟舊頁面。
+
+```sh
+curl -I http://192.168.10.1/
+ssh root@192.168.10.1
+```
+
+如果舊位址仍能開啟，請檢查瀏覽器快取、過期的分頁、其他裝置是否占用舊 IP，或你修改的是否為目前使用的 LAN。
+
+</Step>
+
+## 驗證
+
+<Step where="router-shell" title="確認介面與 DHCP 設定" expected="br-lan 使用新位址，dhcp-range 使用新網段。">
+
+```sh
+ip -4 addr show br-lan
+uci show network.lan
+uci show dhcp.lan
+ubus call network.interface.lan status | head -20
+grep -R "dhcp-range" /var/etc/dnsmasq.conf* /tmp/etc/dnsmasq.conf* 2>/dev/null
+```
+
+`dhcp-range` 應包含 `192.168.10.100,192.168.10.199` 與 `/24`。
+
+</Step>
+
+<Step where="client" title="單獨驗證 DHCP" expected="用戶端取得 192.168.10.x，且閘道／DNS 為 192.168.10.1。">
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.10.1
+```
+
+釋放舊租約／重新連線。如果用戶端仍取得 `192.168.1.x`，請檢查 DHCP 範圍、是否存在第二台 DHCP 伺服器，以及用戶端是否仍在舊網段。
+
+> 這次 E2 測試分兩個階段驗證 DHCP：只做 `network reload` + `dnsmasq restart` 時，netns 用戶端沒有取得租約；`reboot` 後，同一個 netns 用戶端取得 `192.168.10.191/24` 與閘道 `192.168.10.1`。因此本頁把「重新啟動後再測試 DHCP」列為必要步驟，而不是假設 reload 就足夠。
+
+</Step>
+
+<Step where="router-shell" title="確認 WAN 仍然正常" expected="WAN 仍可運作；修改 LAN 沒有重設 WAN。">
+
+```sh
+ip -4 addr show eth1
+ping -c 3 192.168.50.1
+nslookup openwrt.org 192.168.10.1
+```
+
+只修改 LAN 不應重設 WAN 的 DHCP／PPPoE。如果你同時修改了 WAN，請另外驗證。
+
+</Step>
+
+## 還原
+
+<Step where="router-shell" title="從新位址改回舊位址" expected="舊位址恢復可用，新位址逾時。">
+
+```sh
+uci set network.lan.ipaddr='192.168.1.1/24'
+uci commit network
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+管理連線會再次中斷；請把用戶端切回 `192.168.1.x` 或 DHCP，並確認舊位址可用。
+
+</Step>
+
+<Step where="console" title="完全進不去時" expected="不需恢復原廠設定即可復原。">
+
+- 透過序列埠／HDMI／PVE 主控台登入；
+- 檢查 `uci show network.lan` 與 `ip -4 addr show br-lan`；
+- 改回舊位址，或改成你能連上的網段；
+- 如果設定已經一團亂，還原 `/etc/config/network.bak.*` 與 `/etc/config/dhcp.bak.*`；
+- 恢復原廠設定是最後手段，並會清除所有設定。
+
+</Step>
+
+## 常見失敗
+
+### 舊位址仍可開啟
+
+可能是瀏覽器快取、過期的分頁、其他裝置占用舊 IP，或用戶端仍在舊網段。請使用私密視窗／新的終端機，並確認 `curl` 連到的是新 IP。
+
+### 新位址打不開
+
+- 用戶端不在 `192.168.10.0/24`；
+- 靜態位址／閘道填錯；
+- ARP 快取過期：`ip neigh flush dev <iface>`；
+- 防火牆擋住了 LAN 管理；
+- 你修改的是 WAN 或其他介面。
+
+### DHCP 無法運作
+
+- `dhcp.lan.start/limit` 超出新網段；
+- 未重新啟動 `dnsmasq`，或 `/var/etc/dnsmasq.conf*` 仍是舊範圍；
+- 只做 reload 仍無租約：重新啟動 OpenWrt 後再測試（本實驗中這樣做後恢復正常）；
+- 存在第二台 DHCP 伺服器（另一台路由器／VM）；
+- 用戶端沒有釋放舊租約；
+- 用 `logread | grep dnsmasq` 檢查 `no address range`／介面錯誤。
+
+### 新網段發生衝突
+
+與上游光纖數據機（ONT）、VPN 或其他 LAN／VLAN 重疊，會造成路由／解析問題。請改選其他網段，不要硬用。
+
+## E2 實驗記錄（2026-10-20）
+
+- 環境：PVE 9.2.2；OpenWrt 25.12.6 x86 VM 200；LAN `192.168.1.1/24` → `192.168.10.1/24`；DHCP `100–199`。
+- 變更後：舊的 `192.168.1.1` 100% 封包遺失；新的 `192.168.10.1` ping／HTTP 200；LuCI／SSH 正常。
+- 還原：舊位址 HTTP 200；新位址逾時。
+- DHCP：只做 reload 時沒有租約；重新啟動後，netns 用戶端取得 `192.168.10.191/24` 與閘道 `192.168.10.1`。
+- 未驗證：實體用戶端、IPv6、上游衝突情境。
+- 螢幕截圖：`src/assets/screenshots/luci/lan-edit-192-168-10.webp`（MAC／IPv6 已遮蔽）。
+
+## 來源與複核
+
+- 本頁為 E2：位址切換、舊位址失效、重新啟動後的 DHCP 租約與還原均已測試；實體用戶端、IPv6 與上游衝突未測試。
+- 重現配方：`tests/recipes/lan-address-change-25.12.md`。
+- 沒有獨立審閱者；結論僅限於此 VM 環境。
+
+<TestRecord
+  status="verified"
+  environment="OpenWrt 25.12.6 x86 VM 200；LAN 192.168.1.1→192.168.10.1；重新啟動後驗證 DHCP 租約"
+  recipe="tests/recipes/lan-address-change-25.12.md"
+  result="E2：舊位址逾時，新位址的 LuCI／SSH 正常；只做 reload 時 DHCP 沒有租約，但重新啟動後 netns 用戶端取得 192.168.10.191/24；還原後舊位址恢復，新位址逾時"
+  date="2026-10-20"
+/>
+
+<PageSources />

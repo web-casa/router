@@ -1,0 +1,178 @@
+---
+title: "WireGuard 用戶端：設定、AllowedIPs、DNS 與重新連線"
+description: 用戶端只保留自己的私鑰與伺服器公鑰；用 AllowedIPs 選擇僅隧道、LAN 或全部流量走隧道，驗證握手／ping／DNS，並避免 Endpoint 路由迴圈。
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'PVE netns 用戶端；wg0 10.10.0.2/24 → 192.168.1.2:51820；allowed-ips 10.10.0.0/24；握手／ping／HTTP 通過；Windows／手機／DNS／全隧道未測試'
+testRecipe: 'tests/recipes/wireguard-client-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['wireguard 用戶端', 'openwrt wireguard 用戶端', 'wireguard allowedips', 'wireguard 無法連線']
+symptoms: ['wireguard 用戶端沒有握手', '隧道 ping 失敗', '如何設定 allowedips', 'wireguard DNS 無法運作']
+sources:
+  - label: WireGuard 快速入門
+    url: https://www.wireguard.com/quickstart/
+  - label: WireGuard 用戶端設定
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/client
+  - label: WireGuard 路由與 AllowedIPs
+    url: https://www.wireguard.com/quickstart/#configure-the-peer
+  - label: OpenWrt 防火牆
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: 'd749ad7be74e1585'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE netns client" tested={true} evidence="E2" />
+
+## 用戶端需要什麼
+
+- 自己的私鑰（僅用戶端持有）；
+- 伺服器公鑰；
+- 伺服器 endpoint（IP／網域 + UDP 連接埠）；
+- 用戶端的隧道位址；
+- `AllowedIPs`：哪些目的地要走隧道；
+- 選用的 DNS、PersistentKeepalive。
+
+伺服器設定請見 021；用戶端永遠不需要伺服器私鑰。
+
+## Linux `wg-quick` 範例
+
+```ini
+[Interface]
+PrivateKey = <client-private-key>
+Address = 10.10.0.2/24
+# DNS = 10.10.0.1
+
+[Peer]
+PublicKey = <server-public-key>
+Endpoint = 203.0.113.10:51820
+AllowedIPs = 10.10.0.0/24
+PersistentKeepalive = 25
+```
+
+實際使用：
+
+```sh
+sudo install -m 600 client.conf /etc/wireguard/wg0.conf
+sudo wg-quick up wg0
+sudo wg show
+```
+
+`Endpoint` 使用公網位址／網域；本實驗使用的是 LAN 位址 `192.168.1.2:51820`。
+
+## 此處使用的最小手動設定
+
+在 PVE netns 中，用 `ip` + `wg` 建立介面：
+
+```sh
+ip link add wg0 type wireguard
+wg set wg0 private-key /tmp/wg-client.key \
+  peer <server-public-key> \
+  endpoint 192.168.1.2:51820 \
+  allowed-ips 10.10.0.0/24 \
+  persistent-keepalive 5
+ip addr add 10.10.0.2/24 dev wg0
+ip link set wg0 up
+```
+
+用戶端 `192.168.1.251/24` 透過 veth 連到實驗 LAN；`wg0` 只承載 `10.10.0.0/24`。
+
+## 選擇 AllowedIPs
+
+| 目標 | AllowedIPs | 另外還需要 |
+|---|---|---|
+| 僅隧道 IP | `10.10.0.0/24` | 伺服器 peer 允許該用戶端的隧道 IP |
+| 伺服器 LAN | `10.10.0.0/24, 192.168.1.0/24` | 伺服器轉送／回程路由或 NAT；防火牆轉送 |
+| 全隧道／回家 | `0.0.0.0/0, ::/0` | 伺服器 NAT／轉送、DNS，以及可能與 kill-switch 衝突 |
+| 單一 LAN 主機 | `10.10.0.0/24, 192.168.1.10/32` | 暴露範圍最小；伺服器仍需要路由 |
+
+如果 `AllowedIPs` 包含 Endpoint IP（例如 `0.0.0.0/0`），`wg-quick` 會為 Endpoint 加上例外路由；手動設定時，你必須讓 Endpoint 不走隧道，否則握手封包會繞回 `wg0` 形成迴圈。
+
+## 驗證
+
+```sh
+wg show
+ip addr show wg0
+ip route
+ping -c 3 10.10.0.1
+curl -sSI --max-time 5 http://10.10.0.1/ | head -3
+```
+
+本實驗：
+
+- 3 秒前完成握手；
+- `transfer 124 B received, 180 B sent`；
+- 隧道 ping 4/4；
+- HTTP 200（伺服器的 LuCI）。
+
+## DNS
+
+- `DNS = 10.10.0.1` 只是讓用戶端指向隧道位址；伺服器必須實際監聽／轉送 DNS；
+- 使用 `AllowedIPs=0.0.0.0/0` 時，DNS 洩漏／kill switch 是另一個層面的問題；
+- 本實驗沒有把 DNS 移入隧道；`nslookup` 的結果不能證明 DNS 經過了隧道。
+
+## Windows／手機
+
+- 匯入時，請確認 `AllowedIPs`、Endpoint 與 DNS；
+- 手機可能預設為「永遠開啟／依需求 VPN」；請先測試中斷與重新連線；
+- 切勿從聊天或螢幕截圖複製私鑰；
+- 本實驗未測試 Windows／Android／iOS；請勿宣稱「所有平台皆已驗證」。
+
+## 常見失敗
+
+### 沒有握手
+
+- 伺服器公鑰／用戶端私鑰不相符；
+- endpoint／連接埠／防火牆；
+- 伺服器 peer 的 `allowed_ips` 缺少該用戶端的隧道 IP；
+- 時鐘對 WireGuard 不重要，但金鑰很重要。
+
+### 隧道 IP ping 失敗
+
+- 介面沒有位址／處於 down 狀態；
+- `allowed_ips` 缺少 `10.10.0.0/24`；
+- 伺服器防火牆區域；
+- endpoint 路由被錯誤地送進隧道。
+
+### 隧道可 ping，但連不到 LAN
+
+- `AllowedIPs` 缺少 LAN 前綴；
+- 伺服器沒有轉送／回程／NAT；
+- 伺服器防火牆轉送；
+- 不要把隧道連通等同於 LAN 連通。
+
+### DNS 無法運作
+
+- 用戶端沒有設定 DNS；
+- 伺服器 DNS 沒有監聽隧道位址；
+- 全隧道路由／DNS 洩漏；
+- 修改設定前，先分別測試 IP、名稱與 DNS 伺服器。
+
+## E2 實驗記錄（2026-10-20）
+
+- 環境：PVE netns 用戶端 `192.168.1.251/24`；`wg0 10.10.0.2/24`；endpoint `192.168.1.2:51820`；AllowedIPs `10.10.0.0/24`。
+- 伺服器 `wg0 10.10.0.1/24`；用戶端握手成功；傳輸量 1.47 KiB/1.90 KiB（伺服器端視角）。
+- 用戶端 ping `10.10.0.1` 4/4；HTTP 200。
+- 未測試：Windows／手機、經隧道的 DNS、完整 `0.0.0.0/0`、真實公網 endpoint、漫遊／重新連線。
+- 重現配方：`tests/recipes/wireguard-client-25.12.md`。
+
+## 來源與複核
+
+- 本頁為 E2 部分驗證：已測試 Linux netns 用戶端與 LAN 端隧道；行動裝置／DNS／全隧道／公網 WAN 未測試。
+- 私鑰留在用戶端；伺服器只會拿到公鑰。
+- 沒有獨立審閱者；結論僅限於此 VM／netns 環境。
+
+<TestRecord
+  status="partial"
+  environment="PVE netns 用戶端；wg0 10.10.0.2/24 → 192.168.1.2:51820；allowed-ips 10.10.0.0/24；握手／ping／HTTP 通過；Windows／手機／DNS／全隧道未測試"
+  recipe="tests/recipes/wireguard-client-25.12.md"
+  result="E2 部分驗證：用戶端 10.10.0.2/24 與伺服器 10.10.0.1/24 完成握手；隧道 ping 4/4；HTTP 200；Windows／手機、經隧道的 DNS、全隧道路由與真實漫遊未測試"
+  date="2026-10-20"
+/>
+
+<PageSources />

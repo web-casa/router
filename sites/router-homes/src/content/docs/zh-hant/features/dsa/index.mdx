@@ -1,0 +1,54 @@
+---
+title: "OpenWrt 中的 DSA：交換器連接埠成為 Linux 介面，VLAN 設在 br-lan 上"
+description: "在 DSA 目標裝置上，每個交換器連接埠都是 br-lan 橋接中獨立的介面（lan1–lan4），VLAN 以 bridge-vlan 區段設定。以及如何分辨 DSA 與 swconfig。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt dsa", "openwrt swconfig vs dsa", "openwrt bridge-vlan"]
+sources:
+  - label: "OpenWrt DSA"
+    url: https://openwrt.org/docs/guide-user/network/dsa/start
+  - label: "DSA 迷你教學"
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+  - label: "OpenWrt 21.02.0 發佈公告"
+    url: https://forum.openwrt.org/t/openwrt-21-02-0-first-stable-release/105395
+  - label: "OpenWrt 22.03.0 發佈公告"
+    url: https://forum.openwrt.org/t/openwrt-22-03-0-first-stable-release/136252
+sourceHash: '94301dc22a784645'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="dsa" />
+
+## 一句話說明
+
+DSA（Distributed Switch Architecture，分散式交換器架構）是 Linux 核心中用於網路交換器的子系統。在 DSA 裝置上，每個前面板連接埠都以獨立介面呈現，例如 `lan1`–`lan4`，這些連接埠再橋接到 `br-lan`。
+
+## 來源背景
+
+- DSA 最早出現在 21.02，在部分目標裝置上取代了較舊的 swconfig。
+- 22.03 轉換了更多裝置，例如所有 bcm53xx 與 lantiq xrx200。
+- Sysupgrade 無法把 swconfig 設定遷移到 DSA。如果你的裝置已切換，請重新設定網路。
+
+## DSA 上的 VLAN
+
+VLAN 是 `/etc/config/network` 中的 `config bridge-vlan` 區段。介面接著以帶有 VLAN 後綴的形式位於橋接上，例如 `br-lan.1`。每個連接埠依 VLAN 設為 tagged 或 untagged。
+
+## 在你的路由器上查看
+
+```sh
+ip -br link
+uci show network | grep -E 'bridge-vlan|=device'
+```
+
+如果你看到的是 `config switch` 與 `switch_vlan` 區段，表示該裝置仍使用 swconfig，DSA 指南不適用。
+
+## 相關指南
+
+- [DSA VLAN](/zh-hant/wireless-vlan/dsa-vlan/)
+- [訪客 Wi-Fi](/zh-hant/wireless-vlan/guest-wifi/)
+- [有線／無線 AP](/zh-hant/network/ap-mode/)
+
+<PageSources />

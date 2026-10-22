@@ -1,0 +1,196 @@
+{
+  "version": 1,
+  "topK": 5,
+  "queries": [
+    {
+      "id": "zh-hant-dns-01",
+      "locale": "zh-hant",
+      "query": "openwrt dns 設定",
+      "expectedUrls": [
+        "/zh-hant/network/dns/"
+      ],
+      "category": "dns",
+      "aliasCase": true
+    },
+    {
+      "id": "zh-hant-dns-02",
+      "locale": "zh-hant",
+      "query": "dnsmasq 上游 dns",
+      "expectedUrls": [
+        "/zh-hant/network/dns/"
+      ],
+      "category": "dns",
+      "aliasCase": false
+    },
+    {
+      "id": "zh-hant-dns-03",
+      "locale": "zh-hant",
+      "query": "DNS 解析失敗",
+      "expectedUrls": [
+        "/zh-hant/network/dns/"
+      ],
+      "category": "dns",
+      "aliasCase": true
+    },
+    {
+      "id": "zh-hant-pve-01",
+      "locale": "zh-hant",
+      "query": "pve 單網卡 openwrt",
+      "expectedUrls": [
+        "/zh-hant/installation/proxmox/"
+      ],
+      "category": "pve",
+      "aliasCase": true
+    },
+    {
+      "id": "zh-hant-pve-02",
+      "locale": "zh-hant",
+      "query": "proxmox 安裝 openwrt",
+      "expectedUrls": [
+        "/zh-hant/installation/proxmox/"
+      ],
+      "category": "pve",
+      "aliasCase": false
+    },
+    {
+      "id": "zh-hant-agh-01",
+      "locale": "zh-hant",
+      "query": "adguard home openwrt",
+      "expectedUrls": [
+        "/zh-hant/software/adguard-home/"
+      ],
+      "category": "adguard-home",
+      "aliasCase": true
+    },
+    {
+      "id": "zh-hant-agh-02",
+      "locale": "zh-hant",
+      "query": "adguard home 連接埠",
+      "expectedUrls": [
+        "/zh-hant/software/adguard-home/"
+      ],
+      "category": "adguard-home",
+      "aliasCase": false
+    },
+    {
+      "id": "zh-hant-agh-03",
+      "locale": "zh-hant",
+      "query": "dnsmasq 5353",
+      "expectedUrls": [
+        "/zh-hant/software/adguard-home/"
+      ],
+      "category": "adguard-home",
+      "aliasCase": false
+    },
+    {
+      "id": "zh-hant-sqm-01",
+      "locale": "zh-hant",
+      "query": "sqm cake",
+      "expectedUrls": [
+        "/zh-hant/software/sqm/"
+      ],
+      "category": "sqm",
+      "aliasCase": false
+    },
+    {
+      "id": "zh-hant-sqm-02",
+      "locale": "zh-hant",
+      "query": "bufferbloat 延遲",
+      "expectedUrls": [
+        "/zh-hant/software/sqm/"
+      ],
+      "category": "sqm",
+      "aliasCase": true
+    },
+    {
+      "id": "zh-hant-sqm-03",
+      "locale": "zh-hant",
+      "query": "下載時遊戲延遲",
+      "expectedUrls": [
+        "/zh-hant/software/sqm/"
+      ],
+      "category": "sqm",
+      "aliasCase": true
+    },
+    {
+      "id": "zh-hant-luci-01",
+      "locale": "zh-hant",
+      "query": "luci 首次登入",
+      "expectedUrls": [
+        "/zh-hant/getting-started/luci-first-login/"
+      ],
+      "category": "luci",
+      "aliasCase": false
+    },
+    {
+      "id": "zh-hant-fw-01",
+      "locale": "zh-hant",
+      "query": "immortalwrt istoreos",
+      "expectedUrls": [
+        "/zh-hant/getting-started/which-openwrt/"
+      ],
+      "category": "firmware",
+      "aliasCase": true
+    },
+    {
+      "id": "zh-hant-fw-02",
+      "locale": "zh-hant",
+      "query": "openwrt 韌體 target",
+      "expectedUrls": [
+        "/zh-hant/getting-started/which-openwrt/"
+      ],
+      "category": "firmware",
+      "aliasCase": false
+    },
+    {
+      "id": "zh-hant-oc-01",
+      "locale": "zh-hant",
+      "query": "openclash dns 衝突",
+      "expectedUrls": [
+        "/zh-hant/software/openclash/"
+      ],
+      "category": "openclash",
+      "aliasCase": true
+    },
+    {
+      "id": "zh-hant-oc-02",
+      "locale": "zh-hant",
+      "query": "openclash 停用 還原",
+      "expectedUrls": [
+        "/zh-hant/software/openclash/"
+      ],
+      "category": "openclash",
+      "aliasCase": false
+    },
+    {
+      "id": "zh-hant-pkg-01",
+      "locale": "zh-hant",
+      "query": "apk opkg 差異",
+      "expectedUrls": [
+        "/zh-hant/software/package-sources/"
+      ],
+      "category": "package-sources",
+      "aliasCase": false
+    },
+    {
+      "id": "zh-hant-rec-01",
+      "locale": "zh-hant",
+      "query": "管理 IP 被更改",
+      "expectedUrls": [
+        "/zh-hant/troubleshooting/no-web-ui/"
+      ],
+      "category": "recovery",
+      "aliasCase": false
+    },
+    {
+      "id": "zh-hant-rec-02",
+      "locale": "zh-hant",
+      "query": "uhttpd failsafe",
+      "expectedUrls": [
+        "/zh-hant/troubleshooting/no-web-ui/"
+      ],
+      "category": "recovery",
+      "aliasCase": false
+    }
+  ]
+}

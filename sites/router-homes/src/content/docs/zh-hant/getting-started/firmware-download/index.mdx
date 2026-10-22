@@ -1,0 +1,208 @@
+---
+title: "下載韌體之前：型號、版本、target/profile 與復原方式"
+description: 在下載或刷入韌體之前，以唯讀檢查確認確切的型號/硬體版本、target、profile、映像檔類型與復原路徑。
+pageType: overview
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: '特定裝置待定；唯讀檢查清單，未刷機'
+testRecipe: 'tests/recipes/firmware-download-check.md'
+aliases: ['openwrt 韌體下載', 'openwrt 型號', 'openwrt 硬體版本', 'sysupgrade 映像檔', 'factory 映像檔']
+symptoms: ['韌體錯誤', '不知道該選哪個映像檔', '型號不符', '校驗碼失敗']
+sources:
+  - label: OpenWrt Firmware Selector
+    url: https://firmware-selector.openwrt.org/
+  - label: OpenWrt sysupgrade 文件
+    url: https://openwrt.org/docs/guide-user/installation/sysupgrade
+  - label: OpenWrt 25.12 發行說明
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: OpenWrt 裝置頁面
+    url: https://openwrt.org/toh/start
+sourceHash: 'c06b58c12c079954'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="—" device="device pending" tested={false} evidence="E1" />
+
+## 預期成果
+
+- 知道確切的型號與硬體版本，而不是「看起來一樣」的型號。
+- 知道 OpenWrt 的 target/subtarget/profile，以及該下載哪個映像檔。
+- 正確選擇 `sysupgrade`、`factory` 或 x86 combined 映像檔。
+- 驗證檔案來源與校驗碼。
+- 刷機前就知道復原路徑，以及失敗時該走哪條路。
+
+> 這是下載前的檢查清單，不是刷機指南。裸機刷機、bootloader 復原與跨主版本遷移屬於 R2：請由獨立審閱並參考裝置文件。請勿將本頁當成通用刷機教學。
+
+## 先看標籤
+
+<Step where="client" title="記錄型號與硬體版本" expected="型號、版本、地區與標籤細節都已寫下。">
+
+檢查底部標籤、包裝盒與說明書；記錄：
+
+- 廠牌 + 完整型號（不只是系列名稱）；
+- 硬體版本（v1、v2、V2.1 等）；
+- 地區/電信業者版本；
+- 若有 FCC ID 與序號前綴也一併記下（請勿公開）；
+- 復原方式（重設按鈕、TFTP、序列埠、廠商工具）。
+
+同一個型號可能有多個版本，其快閃記憶體、Wi-Fi 晶片或分割區配置各不相同。**型號名稱相同，不代表有單一通用映像檔。**
+
+</Step>
+
+<Step where="router-shell" title="在現有的 OpenWrt 上讀取主機板資料" expected="distribution/target/model/board_name 與裝置頁面相符。">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+cat /tmp/sysinfo/model 2>/dev/null
+cat /tmp/sysinfo/board_name 2>/dev/null
+```
+
+關鍵欄位：`release.distribution`、`release.version`、`release.target`、`model`、`board_name`。`model` 不是硬體版本；不要只憑這一行選擇映像檔。
+
+</Step>
+
+<Step where="router-shell" title="在 x86 上讀取 DMI/BIOS" expected="你知道主機板/裝置型號，且沒有混用 PC 與 VM 映像檔。">
+
+```sh
+cat /sys/class/dmi/id/sys_vendor
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/board_version
+cat /sys/class/dmi/id/bios_version
+```
+
+同時確認 BIOS/Legacy 或 UEFI、磁碟介面，以及映像檔是否為 combined/ext4。這些決定能否開機；僅憑「x86/64」並不足夠。
+
+</Step>
+
+## 檢查 Firmware Selector
+
+<Step where="client" title="依 target/profile 選擇，而不是依檔名" expected="你找到確切的裝置頁面與映像檔。">
+
+開啟 [OpenWrt Firmware Selector](https://firmware-selector.openwrt.org/)：
+
+1. 選擇正確的版本（例如 25.12.6）。
+2. 搜尋完整型號並開啟其裝置頁面。
+3. 確認 target/subtarget、profile 與硬體版本。
+4. 閱讀裝置頁面的「Installation」章節，了解首次安裝與升級所用的映像檔類型。
+5. 下載並驗證 SHA-256；不要只是重新命名檔案。
+
+若 Selector 與裝置頁面不一致，請停止並確認型號/版本；不要挑選最接近的項目。
+
+</Step>
+
+## 映像檔類型
+
+| 映像檔/情境 | 用途 | 主要風險 |
+|---|---|---|
+| `sysupgrade` | 已安裝 OpenWrt，升級時保留/不保留設定 | 跨版本及套件/核心模組不相容 |
+| `factory` / 廠商轉換 | 從廠商韌體首次安裝 | 分割區/刷機方式不符可能導致變磚 |
+| x86 combined/ext4 | 整顆磁碟的 x86 映像檔/VM | BIOS/UEFI、磁碟配置、寫入方式 |
+| 廠商韌體 | 廠商網頁介面/復原工具 | 不要與 OpenWrt 映像檔混用 |
+| 「通用/免拆機」套件 | 來源不明 | 避免；無法驗證 target/profile/校驗碼 |
+
+檔名含有 `sysupgrade` 並不能證明什麼；target、profile、版本與校驗碼都必須相符。
+
+## 下載與驗證
+
+<Step where="client" title="只使用官方/廠商來源" expected="檔案來源可追溯且附有校驗碼。">
+
+優先選擇：
+
+- OpenWrt 的 `downloads.openwrt.org` 或 Firmware Selector；
+- 裝置廠商的官方下載頁面；
+- 專案的官方發行頁面（第三方韌體需額外檢查維護者/簽章）。
+
+不要使用雲端硬碟鏡像、論壇附件或聊天中取得的「預先修改」套件。重新打包的檔案可能夾帶腳本、舊核心或不相符的驅動程式。
+
+</Step>
+
+<Step where="client" title="驗證 SHA-256 與檔案大小" expected="校驗碼與官方發行頁面相符。">
+
+Linux：
+
+```sh
+sha256sum openwrt-*.img.gz
+```
+
+macOS：
+
+```sh
+shasum -a 256 openwrt-*.img.gz
+```
+
+Windows：
+
+```powershell
+certutil -hashfile openwrt-*.img.gz SHA256
+```
+
+與官方的 `sha256sums`/發行頁面比對。若不同，請重新下載；不要「先刷刷看」。
+
+</Step>
+
+## 刷機前的復原準備
+
+<Step where="client" title="寫下復原路徑" expected="你知道刷機失敗時如何進入 failsafe/復原模式。">
+
+至少確認：
+
+- 如何進入 failsafe（按鍵時機/序列埠/IP）；
+- 是否可使用 TFTP/序列埠/廠商復原；
+- 管理用 LAN 位址、閘道與 root 密碼；
+- 設定備份：已安裝 OpenWrt 時使用 `sysupgrade -b`，或使用廠商匯出；
+- 升級後需要重新安裝的套件/核心模組；
+- 穩定的電源；刷機期間不要斷電。
+
+沒有復原路徑、沒有校驗碼、沒有備份：請不要開始。
+
+</Step>
+
+## 常見錯誤
+
+- 只檢查型號，沒有檢查版本；
+- 把 `sysupgrade` 當成 `factory` 使用，或相反；
+- 重新命名其他 target 的映像檔後刷入；
+- 校驗碼不符仍繼續；
+- 使用來源不明的「通用/擴充」套件；
+- 刷機期間斷電或拔線；
+- 升級後沒有檢查 DNS/防火牆/套件就假設成功。
+
+## 失敗分支
+
+### 下載了錯誤的型號
+
+刪除它，並從裝置頁面重新下載；不要「試試看」。若已經刷入，請使用裝置的復原文件（failsafe/TFTP/序列埠）；不要不斷刷入不同的映像檔。
+
+### 校驗碼不符
+
+重新下載；檢查是否因代理/鏡像造成檔案截斷；改用官方來源。不要停用驗證。
+
+### 你的版本未列出
+
+檢查廠商頁面/標籤或 OpenWrt 論壇/裝置頁面。沒有明確支援時，不要假設相容。
+
+### 廠商韌體被鎖定
+
+請使用廠商的流程；不要為了安裝 OpenWrt 而繞過簽章/鎖定。先確認保固與廠商功能的取捨。
+
+## E1 狀態與來源
+
+- 這是 E1：欄位、映像檔類型與復原方式均依據公開文件；未在裝置上進行下載或刷機。
+- 型號/版本來自標籤與廠商頁面；不要將 x86 VM 的經驗推及路由器。
+- Recipe：`tests/recipes/firmware-download-check.md`；刷機步驟不在範圍內。
+
+<TestRecord
+  status="planned"
+  environment="特定裝置待定；唯讀檢查清單，未刷機"
+  recipe="tests/recipes/firmware-download-check.md"
+  result="E1：已記錄型號/版本、target/profile、映像檔類型、校驗碼與復原路徑；未在裝置上執行"
+/>
+
+<PageSources />

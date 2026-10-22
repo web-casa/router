@@ -1,0 +1,53 @@
+---
+title: "OpenWrt 上的 WireGuard：以網路介面方式設定的核心 VPN"
+description: "WireGuard 自 Linux 5.6 起進入主線核心；在 OpenWrt 上，它是一種網路協定，設定方式與一般介面相同。套件、所在位置與檢查方法。"
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt wireguard", "openwrt vpn", "wireguard 路由器"]
+sources:
+  - label: "Linux 5.6 (kernelnewbies)"
+    url: https://kernelnewbies.org/Linux_5.6
+  - label: "OpenWrt WireGuard 基礎"
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/basics
+  - label: "wireguard-tools 套件 (OpenWrt 25.12)"
+    url: https://github.com/openwrt/openwrt/tree/openwrt-25.12/package/network/utils/wireguard-tools
+sourceHash: '485bb9713a3b4791'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="wireguard" />
+
+## 一句話說明
+
+WireGuard 自 2020-03-29 發行的 Linux 5.6 起成為主線核心的一部分。在 OpenWrt 上，它是名為 `wireguard` 的網路協定，設定方式與其他介面相同。
+
+## 組成元件
+
+- `kmod-wireguard`：核心模組。
+- `wireguard-tools`：`wg` 命令。它相依於核心模組，並向 netifd 註冊 `wireguard` 協定。
+- `luci-proto-wireguard`：在 LuCI 中建立介面時，新增「WireGuard VPN」這個協定選項。
+
+## 家用用途
+
+- **伺服器：** 從外部連回你的家用網路。
+- **用戶端：** 讓路由器的流量（全部或一部分）經由遠端 peer 轉送。
+
+兩種情況下，隧道都是 `/etc/config/network` 中的一個介面。它需要防火牆區域，若作為伺服器，還需要在 WAN 開放一個 UDP 連接埠。
+
+## 在你的路由器上查看
+
+```sh
+wg show
+uci show network | grep wireguard
+```
+
+## 相關指南
+
+- [WireGuard 伺服器](/zh-hant/remote-access/wireguard-server/)
+- [WireGuard 用戶端](/zh-hant/remote-access/wireguard-client/)
+- [firewall4 與區域](/zh-hant/features/firewall4/)
+
+<PageSources />

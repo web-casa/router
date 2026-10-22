@@ -1,0 +1,206 @@
+---
+title: "備份與還原：分別驗證設定、套件與管理功能"
+description: 使用 sysupgrade -b/-r 備份與還原 OpenWrt 設定，區分設定存檔、套件與完整映像檔，並在還原後驗證 LAN/HTTP/SSH/DHCP。
+pageType: recovery
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；sysupgrade -b 4.2MB/59 項；sysupgrade -r 還原；已檢查 LAN/HTTP/SSH'
+testRecipe: 'tests/recipes/backup-restore-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt 備份', 'openwrt 還原設定', 'sysupgrade 備份', 'openwrt 重裝後還原']
+symptoms: ['重新刷機後設定遺失', '如何還原備份', 'sysupgrade -b 失敗', '還原後無法存取']
+sources:
+  - label: OpenWrt 備份與還原
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+  - label: OpenWrt sysupgrade
+    url: https://openwrt.org/docs/guide-user/installation/sysupgrade.owut
+  - label: OpenWrt 套件管理員
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: Proxmox VE 備份
+    url: https://pve.proxmox.com/pve-docs/chapter-vzdump.html
+sourceHash: 'eb78c790dd7db4e1'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## 三種不同的「備份」
+
+| 類型 | 包含 | 不包含 | 典型用途 |
+|---|---|---|---|
+| 設定存檔 `sysupgrade -b` | `/etc/config` 與 `sysupgrade.conf` 中列出的檔案 | 韌體、已安裝的套件、整個磁碟 | 重新刷機／升級後還原設定 |
+| 套件清單 | 名稱、版本、軟體源 | 套件二進位檔 | 重新安裝的檢查清單 |
+| 完整映像檔／VM 備份 | 整個磁碟／VM | 無（但體積較大） | 整機還原／更換磁碟 |
+
+**設定備份不是韌體備份。** 還原設定不會把你已移除的套件重新裝回來。
+
+## 備份前
+
+<Step where="router-shell" title="記錄 release、target 與套件清單" expected="你知道這份備份來自哪個 release／target／arch。">
+
+```sh
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+apk list --installed > /tmp/packages-$(date +%F).txt
+wc -l /tmp/packages-$(date +%F).txt
+sysupgrade -l
+```
+
+本實驗：`25.12.6`、`x86/64`、已安裝 239 個套件；`sysupgrade -b` 封存了 59 項。
+
+</Step>
+
+<Step where="router-shell" title="建立設定存檔" expected="得到可驗證、且已複製到裝置外的 .tar.gz。">
+
+```sh
+sysupgrade -b /tmp/backup-$(date +%F).tar.gz
+ls -lh /tmp/backup-*.tar.gz
+tar -tzf /tmp/backup-$(date +%F).tar.gz | head
+sha256sum /tmp/backup-$(date +%F).tar.gz
+```
+
+本實驗：4.2MB、59 項，包含 `etc/config/network`、`dhcp`、`firewall`、`openclash`、`sqm`。
+
+> 存檔可能包含 Wi-Fi 密碼、PPPoE 認證資訊、DDNS／代理設定。請勿上傳到公開雲端硬碟或儲存庫；請當作敏感資料處理。
+
+</Step>
+
+<Step where="client" title="將存檔複製到裝置外" expected="即使裝置損壞／重新刷機後，備份依然存在。">
+
+```sh
+# pull from the router to the admin machine
+scp root@192.168.1.2:/tmp/backup-2026-10-20.tar.gz ./
+sha256sum backup-2026-10-20.tar.gz
+```
+
+不要只留在 `/tmp`：重新啟動就會消失，重新刷機更是必定消失。
+
+</Step>
+
+## 三種還原途徑
+
+### 1. 同版本執行中還原（本實驗）
+
+```sh
+sysupgrade -r /tmp/backup-2026-10-20.tar.gz
+```
+
+`-r` 只還原設定並結束，不會刷寫韌體。接著請重新啟動相關服務或重新開機，讓網路／DHCP／DNS 重新載入。
+
+本實驗先寫入 `network.lan.e2_marker='before-restore'`；執行 `sysupgrade -r` 後該標記消失，LAN 仍為 `192.168.1.2/24`，HTTP 200，SSH 正常。
+
+### 2. 重新刷機／升級時還原
+
+```sh
+sysupgrade -f /tmp/backup-2026-10-20.tar.gz <firmware.img>
+```
+
+`-f` 會在升級時還原設定；不要把備份當成韌體，也不要在不同 release／target 之間盲目還原。
+
+### 3. 整台 VM／映像檔還原
+
+PVE 使用 `vzdump`／快照還原整個 VM 磁碟與設定；這會一併還原韌體 + 套件 + 設定，但體積較大，且可能覆蓋新資料。設定存檔與整機備份無法互相取代。
+
+## 還原後驗證
+
+<Step where="client" title="管理入口" expected="至少各檢查一次 LAN IP、HTTP、SSH 與 DHCP。">
+
+```sh
+ping -c 2 192.168.1.2
+curl -sSI --max-time 5 http://192.168.1.2/ | head -3
+ssh root@192.168.1.2 'uci show network.lan | grep ipaddr'
+```
+
+- HTTP 200 不代表 DHCP 運作正常；
+- 能用 SSH 登入不代表 LuCI 設定正確；
+- 用戶端必須重新更新租約，並從還原後的位址池取得位址。
+
+</Step>
+
+<Step where="router-shell" title="網路／DHCP／DNS" expected="還原後的設定確實生效，而不只是檔案被解開。">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+ubus call network.interface.lan status
+logread | grep -Ei 'dnsmasq|dhcp|netifd' | tail -30
+```
+
+必要時重新啟動：
+
+```sh
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+</Step>
+
+<Step where="router-shell" title="套件" expected="你知道哪些套件必須重新安裝；還原設定不等於還原套件。">
+
+```sh
+apk list --installed | wc -l
+apk list --installed | grep -E 'openclash|sqm|adguard|luci-app' || true
+```
+
+設定存檔不包含二進位檔。重新刷機後，請依套件清單／軟體源重新安裝。OpenClash／SQM／AGH 的設定可能仍在，但程式與核心模組必須重新安裝並驗證。
+
+</Step>
+
+## 常見失敗
+
+### 還原後仍是舊設定
+
+- `sysupgrade -r` 之後沒有重新啟動服務／裝置；
+- 你還原的是另一份存檔；
+- 後續的 UCI 命令覆寫了設定；
+- 存檔中沒有該檔案（檢查 `sysupgrade -l`／`tar -tzf`）。
+
+### 還原後無法存取
+
+- 備份來自不同的 LAN 網段；
+- DHCP／防火牆沒有重新載入；
+- 存檔包含舊密碼／SSH 設定；
+- 使用主控台：`ip -4 addr show br-lan`；不要立刻恢復原廠設定。
+
+### 套件沒有回來
+
+- 設定備份不包含套件檔案；
+- 軟體源／版本不符；
+- 重新安裝 `luci-app-*` 與核心模組；
+- 「設定存在」不代表「程式已安裝」。
+
+### 跨版本還原
+
+- release／target／arch 不符；
+- 新版本中選項被更名／移除；
+- 先在 VM 中測試；
+- 保留舊韌體與整機備份以便還原。
+
+## E2 實驗記錄（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200；LAN `192.168.1.2/24`；`apk`；已安裝 239 個套件。
+- `sysupgrade -b /tmp/backup-e2.tar.gz`：4.2MB、59 項；`tar -tzf` 顯示 `etc/config/network`、`dhcp`、`firewall`、`openclash`、`sqm`。
+- 寫入 `network.lan.e2_marker='before-restore'`；`sysupgrade -r` 之後標記消失，LAN 仍為 `.2`，HTTP 200，SSH 正常。
+- 未測試：整機 PVE 備份還原、跨版本還原、套件重新安裝、實體裝置斷電／變磚。
+- 重現配方：`tests/recipes/backup-restore-25.12.md`。
+
+## 來源與複核
+
+- 本頁為 E2 部分驗證：已測試同版本設定備份／還原與管理入口；整機、跨版本與套件重建未測試。
+- 設定存檔含有敏感資料；請勿提交或分享。
+- 沒有獨立審閱者；結論僅限於此 VM 環境。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；sysupgrade -b 4.2MB/59 項；sysupgrade -r 還原；已檢查 LAN/HTTP/SSH"
+  recipe="tests/recipes/backup-restore-25.12.md"
+  result="E2 部分驗證：sysupgrade -b 產生 4.2MB／59 項的設定存檔；加入測試標記後，sysupgrade -r 移除了該標記，且 LAN 192.168.1.2、HTTP 200 與 SSH 仍正常；完整映像檔／跨版本／套件重新安裝未測試"
+  date="2026-10-20"
+/>
+
+<PageSources />

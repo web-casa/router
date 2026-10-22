@@ -1,0 +1,179 @@
+---
+title: "無法上網或間歇斷線：全部裝置、單一用戶端、單一應用程式"
+description: 以五個層級（WAN、DNS、LAN/DHCP、用戶端路由、應用程式代理）區分整個網路故障與單一裝置或單一應用程式故障。
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200；WAN 192.168.50.191/24；LAN 192.168.1.1；netns 用戶端 192.168.1.175'
+testRecipe: 'tests/recipes/no-internet-triage-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt 無法上網', 'openwrt 間歇斷線', '只有一台裝置無法上網', 'dns 解析失敗']
+symptoms: ['所有裝置都離線', '只有一台裝置離線', 'ping IP 正常但網頁失敗', '網路間歇斷線']
+sources:
+  - label: OpenWrt 網路疑難排解
+    url: https://openwrt.org/docs/guide-user/network/troubleshooting
+  - label: OpenWrt DHCP 與 DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt 防火牆
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt failsafe
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+sourceHash: 'bd543737b04bca88'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## 先界定是哪一種「無法上網」
+
+| 症狀 | 較可能的層級 | 第一步 |
+|---|---|---|
+| 所有裝置都無法瀏覽 | WAN/上游/DNS/NAT | 從路由器測試 WAN/DNS |
+| 只有一台裝置離線 | 該用戶端的 IP/閘道/DNS/Wi-Fi/VPN | 與同一 LAN 上的另一個用戶端比較 |
+| 只有一個應用程式失敗 | 應用程式 DNS/代理/QUIC/IPv6 | 試試另一個瀏覽器、停用代理、測試 DNS |
+| 間歇性 | 連線、DHCP 租約、Wi-Fi、上游 | 記錄時間軸；單次 ping 不夠 |
+| ping IP 正常，網頁失敗 | DNS 或代理 | `nslookup` + 替代 DNS |
+
+## 五個層級
+
+### 1. WAN / 上游
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+ping -c 3 192.168.50.1
+ping -c 3 1.1.1.1
+```
+
+- 沒有 WAN 位址：檢查 DHCP/PPPoE（參見 007）；
+- 無法連到閘道：檢查網路線/上游/ONT；
+- 可連到閘道但公網 IP 失敗：上游/NAT/防火牆；
+- 部分遺失：變更設定前，先記錄時間/連線狀態。
+
+### 2. DNS
+
+```sh
+nslookup openwrt.org 127.0.0.1
+nslookup openwrt.org 192.168.50.1
+cat /tmp/resolv.conf.d/resolv.conf.auto
+logread | grep -i dnsmasq | tail -20
+```
+
+本實驗在停止 dnsmasq 後：
+
+- 路由器 `ping 1.1.1.1` 仍然正常；
+- `nslookup openwrt.org 127.0.0.1` 失敗；
+- 用戶端 `ping 1.1.1.1` 正常，DNS 失敗；
+- 重新啟動 dnsmasq 後恢復。
+
+這就是典型的「IP 通、名稱不通」模式。
+
+### 3. LAN / DHCP / 用戶端位址
+
+```sh
+ip -4 addr show br-lan
+cat /tmp/dhcp.leases
+ip neigh
+```
+
+在用戶端上：
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.1.1
+```
+
+閘道錯誤、IP 衝突或舊的子網路，看起來都像是「只有這台裝置離線」。
+
+### 4. 防火牆 / NAT / 轉送
+
+```sh
+uci show firewall
+nft list ruleset 2>/dev/null | head -80
+logread | grep -i firewall | tail -20
+```
+
+若 WAN 有位址且 DNS 正常，但 LAN 用戶端無法上網，請檢查：
+
+- LAN/WAN 區域；
+- WAN masquerade；
+- LAN→WAN 轉送；
+- 自訂規則是否封鎖 DNS/轉送。
+
+### 5. 單一用戶端 / 單一應用程式
+
+單一用戶端：
+
+- 移除其預設路由：`ip route del default`；若仍能連到閘道但公網 IP 失敗，問題就在該用戶端的路由；
+- 還原：`ip route add default via 192.168.1.1`；
+- 檢查 Wi-Fi、VPN、代理、私人 DNS、IPv6 優先設定。
+
+單一應用程式：
+
+- 試試另一個瀏覽器 / 停用代理；
+- 以 `nslookup`/`curl -v` 比較；
+- 應用程式層級的 DoH/QUIC/代理可能繞過路由器 DNS；
+- 不要用「重新安裝應用程式」取代分層診斷。
+
+## 錄製的示範（015 實驗室）
+
+<TerminalCast
+  src="/casts/015-triage.cast"
+  title="015 實驗室：DNS、WAN 與單一用戶端路由"
+  caption="真實的 OpenWrt 25.12.6 VM + netns 用戶端：停止 DNS（IP 通/DNS 失敗）、ifdown WAN（閘道通/公網失敗），然後移除用戶端預設路由（只有該用戶端失敗）。以程式碼區塊為準。"
+/>
+
+## 記錄間歇性斷線
+
+不要只寫「有時候會斷」。請記錄：
+
+- 時間、持續多久、是否自行恢復；
+- 所有裝置或單一裝置；
+- 有線與 Wi-Fi、2.4/5 GHz；
+- WAN 位址/租約是否改變；
+- `logread` 中連線/DHCP/DNS/防火牆的時間戳記；
+- 是否發生在下載/上傳/漫遊/睡眠期間。
+
+沒有時間軸，「間歇性」問題很難修復或驗證。
+
+## 復原順序
+
+1. 先恢復 WAN/DNS 服務；不要恢復原廠設定；
+2. 若只有一個用戶端有問題，請修改該用戶端，而不是路由器；
+3. 若只有一個應用程式有問題，請先停用代理/私人 DNS；
+4. 若要重新開機，請先記錄重新開機前的狀態；
+5. 恢復原廠設定是最後手段；請先備份。
+
+## E2 實驗室實測（2026-10-20）
+
+- 環境：OpenWrt 25.12.6 x86 VM 200；WAN DHCP `192.168.50.191/24`；LAN `192.168.1.1/24`；netns 用戶端 `192.168.1.175/24`。
+- 停止 DNS：路由器對外 ping 正常；路由器/用戶端 DNS 失敗；重新啟動 dnsmasq 後恢復。
+- WAN `ifdown`：WAN 位址消失；用戶端可 ping 閘道但無法 ping `1.1.1.1`；`ifup wan` 後恢復。
+- 移除用戶端預設路由：閘道可連，公網 IP 無法連線；還原路由後恢復。
+- 未測試：真實 Wi-Fi、實體連線抖動、上游抖動、應用程式代理/DoH/QUIC、IPv6 優先。
+- Cast：`public/casts/015-triage.cast`；recipe：`tests/recipes/no-internet-triage-25.12.md`。
+
+## 來源與審閱
+
+- 這是 E2 partial：已測試三種受控故障；間歇性/實體/應用程式層級未測試。
+- 沒有獨立審閱者；結論僅限於此 VM/netns 環境。
+- 不要僅憑單次 ping 或單次網頁載入失敗就怪罪 ISP。
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200；WAN 192.168.50.191/24；LAN 192.168.1.1；netns 用戶端 192.168.1.175"
+  recipe="tests/recipes/no-internet-triage-25.12.md"
+  result="E2 partial：停止 DNS 時，公網 IP ping 正常但 DNS 失敗；重新啟動後恢復。WAN ifdown 時，用戶端可連到閘道但公網 IP 失敗；ifup 後恢復。移除用戶端預設路由只會讓該終端機失效。間歇性/實體 Wi-Fi/應用程式代理未測試。"
+  date="2026-10-20"
+/>
+
+<PageSources />
