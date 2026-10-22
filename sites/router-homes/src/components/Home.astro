@@ -6,6 +6,7 @@ import { getCollection } from 'astro:content';
 import meta from '../../site.meta';
 import FeatureGrid from './features/FeatureGrid.astro';
 import Icon from './Icon.astro';
+import { pick, localeLang } from '../i18n';
 import '../styles/sections.css';
 
 interface Props {
@@ -13,14 +14,13 @@ interface Props {
   locale?: string;
 }
 const locale = Astro.props.locale ?? (Astro.locals as any).starlightRoute?.locale ?? 'en';
-const isEn = locale === 'en';
-const lang = isEn ? 'en' : 'zh-CN';
+const lang = localeLang(locale);
 
 const docs = (await getCollection('docs')).filter((d) => d.id.startsWith(`${locale}/`));
 const bySlug = new Map(docs.map((d) => [d.id.slice(locale.length + 1).replace(/\/index$/, ''), d]));
 
 type Item = { label?: string; translations?: Record<string, string>; slug?: string; items?: Item[] };
-const label = (item: Item) => (isEn ? item.label : item.translations?.[lang] ?? item.label) ?? '';
+const label = (item: Item) => (lang === 'en' ? item.label : item.translations?.[lang] ?? item.label) ?? '';
 // Solar icon per sidebar group, keyed by its English label.
 const groupIcons: Record<string, string> = {
   'Getting Started': 'flag',
@@ -63,8 +63,8 @@ const levels = (['E1', 'E2', 'E3'] as const).map((level) => ({
   count: pages.filter((d) => d.data.evidenceLevel === level).length,
 }));
 
-const t = isEn
-  ? {
+const t = pick(locale, {
+  en: {
       specKicker: 'Before step one',
       specTitle: 'Every guide opens with the same five facts.',
       specBody:
@@ -97,8 +97,8 @@ const t = isEn
       closeBody: 'It takes a minute in LuCI or one sysupgrade command, and it is the difference between a rollback and a reinstall.',
       closeCta: 'Backup and restore',
       closeAlt: 'Firmware upgrade',
-    }
-  : {
+  },
+  zh: {
       specKicker: '动手之前',
       specTitle: '每篇操作页，|先写清五件事。',
       specBody:
@@ -130,7 +130,177 @@ const t = isEn
       closeBody: '在 LuCI 里点一下，或者一条 sysupgrade 命令，一分钟的事。它决定了出错后是回滚，还是重装。',
       closeCta: '备份与恢复',
       closeAlt: '固件升级',
-    };
+  },
+  es: {
+      specKicker: 'Antes del primer paso',
+      specTitle: 'Cada guía empieza con los mismos cinco datos.',
+      specBody:
+        'Muchas redes domésticas se rompen por un comando copiado de un firmware equivocado. Por eso cada página indica con qué se escribió, dónde se ejecuta cada comando y cómo volver atrás si algo sale mal.',
+      spec: [
+        ['Firmware', 'OpenWrt 25.12.6', 'diferencias con 24.10 señaladas en el texto'],
+        ['Dispositivo', 'VM x86 en PVE 9.2', 'revisión de hardware cuando importa'],
+        ['Gestor de paquetes', 'apk', 'comandos de opkg por separado'],
+        ['Se ejecuta en', 'Shell del router · LuCI · Ordenador', 'indicado en cada paso'],
+        ['Vía de retorno', 'backup.tar.gz + failsafe', 'escrita antes del cambio, no después'],
+      ],
+      plate: 'env · network/dns',
+      topicsKicker: 'Guías',
+      topicsTitle: 'Empiece por la tarea que tiene delante.',
+      pages: (n: number) => `${n} ${n === 1 ? 'página' : 'páginas'}`,
+      troubleKicker: '¿Algo falla ahora mismo?',
+      troubleTitle: 'Empiece por el síntoma.',
+      troubleBody: 'Cada página de diagnóstico avanza capa por capa y mantiene abierta la vía de la consola, así que restablecer es el último recurso.',
+      evidenceKicker: 'Niveles de evidencia',
+      evidenceTitle: 'Indicamos lo seguros que estamos.',
+      evidenceBody:
+        'Una página solo dice «probado» cuando se ha ejecutado una receta fija. Las afirmaciones sobre hardware real, como el rendimiento o la cobertura, esperan al E3.',
+      ladder: {
+        E1: ['Basado en documentación oficial', 'Especificaciones y documentación, aún no ejecutadas en nuestro laboratorio.'],
+        E2: ['Reproducido en una VM de laboratorio', 'Una receta fija ejecutada paso a paso en OpenWrt x86 bajo PVE.'],
+        E3: ['Medido en hardware real', 'Routers físicos y redes reales. Todavía no hay ninguno publicado.'],
+      } as Record<string, [string, string]>,
+      closeKicker: 'Un hábito',
+      closeTitle: 'Haga una copia de seguridad antes de cambiar nada.',
+      closeBody: 'Lleva un minuto en LuCI o un solo comando sysupgrade, y marca la diferencia entre revertir y reinstalar.',
+      closeCta: 'Copia de seguridad y restauración',
+      closeAlt: 'Actualización del firmware',
+  },
+  de: {
+      specKicker: 'Vor dem ersten Schritt',
+      specTitle: 'Jede Anleitung beginnt mit denselben fünf Angaben.',
+      specBody:
+        'Viele kaputte Heimnetze beginnen mit einem Befehl, der für die falsche Firmware gedacht war. Deshalb steht auf jeder Seite, wofür sie geschrieben wurde, wo jeder Befehl ausgeführt wird und wie Sie zurückkommen, falls etwas schiefgeht.',
+      spec: [
+        ['Firmware', 'OpenWrt 25.12.6', 'Unterschiede zu 24.10 im Text vermerkt'],
+        ['Gerät', 'x86-VM auf PVE 9.2', 'Hardware-Revision, wenn sie relevant ist'],
+        ['Paketmanager', 'apk', 'opkg-Befehle getrennt aufgeführt'],
+        ['Ausführung in', 'Router-Shell · LuCI · Computer', 'bei jedem Schritt angegeben'],
+        ['Rückweg', 'backup.tar.gz + failsafe', 'vor der Änderung festgehalten, nicht danach'],
+      ],
+      plate: 'env · network/dns',
+      topicsKicker: 'Anleitungen',
+      topicsTitle: 'Beginnen Sie bei der Aufgabe, die vor Ihnen liegt.',
+      pages: (n: number) => `${n} ${n === 1 ? 'Seite' : 'Seiten'}`,
+      troubleKicker: 'Gerade etwas kaputt?',
+      troubleTitle: 'Beginnen Sie beim Symptom.',
+      troubleBody: 'Jede Diagnoseseite arbeitet Schicht für Schicht und hält den Zugang über die Konsole offen, sodass ein Zurücksetzen der letzte Ausweg bleibt.',
+      evidenceKicker: 'Evidenzstufen',
+      evidenceTitle: 'Wir kennzeichnen, wie sicher wir sind.',
+      evidenceBody:
+        'Eine Seite sagt nur dann „getestet“, wenn ein festes Rezept ausgeführt wurde. Aussagen zu echter Hardware, etwa zu Durchsatz und Abdeckung, warten auf E3.',
+      ladder: {
+        E1: ['Aus offiziellen Dokumenten', 'Spezifikationen und Dokumentation, in unserem Labor noch nicht ausgeführt.'],
+        E2: ['In einer Labor-VM nachgestellt', 'Ein festes Rezept, Schritt für Schritt auf OpenWrt x86 unter PVE ausgeführt.'],
+        E3: ['Auf echter Hardware gemessen', 'Physische Router und reale Netzwerke. Bisher ist nichts veröffentlicht.'],
+      } as Record<string, [string, string]>,
+      closeKicker: 'Eine Gewohnheit',
+      closeTitle: 'Legen Sie ein Backup an, bevor Sie etwas ändern.',
+      closeBody: 'Das dauert in LuCI eine Minute oder einen sysupgrade-Befehl und entscheidet darüber, ob Sie zurückrollen oder neu installieren müssen.',
+      closeCta: 'Sicherung und Wiederherstellung',
+      closeAlt: 'Firmware-Update',
+  },
+  fr: {
+      specKicker: 'Avant la première étape',
+      specTitle: 'Chaque guide commence par les mêmes cinq informations.',
+      specBody:
+        'Beaucoup de réseaux domestiques tombent en panne à cause d’une commande copiée depuis le mauvais firmware. Chaque page indique donc pour quoi elle a été écrite, où s’exécute chaque commande et comment revenir en arrière si cela tourne mal.',
+      spec: [
+        ['Firmware', 'OpenWrt 25.12.6', 'différences avec 24.10 signalées dans le texte'],
+        ['Appareil', 'VM x86 sur PVE 9.2', 'révision matérielle lorsqu’elle compte'],
+        ['Gestionnaire de paquets', 'apk', 'commandes opkg présentées à part'],
+        ['S’exécute dans', 'Shell du routeur · LuCI · Ordinateur', 'indiqué à chaque étape'],
+        ['Retour arrière', 'backup.tar.gz + failsafe', 'rédigé avant la modification, pas après'],
+      ],
+      plate: 'env · network/dns',
+      topicsKicker: 'Guides',
+      topicsTitle: 'Partez de la tâche que vous avez devant vous.',
+      pages: (n: number) => `${n} page${n === 1 ? '' : 's'}`,
+      troubleKicker: 'Quelque chose est cassé en ce moment ?',
+      troubleTitle: 'Partez du symptôme.',
+      troubleBody: 'Chaque page de diagnostic avance couche par couche et garde la voie de la console ouverte : la réinitialisation reste le dernier recours.',
+      evidenceKicker: 'Niveaux de preuve',
+      evidenceTitle: 'Nous indiquons notre degré de certitude.',
+      evidenceBody:
+        'Une page ne dit « testé » que lorsqu’une recette fixe a été exécutée. Les affirmations sur du matériel réel, comme le débit ou la couverture, attendent le niveau E3.',
+      ladder: {
+        E1: ['Tiré de la documentation officielle', 'Spécifications et documentation, pas encore exécutées dans notre laboratoire.'],
+        E2: ['Reproduit dans une VM de laboratoire', 'Une recette fixe exécutée pas à pas sur OpenWrt x86 sous PVE.'],
+        E3: ['Mesuré sur du matériel réel', 'Routeurs physiques et réseaux réels. Aucun n’est encore publié.'],
+      } as Record<string, [string, string]>,
+      closeKicker: 'Une habitude',
+      closeTitle: 'Faites une sauvegarde avant de modifier quoi que ce soit.',
+      closeBody: 'Cela prend une minute dans LuCI ou une seule commande sysupgrade, et c’est ce qui sépare un retour arrière d’une réinstallation.',
+      closeCta: 'Sauvegarde et restauration',
+      closeAlt: 'Mise à jour du firmware',
+  },
+  ja: {
+      specKicker: '手順に入る前に',
+      specTitle: 'どのガイドも、|同じ5つの前提から始まります。',
+      specBody:
+        '家庭内ネットワークの不具合は、別のファームウェア向けのコマンドをコピーしたことから始まるケースが少なくありません。そこで各ページに、想定している環境、各コマンドを実行する場所、失敗したときの戻し方を明記しています。',
+      spec: [
+        ['ファームウェア', 'OpenWrt 25.12.6', '24.10 との違いは本文中に明記'],
+        ['デバイス', 'PVE 9.2 上の x86 VM', '必要に応じてハードウェアのリビジョンも記載'],
+        ['パッケージマネージャー', 'apk', 'opkg のコマンドは別に記載'],
+        ['実行場所', 'ルーターのシェル · LuCI · パソコン', '各手順に明記'],
+        ['戻し方', 'backup.tar.gz + failsafe', '変更の前に用意'],
+      ],
+      plate: 'env · network/dns',
+      topicsKicker: 'ガイド',
+      topicsTitle: '目の前の作業から|始めましょう。',
+      pages: (n: number) => `${n} ページ`,
+      troubleKicker: '今まさに困っていますか？',
+      troubleTitle: '症状から|調べましょう。',
+      troubleBody: '切り分けのページは、レイヤーごとに順を追って原因を絞り込みます。コンソールからの接続経路は常に確保し、初期化は最後の手段とします。',
+      evidenceKicker: '確からしさのレベル',
+      evidenceTitle: 'どこまで確かかを、|ページごとに|明示します。',
+      evidenceBody:
+        '「テスト済み」と書くのは、定められた手順を実際に実行したページだけです。スループットや電波の到達範囲など、実機に関する結論は E3 を待ちます。',
+      ladder: {
+        E1: ['公式ドキュメントに基づく', '公式の仕様とドキュメントに基づく内容です。当サイトのラボではまだ実行していません。'],
+        E2: ['ラボ VM で再現', 'PVE 上の OpenWrt x86 で、定められた手順を一歩ずつ実行して再現しました。'],
+        E3: ['実機で計測', '物理ルーターと実際のネットワークでの結果です。まだ公開していません。'],
+      } as Record<string, [string, string]>,
+      closeKicker: 'ひとつの習慣',
+      closeTitle: '何かを変更する前に、|バックアップを。',
+      closeBody: 'LuCI でのクリック、または sysupgrade のコマンド1つで1分もかかりません。ロールバックで済むか、再インストールになるかの分かれ目です。',
+      closeCta: 'バックアップとリストア',
+      closeAlt: 'ファームウェアのアップグレード',
+  },
+  'zh-hant': {
+      specKicker: '動手之前',
+      specTitle: '每篇操作頁，|先寫清五件事。',
+      specBody:
+        '家裡的網路出問題，很多是從一條抄錯韌體版本的指令開始的。所以每頁都先說明：依據什麼環境撰寫、每條指令在哪裡執行、改壞了如何回復。',
+      spec: [
+        ['韌體', 'OpenWrt 25.12.6', '與 24.10 的差異就地標註'],
+        ['裝置', 'PVE 9.2 上的 x86 VM', '必要時寫明硬體修訂版'],
+        ['套件管理員', 'apk', 'opkg 指令單獨列出，不混用'],
+        ['執行位置', '路由器 Shell · LuCI · 電腦', '每一步都標註'],
+        ['復原途徑', 'backup.tar.gz + failsafe', '在變更之前先寫好'],
+      ],
+      plate: 'env · network/dns',
+      topicsKicker: '文件',
+      topicsTitle: '從你手上的|那件事開始。',
+      pages: (n: number) => `${n} 篇`,
+      troubleKicker: '現在就出問題了？',
+      troubleTitle: '從症狀開始查。',
+      troubleBody: '排查頁逐層定位，並始終保留主控台入口，還原為預設值放在最後。',
+      evidenceKicker: '證據等級',
+      evidenceTitle: '我們把|「有多確定」|寫出來。',
+      evidenceBody: '只有依固定配方執行過，頁面才會寫「已實測」。傳輸量、涵蓋範圍這類實體硬體的結論，要等到 E3。',
+      ladder: {
+        E1: ['依據官方文件', '官方規格與文件，尚未在本站實驗環境執行。'],
+        E2: ['實驗 VM 重現', '在 PVE 上的 OpenWrt x86 中，依固定配方逐步重現。'],
+        E3: ['實體裝置實測', '實體路由器與真實網路。目前尚未發布。'],
+      } as Record<string, [string, string]>,
+      closeKicker: '一個習慣',
+      closeTitle: '修改任何東西之前，|先備份。',
+      closeBody: '在 LuCI 裡點一下，或是一條 sysupgrade 指令，一分鐘就能完成。它決定了出錯後是回復，還是重新安裝。',
+      closeCta: '備份與還原',
+      closeAlt: '韌體升級',
+  },
+});
 
 // Headings may mark preferred break points with '|'; each phrase becomes an
 // inline-block so CJK lines break between phrases rather than mid-word.

@@ -3,21 +3,47 @@
 import HeroCopy from './HeroCopy.astro';
 import HeroStats from './HeroStats.astro';
 import type { HeroData } from './data';
+import { pick } from '../../i18n';
 
 interface Props { hero: HeroData }
 const { hero } = Astro.props;
-const isEn = hero.isEn;
-const t = isEn
-  ? {
+const t = pick(hero.locale, {
+  en: {
       diagram:
         'Diagram: the internet reaches the OpenWrt router over WAN; the router serves a computer, a phone and a Wi-Fi access point on the LAN. A dashed line marks the recovery path from a local console.',
       n: { isp: 'ISP · ONT', ispSub: 'pppoe-wan', router: 'OpenWrt', routerSub: 'br-lan 192.168.1.1', pc: 'Computer', pcSub: 'DHCP .100–.250', phone: 'Phone', phoneSub: 'DNS → .1:53', ap: 'Wi-Fi AP', apSub: 'dumb AP .2', back: 'Way back', backSub: 'failsafe · console' },
-    }
-  : {
+  },
+  zh: {
       diagram:
         '示意图：互联网经 WAN 到达 OpenWrt 路由器；路由器在 LAN 侧为电脑、手机和 Wi-Fi AP 提供服务。虚线表示从本地控制台进入的恢复路径。',
       n: { isp: 'ISP · 光猫', ispSub: 'pppoe-wan', router: 'OpenWrt', routerSub: 'br-lan 192.168.1.1', pc: '电脑', pcSub: 'DHCP .100–.250', phone: '手机', phoneSub: 'DNS → .1:53', ap: 'Wi-Fi AP', apSub: '有线 AP .2', back: '恢复路径', backSub: 'failsafe · 控制台' },
-    };
+  },
+  es: {
+    diagram:
+      'Diagrama: internet llega al router OpenWrt por la WAN; el router da servicio en la LAN a un ordenador, un teléfono y un punto de acceso Wi-Fi. Una línea discontinua marca la vía de recuperación desde una consola local.',
+    n: { isp: 'ISP · ONT', ispSub: 'pppoe-wan', router: 'OpenWrt', routerSub: 'br-lan 192.168.1.1', pc: 'Ordenador', pcSub: 'DHCP .100–.250', phone: 'Teléfono', phoneSub: 'DNS → .1:53', ap: 'AP Wi-Fi', apSub: 'AP sin router .2', back: 'Vía de retorno', backSub: 'failsafe · consola' },
+  },
+  de: {
+    diagram:
+      'Diagramm: Das Internet erreicht den OpenWrt-Router über das WAN; der Router versorgt im LAN einen Computer, ein Smartphone und einen WLAN-Access-Point. Eine gestrichelte Linie markiert den Wiederherstellungsweg über eine lokale Konsole.',
+    n: { isp: 'ISP · ONT', ispSub: 'pppoe-wan', router: 'OpenWrt', routerSub: 'br-lan 192.168.1.1', pc: 'Computer', pcSub: 'DHCP .100–.250', phone: 'Smartphone', phoneSub: 'DNS → .1:53', ap: 'WLAN-AP', apSub: 'Dumb-AP .2', back: 'Rückweg', backSub: 'Failsafe · Konsole' },
+  },
+  fr: {
+    diagram:
+      'Schéma : Internet atteint le routeur OpenWrt par le WAN ; sur le LAN, le routeur dessert un ordinateur, un téléphone et un point d’accès Wi-Fi. Une ligne en pointillés indique la voie de récupération depuis une console locale.',
+    n: { isp: 'FAI · ONT', ispSub: 'pppoe-wan', router: 'OpenWrt', routerSub: 'br-lan 192.168.1.1', pc: 'Ordinateur', pcSub: 'DHCP .100–.250', phone: 'Téléphone', phoneSub: 'DNS → .1:53', ap: 'AP Wi-Fi', apSub: 'AP simple .2', back: 'Retour arrière', backSub: 'failsafe · console' },
+  },
+  ja: {
+    diagram:
+      '図：インターネットは WAN から OpenWrt ルーターに届き、ルーターは LAN 側でパソコン、スマートフォン、Wi-Fi アクセスポイントにサービスを提供します。破線は、ローカルコンソールからの復旧経路を示します。',
+    n: { isp: 'ISP · ONT', ispSub: 'pppoe-wan', router: 'OpenWrt', routerSub: 'br-lan 192.168.1.1', pc: 'パソコン', pcSub: 'DHCP .100–.250', phone: 'スマートフォン', phoneSub: 'DNS → .1:53', ap: 'Wi-Fi AP', apSub: 'ブリッジモード AP .2', back: '戻し方', backSub: 'failsafe · コンソール' },
+  },
+  'zh-hant': {
+    diagram:
+      '示意圖：網際網路經由 WAN 連到 OpenWrt 路由器；路由器在 LAN 端為電腦、手機和 Wi-Fi AP 提供服務。虛線表示從本機主控台進入的復原途徑。',
+    n: { isp: 'ISP · 光纖數據機', ispSub: 'pppoe-wan', router: 'OpenWrt', routerSub: 'br-lan 192.168.1.1', pc: '電腦', pcSub: 'DHCP .100–.250', phone: '手機', phoneSub: 'DNS → .1:53', ap: 'Wi-Fi AP', apSub: '有線 AP .2', back: '復原途徑', backSub: 'failsafe · 主控台' },
+  },
+});
 
 // Wires of the schematic: id, path and packet duration (s).
 const wires = [

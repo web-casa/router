@@ -4,6 +4,7 @@
 import HeroCopy from './HeroCopy.astro';
 import HeroStats from './HeroStats.astro';
 import type { HeroData } from './data';
+import { pick } from '../../i18n';
 
 interface Props { hero: HeroData }
 const { hero } = Astro.props;
@@ -17,7 +18,7 @@ const script: Line[] = [
   { kind: 'cmd', text: "ubus call network.interface.wan status | grep '\"up\"'" },
   { kind: 'out', text: '\t"up": true,' },
   { kind: 'cmd', text: 'sysupgrade -b /tmp/backup.tar.gz' },
-  { kind: 'note', text: hero.isEn ? '# backup saved. now you can change things.' : '# 已备份，现在可以放心改了。' },
+  { kind: 'note', text: pick(hero.locale, { en: '# backup saved. now you can change things.', zh: '# 已备份，现在可以放心改了。', 'zh-hant': '# 已備份，現在可以放心修改了。', ja: '# バックアップを保存しました。これで安心して変更できます。', es: '# copia guardada. Ya puede cambiar cosas.', de: '# Backup gespeichert. Jetzt können Sie Änderungen vornehmen.', fr: '# sauvegarde faite. Vous pouvez maintenant modifier.' }) },
 ];
 
 // Timeline: commands type at ~26ms/char, output lands shortly after.
@@ -35,7 +36,7 @@ const end = t;
   <HeroCopy hero={hero} align="center" />
 
   <div class="rh-term-stage rh-in rh-in-scale" style="--i:4">
-    <div class="rh-term-window" role="img" aria-label={hero.isEn ? 'A terminal session on an OpenWrt router: check the release, the LAN address and WAN status, then save a backup.' : 'OpenWrt 路由器上的终端会话：查看版本、LAN 地址和 WAN 状态，然后保存备份。'}>
+    <div class="rh-term-window" role="img" aria-label={pick(hero.locale, { en: 'A terminal session on an OpenWrt router: check the release, the LAN address and WAN status, then save a backup.', zh: 'OpenWrt 路由器上的终端会话：查看版本、LAN 地址和 WAN 状态，然后保存备份。', 'zh-hant': 'OpenWrt 路由器上的終端機工作階段：查看版本、LAN 位址與 WAN 狀態，然後儲存備份。', ja: 'OpenWrt ルーター上のターミナルセッション：リリース、LAN アドレス、WAN の状態を確認し、バックアップを保存します。', es: 'Una sesión de terminal en un router OpenWrt: comprobar la versión, la dirección LAN y el estado de la WAN, y después guardar una copia de seguridad.', de: 'Eine Terminalsitzung auf einem OpenWrt-Router: Release, LAN-Adresse und WAN-Status prüfen und dann ein Backup speichern.', fr: 'Une session de terminal sur un routeur OpenWrt : vérifier la version, l’adresse LAN et l’état du WAN, puis enregistrer une sauvegarde.' })}>
       <div class="rh-term-head" aria-hidden="true">
         <i></i><i></i><i></i>
         <span>ssh root@192.168.1.1</span>

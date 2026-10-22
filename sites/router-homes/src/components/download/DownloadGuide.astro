@@ -4,16 +4,16 @@
 // Interactive parts use radio/checkbox inputs and :has(), so they work without JS.
 import '../../styles/sections.css';
 import Icon from '../Icon.astro';
+import { pick } from '../../i18n';
 import { CHECKED_AT, RELEASE, devices, groups, selectorUrl, targetUrl } from './devices';
 
 const locale = (Astro.locals as any).starlightRoute?.locale ?? 'en';
-const isEn = locale === 'en';
 const L = (p: string) => `/${locale}/${p}/`;
 const x86Base = targetUrl('x86/64');
 const x86File = (fs: string, efi: boolean) => `openwrt-${RELEASE}-x86-64-generic-${fs}-combined${efi ? '-efi' : ''}.img.gz`;
 
-const t = isEn
-  ? {
+const t = pick(locale, {
+  en: {
       pathKicker: 'Start here',
       pathTitle: 'Which one are you?',
       paths: [
@@ -78,8 +78,8 @@ const t = isEn
       ],
       ready: 'Ready. Keep this page open while you flash.',
       notReady: 'Not yet: anything unticked is a way to brick the device.',
-    }
-  : {
+  },
+  zh: {
       pathKicker: '从这里开始',
       pathTitle: '你是哪种情况？',
       paths: [
@@ -144,7 +144,338 @@ const t = isEn
       ],
       ready: '可以开始了。刷机时别关这个页面。',
       notReady: '还不行：每一项没勾上的，都是一种变砖的方式。',
-    };
+  },
+  es: {
+      pathKicker: 'Empiece aquí',
+      pathTitle: '¿Cuál es su caso?',
+      paths: [
+        { tag: 'Router con el firmware de fábrica', title: 'Quiero instalar OpenWrt en mi router', steps: ['Lea la etiqueta: modelo y versión de hardware', 'Busque el dispositivo exacto en el selector de firmware', 'Siga sus notas de instalación (a menudo una imagen factory)', 'Compruebe el SHA-256 y flashee'], href: L('getting-started/firmware-download'), cta: 'Comprobar la descarga del firmware' },
+        { tag: 'Ya usa OpenWrt o un derivado', title: 'Ya uso OpenWrt, ImmortalWrt o iStoreOS', steps: ['Averigüe qué distribución usa', 'Anote target, profile y gestor de paquetes', 'Haga una copia de seguridad y use la imagen sysupgrade correspondiente'], href: L('getting-started/which-openwrt'), cta: '¿Qué OpenWrt es este?' },
+        { tag: 'Mini PC x86 o máquina virtual', title: 'Voy a instalarlo en x86 o Proxmox', steps: ['Compruebe si arranca en BIOS o UEFI', 'Elija una imagen combined (ext4 o squashfs)', 'Verifique, descomprima, importe o escriba en disco'], href: L('getting-started/x86-image'), cta: 'Guía de imágenes x86', anchor: '#x86' },
+      ],
+      stepsKicker: 'Tres comprobaciones',
+      stepsTitle: 'Identificar, emparejar, verificar.',
+      steps: [
+        { n: '1', title: 'Identifique lo que tiene', body: 'En un dispositivo que ya ejecuta OpenWrt, estos campos indican qué descargar. Fíese de ellos antes que de la página «Acerca de».', href: L('getting-started/which-openwrt'), cta: 'Guía completa' },
+        { n: '2', title: 'Empareje el hardware exacto', body: 'El mismo nombre de modelo no implica la misma imagen. Los tres ejemplos proceden de las listas de compilación de 25.12.6:', href: L('getting-started/firmware-download'), cta: 'Guía completa' },
+        { n: '3', title: 'Verifique la descarga', body: 'Compárela con el archivo sha256sums de la misma carpeta de descarga. Si no coincide, descargue de nuevo.', href: L('getting-started/firmware-download'), cta: 'Guía completa' },
+      ],
+      traps: [
+        ['TP-Link Archer C6', 'v2 → ath79/generic · v3 → ramips/mt7621'],
+        ['CMCC RAX3000M', 'unidades con eMMC y con NAND · archivos de arranque DDR3 / DDR4'],
+        ['Xiaomi AX3000T', 'particionado de fábrica · particionado OpenWrt U-Boot'],
+      ],
+      typesKicker: 'Tipos de imagen',
+      typesTitle: 'Para qué sirve cada archivo.',
+      types: [
+        ['factory', 'Primera instalación desde el firmware del fabricante, si la página del dispositivo lo indica.', 'Actualizar un OpenWrt ya instalado.'],
+        ['sysupgrade', 'Actualizar un dispositivo que ya ejecuta OpenWrt. Conserva la configuración por defecto.', 'Primera instalación desde el firmware del fabricante.'],
+        ['combined', 'x86: disco completo con particiones y cargador de arranque, para arranque BIOS.', 'Un equipo solo UEFI.'],
+        ['combined-efi', 'x86: lo mismo, para arranque UEFI (PVE: OVMF).', 'Legacy BIOS / SeaBIOS.'],
+        ['rootfs · tar.gz', 'Solo el sistema de archivos raíz: configuraciones de arranque existentes, contenedores.', 'Escribirla directamente en un disco esperando que arranque.'],
+        ['sdcard.img.gz', 'Placas que arrancan desde una tarjeta SD, como la Banana Pi.', 'Routers con solo memoria flash interna.'],
+      ],
+      use: 'Sirve para',
+      avoid: 'No sirve para',
+      x86Kicker: 'Selector x86',
+      x86Title: 'Dos preguntas, un archivo.',
+      boot: '¿Cómo arranca?',
+      fsq: '¿Qué sistema de archivos raíz?',
+      bios: 'BIOS / Legacy · PVE SeaBIOS',
+      uefi: 'UEFI · PVE OVMF',
+      ext4: 'ext4: escribible, como un disco Linux normal',
+      squash: 'squashfs: raíz de solo lectura, permite restablecer los valores por defecto',
+      tested: 'Probado en laboratorio (E2): arranca en PVE con SeaBIOS',
+      untested: 'Aún no probado en nuestro laboratorio',
+      getIt: 'Descargar',
+      sums: 'sha256sums',
+      x86More: 'Descompresión, importación en PVE y escritura en disco',
+      devKicker: 'Dispositivos',
+      devTitle: 'Dispositivos habituales con imagen oficial.',
+      devNote: `Todos los dispositivos de aquí tienen una imagen oficial de OpenWrt ${RELEASE} (listas de compilación comprobadas el ${CHECKED_AT}). Aparecer en la lista no equivale a recomendado: compruebe antes la versión de su hardware.`,
+      all: 'Todos',
+      selector: 'Selector de firmware',
+      folder: 'Carpeta de descarga',
+      wifi: { 'Wi-Fi 6': 'Wi-Fi 6', 'Wi-Fi 5': 'Wi-Fi 5', 'Wi-Fi 4': 'Wi-Fi 4', none: 'Sin Wi-Fi', addon: 'Wi-Fi mediante tarjeta adicional' } as Record<string, string>,
+      notListed: '¿No está aquí? Busque en el selector de firmware: la lista completa incluye más de 2200 dispositivos.',
+      checkKicker: 'Antes de flashear',
+      checkTitle: 'Marque las seis y empiece.',
+      checks: [
+        'El modelo y la versión de hardware coinciden con la página del dispositivo',
+        'El tipo de imagen es el adecuado: factory / sysupgrade / combined',
+        'El SHA-256 coincide con el sha256sums oficial',
+        'Sé cómo entra este dispositivo en failsafe o en modo de recuperación',
+        'Tengo una copia de seguridad de la configuración actual (o del firmware del fabricante)',
+        'La alimentación es estable y el ordenador está conectado por cable',
+      ],
+      ready: 'Listo. Mantenga esta página abierta mientras flashea.',
+      notReady: 'Todavía no: cada casilla sin marcar es una forma de dejar el dispositivo inservible.',
+  },
+  de: {
+      pathKicker: 'Hier beginnen',
+      pathTitle: 'Welcher Fall trifft auf Sie zu?',
+      paths: [
+        { tag: 'Router mit Original-Firmware', title: 'Ich möchte OpenWrt auf meinem Router installieren', steps: ['Lesen Sie das Typenschild: Modell und Hardware-Version', 'Suchen Sie das genaue Gerät im Firmware-Selector', 'Folgen Sie den Installationshinweisen (oft ein factory-Image)', 'Prüfen Sie den SHA-256-Hash, dann flashen Sie'], href: L('getting-started/firmware-download'), cta: 'Firmware-Download prüfen' },
+        { tag: 'Bereits OpenWrt oder ein Fork', title: 'Ich nutze bereits OpenWrt, ImmortalWrt oder iStoreOS', steps: ['Finden Sie heraus, welche Distribution läuft', 'Notieren Sie Target, Profile und Paketmanager', 'Sichern Sie die Konfiguration und nutzen Sie dann das passende sysupgrade-Image'], href: L('getting-started/which-openwrt'), cta: 'Welches OpenWrt ist das?' },
+        { tag: 'x86-Mini-PC oder VM', title: 'Ich installiere auf x86 oder Proxmox', steps: ['Prüfen Sie, ob per BIOS oder UEFI gebootet wird', 'Wählen Sie ein combined-Image (ext4 oder squashfs)', 'Verifizieren, entpacken, importieren oder auf den Datenträger schreiben'], href: L('getting-started/x86-image'), cta: 'x86-Image-Anleitung', anchor: '#x86' },
+      ],
+      stepsKicker: 'Drei Prüfungen',
+      stepsTitle: 'Erkennen, zuordnen, verifizieren.',
+      steps: [
+        { n: '1', title: 'Erkennen, was Sie haben', body: 'Bei einem Gerät, auf dem bereits OpenWrt läuft, zeigen diese Felder, was Sie herunterladen müssen. Verlassen Sie sich darauf statt auf die Seite „Über“.', href: L('getting-started/which-openwrt'), cta: 'Vollständige Anleitung' },
+        { n: '2', title: 'Die genaue Hardware zuordnen', body: 'Gleicher Modellname bedeutet nicht gleiches Image. Alle drei Beispiele stammen aus den Build-Listen von 25.12.6:', href: L('getting-started/firmware-download'), cta: 'Vollständige Anleitung' },
+        { n: '3', title: 'Den Download verifizieren', body: 'Vergleichen Sie ihn mit der Datei sha256sums im selben Download-Ordner. Stimmt er nicht überein, laden Sie erneut herunter.', href: L('getting-started/firmware-download'), cta: 'Vollständige Anleitung' },
+      ],
+      traps: [
+        ['TP-Link Archer C6', 'v2 → ath79/generic · v3 → ramips/mt7621'],
+        ['CMCC RAX3000M', 'Geräte mit eMMC und NAND · Boot-Dateien für DDR3 / DDR4'],
+        ['Xiaomi AX3000T', 'Original-Partitionierung · OpenWrt-U-Boot-Partitionierung'],
+      ],
+      typesKicker: 'Image-Typen',
+      typesTitle: 'Wofür welche Datei gedacht ist.',
+      types: [
+        ['factory', 'Erstinstallation von der Hersteller-Firmware, wenn die Geräteseite das vorsieht.', 'Ein bereits installiertes OpenWrt aktualisieren.'],
+        ['sysupgrade', 'Update eines Geräts, auf dem bereits OpenWrt läuft. Die Konfiguration bleibt standardmäßig erhalten.', 'Erstinstallation von der Hersteller-Firmware.'],
+        ['combined', 'x86: ganzer Datenträger mit Partitionen und Bootloader, für BIOS-Boot.', 'Ein reiner UEFI-Rechner.'],
+        ['combined-efi', 'x86: dasselbe für UEFI-Boot (PVE: OVMF).', 'Legacy BIOS / SeaBIOS.'],
+        ['rootfs · tar.gz', 'Nur das Root-Dateisystem: bestehende Boot-Setups, Container.', 'Direkt auf einen Datenträger schreiben und auf einen Boot hoffen.'],
+        ['sdcard.img.gz', 'Boards, die von einer SD-Karte booten, etwa Banana Pi.', 'Router, die nur internen Flash-Speicher haben.'],
+      ],
+      use: 'Geeignet für',
+      avoid: 'Nicht geeignet für',
+      x86Kicker: 'x86-Auswahl',
+      x86Title: 'Zwei Fragen, eine Datei.',
+      boot: 'Wie wird gebootet?',
+      fsq: 'Welches Root-Dateisystem?',
+      bios: 'BIOS / Legacy · PVE SeaBIOS',
+      uefi: 'UEFI · PVE OVMF',
+      ext4: 'ext4: beschreibbar, wie ein normaler Linux-Datenträger',
+      squash: 'squashfs: schreibgeschütztes Root, Zurücksetzen auf Standardwerte möglich',
+      tested: 'Im Labor getestet (E2): Boot in PVE mit SeaBIOS erfolgreich',
+      untested: 'In unserem Labor noch nicht getestet',
+      getIt: 'Herunterladen',
+      sums: 'sha256sums',
+      x86More: 'Entpacken, PVE-Import und Schreiben auf Datenträger',
+      devKicker: 'Geräte',
+      devTitle: 'Gängige Geräte mit offiziellem Image.',
+      devNote: `Für jedes Gerät hier gibt es ein offizielles OpenWrt-${RELEASE}-Image (Build-Listen geprüft am ${CHECKED_AT}). Gelistet heißt nicht empfohlen: Prüfen Sie zuerst Ihre Hardware-Version.`,
+      all: 'Alle',
+      selector: 'Firmware-Selector',
+      folder: 'Download-Ordner',
+      wifi: { 'Wi-Fi 6': 'Wi-Fi 6', 'Wi-Fi 5': 'Wi-Fi 5', 'Wi-Fi 4': 'Wi-Fi 4', none: 'Kein WLAN', addon: 'WLAN über Zusatzkarte' } as Record<string, string>,
+      notListed: 'Nicht dabei? Suchen Sie im Firmware-Selector, dort finden Sie die vollständige Liste mit mehr als 2200 Geräten.',
+      checkKicker: 'Vor dem Flashen',
+      checkTitle: 'Haken Sie alle sechs ab, dann legen Sie los.',
+      checks: [
+        'Modell und Hardware-Version stimmen mit der Geräteseite überein',
+        'Der Image-Typ passt: factory / sysupgrade / combined',
+        'Der SHA-256-Hash stimmt mit der offiziellen sha256sums überein',
+        'Ich weiß, wie dieses Gerät in Failsafe oder den Recovery-Modus kommt',
+        'Ich habe eine Sicherung der aktuellen Konfiguration (oder der Hersteller-Firmware)',
+        'Die Stromversorgung ist stabil und der Computer hängt an einem Kabelanschluss',
+      ],
+      ready: 'Bereit. Lassen Sie diese Seite beim Flashen geöffnet.',
+      notReady: 'Noch nicht: Jedes nicht abgehakte Element ist eine Möglichkeit, das Gerät zu bricken.',
+  },
+  fr: {
+      pathKicker: 'Par où commencer',
+      pathTitle: 'Quel est votre cas ?',
+      paths: [
+        { tag: 'Routeur avec le firmware d’origine', title: 'Je veux installer OpenWrt sur mon routeur', steps: ['Lisez l’étiquette : modèle et version matérielle', 'Trouvez l’appareil exact dans le sélecteur de firmware', 'Suivez ses notes d’installation (souvent une image factory)', 'Vérifiez le SHA-256, puis flashez'], href: L('getting-started/firmware-download'), cta: 'Vérifier le téléchargement du firmware' },
+        { tag: 'Déjà sous OpenWrt ou un fork', title: 'J’utilise déjà OpenWrt, ImmortalWrt ou iStoreOS', steps: ['Identifiez la distribution que vous utilisez', 'Notez le target, le profile et le gestionnaire de paquets', 'Faites une sauvegarde, puis utilisez l’image sysupgrade correspondante'], href: L('getting-started/which-openwrt'), cta: 'Quel OpenWrt est-ce ?' },
+        { tag: 'Mini PC x86 ou VM', title: 'J’installe sur x86 ou Proxmox', steps: ['Vérifiez si le démarrage se fait en BIOS ou en UEFI', 'Choisissez une image combined (ext4 ou squashfs)', 'Vérifiez, décompressez, importez ou écrivez sur le disque'], href: L('getting-started/x86-image'), cta: 'Guide des images x86', anchor: '#x86' },
+      ],
+      stepsKicker: 'Trois vérifications',
+      stepsTitle: 'Identifier, faire correspondre, vérifier.',
+      steps: [
+        { n: '1', title: 'Identifiez ce que vous avez', body: 'Sur un appareil qui fait déjà tourner OpenWrt, ces champs indiquent quoi télécharger. Fiez-vous à eux plutôt qu’à la page « À propos ».', href: L('getting-started/which-openwrt'), cta: 'Guide complet' },
+        { n: '2', title: 'Faites correspondre le matériel exact', body: 'Un même nom de modèle ne signifie pas la même image. Les trois exemples viennent des listes de compilation de 25.12.6 :', href: L('getting-started/firmware-download'), cta: 'Guide complet' },
+        { n: '3', title: 'Vérifiez le téléchargement', body: 'Comparez-le au fichier sha256sums du même dossier de téléchargement. S’il ne correspond pas, téléchargez à nouveau.', href: L('getting-started/firmware-download'), cta: 'Guide complet' },
+      ],
+      traps: [
+        ['TP-Link Archer C6', 'v2 → ath79/generic · v3 → ramips/mt7621'],
+        ['CMCC RAX3000M', 'modèles eMMC et NAND · fichiers de démarrage DDR3 / DDR4'],
+        ['Xiaomi AX3000T', 'partitionnement d’origine · partitionnement OpenWrt U-Boot'],
+      ],
+      typesKicker: 'Types d’image',
+      typesTitle: 'À quoi sert chaque fichier.',
+      types: [
+        ['factory', 'Première installation depuis le firmware du constructeur, quand la page de l’appareil l’indique.', 'Mettre à jour un OpenWrt déjà installé.'],
+        ['sysupgrade', 'Mettre à jour un appareil qui fait déjà tourner OpenWrt. Conserve la configuration par défaut.', 'Première installation depuis le firmware du constructeur.'],
+        ['combined', 'x86 : disque complet avec partitions et chargeur de démarrage, pour un démarrage BIOS.', 'Une machine UEFI uniquement.'],
+        ['combined-efi', 'x86 : idem, pour un démarrage UEFI (PVE : OVMF).', 'Legacy BIOS / SeaBIOS.'],
+        ['rootfs · tar.gz', 'Système de fichiers racine seul : configurations de démarrage existantes, conteneurs.', 'Écrire directement sur un disque en espérant qu’il démarre.'],
+        ['sdcard.img.gz', 'Cartes qui démarrent depuis une carte SD, comme la Banana Pi.', 'Routeurs avec mémoire flash interne uniquement.'],
+      ],
+      use: 'Pour',
+      avoid: 'Pas pour',
+      x86Kicker: 'Sélecteur x86',
+      x86Title: 'Deux questions, un fichier.',
+      boot: 'Comment démarre-t-il ?',
+      fsq: 'Quel système de fichiers racine ?',
+      bios: 'BIOS / Legacy · PVE SeaBIOS',
+      uefi: 'UEFI · PVE OVMF',
+      ext4: 'ext4 : accessible en écriture, comme un disque Linux classique',
+      squash: 'squashfs : racine en lecture seule, retour aux paramètres par défaut possible',
+      tested: 'Testé en laboratoire (E2) : démarrage dans PVE avec SeaBIOS',
+      untested: 'Pas encore testé dans notre laboratoire',
+      getIt: 'Télécharger',
+      sums: 'sha256sums',
+      x86More: 'Décompression, import dans PVE et écriture sur disque',
+      devKicker: 'Appareils',
+      devTitle: 'Appareils courants avec image officielle.',
+      devNote: `Chaque appareil ci-dessous dispose d’une image officielle OpenWrt ${RELEASE} (listes de compilation vérifiées le ${CHECKED_AT}). Être listé ne veut pas dire recommandé : vérifiez d’abord la version de votre matériel.`,
+      all: 'Tous',
+      selector: 'Sélecteur de firmware',
+      folder: 'Dossier de téléchargement',
+      wifi: { 'Wi-Fi 6': 'Wi-Fi 6', 'Wi-Fi 5': 'Wi-Fi 5', 'Wi-Fi 4': 'Wi-Fi 4', none: 'Sans Wi-Fi', addon: 'Wi-Fi via carte additionnelle' } as Record<string, string>,
+      notListed: 'Il n’est pas là ? Cherchez dans le sélecteur de firmware : la liste complète compte plus de 2200 appareils.',
+      checkKicker: 'Avant de flasher',
+      checkTitle: 'Cochez les six, puis lancez-vous.',
+      checks: [
+        'Le modèle et la version matérielle correspondent à la page de l’appareil',
+        'Le type d’image convient : factory / sysupgrade / combined',
+        'Le SHA-256 correspond au sha256sums officiel',
+        'Je sais comment cet appareil passe en failsafe ou en mode de récupération',
+        'J’ai une sauvegarde de la configuration actuelle (ou du firmware du constructeur)',
+        'L’alimentation est stable et l’ordinateur est branché en filaire',
+      ],
+      ready: 'Prêt. Gardez cette page ouverte pendant le flashage.',
+      notReady: 'Pas encore : chaque case non cochée est une façon de rendre l’appareil inutilisable.',
+  },
+  ja: {
+      pathKicker: 'ここから始める',
+      pathTitle: 'あなたはどのケースですか？',
+      paths: [
+        { tag: '純正ファームウェアのルーター', title: 'ルーターに OpenWrt を入れたい', steps: ['ラベルでモデルとハードウェアバージョンを確認する', 'ファームウェアセレクターで該当デバイスを探す', 'そのデバイスのインストール手順に従う（多くは factory イメージ）', 'SHA-256 を確認してからフラッシュする'], href: L('getting-started/firmware-download'), cta: 'ファームウェアのダウンロード確認' },
+        { tag: 'すでに OpenWrt またはその派生版', title: 'すでに OpenWrt・ImmortalWrt・iStoreOS を使っている', steps: ['どのディストリビューションか確認する', 'target、profile、パッケージマネージャーを控える', 'バックアップを取り、対応する sysupgrade イメージを使う'], href: L('getting-started/which-openwrt'), cta: 'これはどの OpenWrt？' },
+        { tag: 'x86 ミニ PC または VM', title: 'x86 または Proxmox にインストールする', steps: ['BIOS と UEFI のどちらで起動するか確認する', 'combined イメージ（ext4 または squashfs）を選ぶ', '検証・展開し、インポートまたはディスクに書き込む'], href: L('getting-started/x86-image'), cta: 'x86 イメージガイド', anchor: '#x86' },
+      ],
+      stepsKicker: '3つの確認',
+      stepsTitle: '見分ける、合わせる、検証する。',
+      steps: [
+        { n: '1', title: '手元の機器を見分ける', body: 'すでに OpenWrt が動いている機器では、次の項目からダウンロードすべきものがわかります。「バージョン情報」ページよりもこちらを信頼してください。', href: L('getting-started/which-openwrt'), cta: 'ガイド全文' },
+        { n: '2', title: 'ハードウェアを正確に合わせる', body: '同じモデル名でも同じイメージとは限りません。次の3つの例は、いずれも 25.12.6 のビルド一覧にあるものです。', href: L('getting-started/firmware-download'), cta: 'ガイド全文' },
+        { n: '3', title: 'ダウンロードを検証する', body: '同じダウンロードフォルダにある sha256sums ファイルと照合します。一致しない場合は、ダウンロードし直してください。', href: L('getting-started/firmware-download'), cta: 'ガイド全文' },
+      ],
+      traps: [
+        ['TP-Link Archer C6', 'v2 → ath79/generic · v3 → ramips/mt7621'],
+        ['CMCC RAX3000M', 'eMMC 版と NAND 版 · DDR3 / DDR4 用のブートファイル'],
+        ['Xiaomi AX3000T', '純正レイアウト · OpenWrt U-Boot レイアウト'],
+      ],
+      typesKicker: 'イメージの種類',
+      typesTitle: 'ファイルごとの用途。',
+      types: [
+        ['factory', 'ベンダーのファームウェアからの初回インストール。デバイスのページに指示がある場合。', 'すでに入っている OpenWrt のアップグレード。'],
+        ['sysupgrade', 'すでに OpenWrt が動いているデバイスのアップグレード。設定は標準で保持されます。', 'ベンダーのファームウェアからの初回インストール。'],
+        ['combined', 'x86：パーティションとブートローダーを含むディスク全体。BIOS 起動向け。', 'UEFI のみのマシン。'],
+        ['combined-efi', 'x86：上と同じ内容で、UEFI 起動向け（PVE では OVMF）。', 'レガシー BIOS / SeaBIOS。'],
+        ['rootfs · tar.gz', 'ルートファイルシステムのみ。既存のブート構成やコンテナ向け。', 'ディスクに直接書き込んで、そのまま起動することを期待する場合。'],
+        ['sdcard.img.gz', 'Banana Pi など、SD カードから起動するボード。', '内蔵フラッシュのみのルーター。'],
+      ],
+      use: '用途',
+      avoid: '不向き',
+      x86Kicker: 'x86 イメージ選び',
+      x86Title: '2つの質問で、1つのファイルに。',
+      boot: 'どのように起動しますか？',
+      fsq: 'ルートファイルシステムは？',
+      bios: 'BIOS / レガシー · PVE の SeaBIOS',
+      uefi: 'UEFI · PVE の OVMF',
+      ext4: 'ext4 — 通常の Linux ディスクと同じく書き込み可能',
+      squash: 'squashfs — 読み取り専用のルート。初期設定に戻せます',
+      tested: 'ラボでテスト済み（E2）：PVE の SeaBIOS で起動を確認',
+      untested: '当サイトのラボではまだテストしていません',
+      getIt: 'ダウンロード',
+      sums: 'sha256sums',
+      x86More: '展開、PVE へのインポート、ディスクへの書き込み',
+      devKicker: 'デバイス',
+      devTitle: '公式イメージのある|主要デバイス。',
+      devNote: `ここに挙げたデバイスには、いずれも OpenWrt ${RELEASE} の公式イメージがあります（ビルド一覧の確認日：${CHECKED_AT}）。掲載されていることは推奨を意味しません。まずハードウェアバージョンを確認してください。`,
+      all: 'すべて',
+      selector: 'ファームウェアセレクター',
+      folder: 'ダウンロードフォルダ',
+      wifi: { 'Wi-Fi 6': 'Wi-Fi 6', 'Wi-Fi 5': 'Wi-Fi 5', 'Wi-Fi 4': 'Wi-Fi 4', none: 'Wi-Fi なし', addon: 'Wi-Fi は拡張カードで対応' } as Record<string, string>,
+      notListed: '見つかりませんか？ファームウェアセレクターで検索すると、2200 以上のデバイスの全一覧が見られます。',
+      checkKicker: 'フラッシュする前に',
+      checkTitle: '6つすべてにチェックを入れてから、|始めましょう。',
+      checks: [
+        'モデルとハードウェアバージョンがデバイスのページと一致している',
+        'イメージの種類が合っている（factory / sysupgrade / combined）',
+        'SHA-256 が公式の sha256sums と一致している',
+        'このデバイスで failsafe やリカバリーモードに入る方法を把握している',
+        '現在の設定（またはベンダーのファームウェア）のバックアップがある',
+        '電源が安定していて、パソコンを有線ポートに接続している',
+      ],
+      ready: '準備できました。フラッシュ中は、このページを開いたままにしてください。',
+      notReady: 'まだです：チェックが入っていない項目は、デバイスを文鎮化させる原因になります。',
+  },
+  'zh-hant': {
+      pathKicker: '從這裡開始',
+      pathTitle: '你是哪一種情況？',
+      paths: [
+        { tag: '路由器 · 仍是原廠韌體', title: '我想幫路由器刷上 OpenWrt', steps: ['看標籤：型號與硬體版本', '在韌體選擇器中找到完全對應的裝置', '依裝置頁的安裝說明操作（通常是 factory 映像檔）', '驗證 SHA-256，再刷入'], href: L('getting-started/firmware-download'), cta: '韌體下載核對' },
+        { tag: '已經在用 OpenWrt 或衍生版', title: '我已經在用 OpenWrt / ImmortalWrt / iStoreOS', steps: ['先確認你用的是哪個發行版', '記下 target、profile 與套件管理員', '備份後，使用對應的 sysupgrade 映像檔'], href: L('getting-started/which-openwrt'), cta: '韌體辨識' },
+        { tag: 'x86 迷你主機或虛擬機器', title: '我要安裝在 x86 或 PVE 上', steps: ['確認是 BIOS 還是 UEFI 開機', '選擇 combined 映像檔（ext4 或 squashfs）', '驗證、解壓縮，再匯入或寫入磁碟'], href: L('getting-started/x86-image'), cta: 'x86 映像檔選擇', anchor: '#x86' },
+      ],
+      stepsKicker: '三步核對',
+      stepsTitle: '認清，對上，驗證。',
+      steps: [
+        { n: '1', title: '認清你手上的是什麼', body: '已經在執行 OpenWrt 的裝置，看這幾個欄位就知道該下載哪個映像檔；以它為準，不要看「關於」頁面。', href: L('getting-started/which-openwrt'), cta: '完整步驟' },
+        { n: '2', title: '對上確切的硬體', body: '型號名稱相同不代表映像檔相同。以下三個例子都來自 25.12.6 的建置清單：', href: L('getting-started/firmware-download'), cta: '完整步驟' },
+        { n: '3', title: '驗證下載的檔案', body: '與同一個下載目錄中的 sha256sums 比對；對不上就重新下載。', href: L('getting-started/firmware-download'), cta: '完整步驟' },
+      ],
+      traps: [
+        ['TP-Link Archer C6', 'v2 → ath79/generic · v3 → ramips/mt7621'],
+        ['CMCC RAX3000M', '有 eMMC 與 NAND 兩種 · 開機檔分 DDR3/DDR4'],
+        ['Xiaomi AX3000T', '原廠分區 · OpenWrt U-Boot 分區'],
+      ],
+      typesKicker: '映像檔類型',
+      typesTitle: '每種檔案的用途。',
+      types: [
+        ['factory', '從原廠韌體首次安裝（以裝置頁說明為準）。', '升級已經安裝好的 OpenWrt。'],
+        ['sysupgrade', '升級已經在執行 OpenWrt 的裝置，預設保留設定。', '從原廠韌體首次安裝。'],
+        ['combined', 'x86：含分區與開機載入程式的整碟映像檔，BIOS 開機。', '僅支援 UEFI 的機器。'],
+        ['combined-efi', 'x86：同上，UEFI 開機（PVE 選 OVMF）。', 'Legacy BIOS / SeaBIOS。'],
+        ['rootfs · tar.gz', '只有根檔案系統：已有開機機制的情境、容器。', '直接寫入磁碟並期望它能開機。'],
+        ['sdcard.img.gz', '從 SD 卡開機的開發板，例如 Banana Pi。', '只有內建快閃記憶體的路由器。'],
+      ],
+      use: '適用',
+      avoid: '不適用',
+      x86Kicker: 'x86 選擇器',
+      x86Title: '兩個問題，|選出一個檔案。',
+      boot: '以哪種方式開機？',
+      fsq: '根檔案系統選哪一種？',
+      bios: 'BIOS / Legacy · PVE SeaBIOS',
+      uefi: 'UEFI · PVE OVMF',
+      ext4: 'ext4：可寫入，與一般 Linux 磁碟相同',
+      squash: 'squashfs：唯讀根目錄，可還原為預設值',
+      tested: '本站實驗已驗證（E2）：PVE SeaBIOS 下開機成功',
+      untested: '本站實驗尚未測試這個組合',
+      getIt: '下載',
+      sums: 'sha256sums',
+      x86More: '解壓縮、PVE 匯入與實體機寫入磁碟',
+      devKicker: '裝置',
+      devTitle: '有官方映像檔的|常見裝置。',
+      devNote: `以下裝置都有 OpenWrt ${RELEASE} 官方映像檔（建置清單核對於 ${CHECKED_AT}）。列在清單中不代表推薦，請先核對你的硬體版本。`,
+      all: '全部',
+      selector: '韌體選擇器',
+      folder: '下載目錄',
+      wifi: { 'Wi-Fi 6': 'Wi-Fi 6', 'Wi-Fi 5': 'Wi-Fi 5', 'Wi-Fi 4': 'Wi-Fi 4', none: '無 Wi-Fi', addon: 'Wi-Fi 需擴充卡' } as Record<string, string>,
+      notListed: '找不到你的裝置？到韌體選擇器搜尋，那裡有 2200 多款裝置的完整清單。',
+      checkKicker: '刷機之前',
+      checkTitle: '六項都勾選，|再開始。',
+      checks: [
+        '型號與硬體版本和裝置頁一致',
+        '映像檔類型正確：factory / sysupgrade / combined',
+        'SHA-256 與官方 sha256sums 一致',
+        '知道這台裝置如何進入 failsafe 或復原模式',
+        '已備份目前的設定（或原廠韌體）',
+        '電源穩定，電腦接在有線連接埠上',
+      ],
+      ready: '可以開始了。刷機時請保持此頁面開啟。',
+      notReady: '還不行：每一項未勾選的，都是一種讓裝置變磚的方式。',
+  },
+});
 
 // Headings may mark preferred break points with '|' (see Home.astro).
 const phrases = (text: string) => text.split('|').map((p) => `<span class="rh-phrase">${p}</span>`).join('');
@@ -199,8 +530,8 @@ const counts = Object.fromEntries(groups.map((g) => [g.id, devices.filter((d) =>
           {i === 0 && (
             <pre class="dl-code"><span class="c">root@OpenWrt:~# </span>ubus call system board
 {'{'}
-  <b>"model"</b>: "&lt;{isEn ? 'device model' : '设备型号'}&gt;",
-  <b>"board_name"</b>: "&lt;{isEn ? 'board id' : '板子 ID'}&gt;",
+  <b>"model"</b>: "&lt;{pick(locale, { en: 'device model', zh: '设备型号', 'zh-hant': '裝置型號', ja: 'デバイスのモデル名', es: 'modelo del dispositivo', de: 'Gerätemodell', fr: 'modèle de l’appareil' })}&gt;",
+  <b>"board_name"</b>: "&lt;{pick(locale, { en: 'board id', zh: '板子 ID', 'zh-hant': '板子 ID', ja: 'ボード ID', es: 'ID de la placa', de: 'Board-ID', fr: 'ID de la carte' })}&gt;",
   "release": {'{'}
     <b>"distribution"</b>: "OpenWrt",
     <b>"version"</b>: "{RELEASE}",
@@ -297,7 +628,7 @@ const counts = Object.fromEntries(groups.map((g) => [g.id, devices.filter((d) =>
       <div class="dl-filter" role="radiogroup" aria-label={t.devKicker}>
         <label><input type="radio" name="dl-group" value="all" checked /><span>{t.all}<em>{devices.length}</em></span></label>
         {groups.map((g) => (
-          <label><input type="radio" name="dl-group" value={g.id} /><span><Icon name={groupIcons[g.id]} />{isEn ? g.en : g.zh}<em>{counts[g.id]}</em></span></label>
+          <label><input type="radio" name="dl-group" value={g.id} /><span><Icon name={groupIcons[g.id]} />{pick(locale, { en: g.en, zh: g.zh, 'zh-hant': g['zh-hant'], ja: g.ja, es: g.es, de: g.de, fr: g.fr })}<em>{counts[g.id]}</em></span></label>
         ))}
       </div>
       <ul class="dl-devices">
@@ -308,7 +639,7 @@ const counts = Object.fromEntries(groups.map((g) => [g.id, devices.filter((d) =>
               <code>{d.target}</code>
             </div>
             <h3><Icon name={groupIcons[d.group]} />{d.name}</h3>
-            {d.variants && <p class="dl-variants">{isEn ? d.variants.en : d.variants.zh}</p>}
+            {d.variants && <p class="dl-variants">{pick(locale, { en: d.variants.en, zh: d.variants.zh, 'zh-hant': d.variants['zh-hant'], ja: d.variants.ja, es: d.variants.es, de: d.variants.de, fr: d.variants.fr })}</p>}
             <div class="dl-device-links">
               <a href={selectorUrl(d)}>{t.selector}<Fragment set:html={ext} /></a>
               <a href={targetUrl(d.target)}>{t.folder}<Fragment set:html={ext} /></a>

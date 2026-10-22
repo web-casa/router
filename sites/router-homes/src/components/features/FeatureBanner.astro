@@ -3,17 +3,18 @@
 import Icon from '../Icon.astro';
 import FeatureVisual from './FeatureVisual.astro';
 import { featureBySlug, type FeatureSlug } from './features';
+import { pick } from '../../i18n';
 
 interface Props { slug: FeatureSlug }
 const { slug } = Astro.props;
-const isEn = ((Astro.locals as any).starlightRoute?.locale ?? 'en') === 'en';
+const locale = (Astro.locals as any).starlightRoute?.locale ?? 'en';
 const feature = featureBySlug[slug];
-const copy = isEn ? feature.en : feature.zh;
+const copy = pick(locale, { en: feature.en, zh: feature.zh, 'zh-hant': feature['zh-hant'], ja: feature.ja, es: feature.es, de: feature.de, fr: feature.fr });
 ---
 
 <figure class:list={['feature-banner', 'not-content', { 'feature-banner-hero': slug === 'openwrt-25-12' }]}>
   <div class="feature-banner-visual">
-    <FeatureVisual slug={slug} isEn={isEn} />
+    <FeatureVisual slug={slug} locale={locale} />
   </div>
   <figcaption>
     <Icon name={feature.icon} />

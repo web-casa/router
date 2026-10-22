@@ -1,8 +1,9 @@
 ---
+import { pick } from '../i18n';
 import Default from '@astrojs/starlight/components/Footer.astro';
 
 const route = (Astro.locals as any).starlightRoute;
-const isEn = route.locale === 'en';
+const locale = route.locale ?? 'en';
 const isSplash = route.entry.data.template === 'splash';
 const home = `/${route.locale ?? 'en'}/`;
 // Splash pages have no Starlight footer; use a footer landmark there.
@@ -13,12 +14,18 @@ const ColophonTag = isSplash ? 'footer' : 'div';
 <ColophonTag class="rh-colophon" role={isSplash ? 'contentinfo' : undefined}>
   <a href={home} class="rh-colophon-brand" translate="no">Router.Homes</a>
   <p>
-    {isEn
-      ? 'Independent OpenWrt notes. Every page states the firmware, device, package manager and way back.'
-      : '独立的 OpenWrt 实操笔记。每页写明固件、设备、包管理器与恢复路径。'}
+    {pick(locale, {
+      en: 'Independent OpenWrt notes. Every page states the firmware, device, package manager and way back.',
+      zh: '独立的 OpenWrt 实操笔记。每页写明固件、设备、包管理器与恢复路径。',
+      'zh-hant': '獨立的 OpenWrt 實作筆記。每頁都寫明韌體、裝置、套件管理員與復原途徑。',
+      ja: '独立した OpenWrt の実践ノートです。各ページにファームウェア、デバイス、パッケージマネージャー、元に戻す手順を明記しています。',
+      es: 'Notas independientes sobre OpenWrt. Cada página indica el firmware, el dispositivo, el gestor de paquetes y la vía de retorno.',
+      de: 'Unabhängige OpenWrt-Notizen. Jede Seite nennt Firmware, Gerät, Paketmanager und den Rückweg.',
+      fr: 'Notes indépendantes sur OpenWrt. Chaque page précise le firmware, l’appareil, le gestionnaire de paquets et le retour arrière.',
+    })}
   </p>
   <span class="rh-colophon-credit">
-    {isEn ? 'Icons: ' : '图标：'}<a href="https://www.figma.com/community/file/1166831539721848736" rel="noopener noreferrer">Solar</a>
+    {pick(locale, { en: 'Icons: ', zh: '图标：', 'zh-hant': '圖示：', ja: 'アイコン：', es: 'Iconos: ', de: 'Symbole: ', fr: 'Icônes : ' })}<a href="https://www.figma.com/community/file/1166831539721848736" rel="noopener noreferrer">Solar</a>
     {' '}by 480 Design, <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener noreferrer">CC BY 4.0</a>
   </span>
   <span class="rh-colophon-sig" aria-hidden="true">

@@ -1,5 +1,6 @@
 ---
 import Icon from './Icon.astro';
+import { pick } from '../i18n';
 
 // "Applicable environment" plate at the top of a guide: evidence level on the
 // left (signal bars, like the home page ladder), the four facts on the right,
@@ -14,12 +15,77 @@ interface Props {
 }
 const route = (Astro.locals as any).starlightRoute;
 const locale = route?.locale ?? 'en';
-const isEn = locale === 'en';
+const labels = pick(locale, {
+  en: {
+    heading: 'Applicable environment',
+    firmware: 'Firmware', version: 'Version', pm: 'Package manager', device: 'Device',
+    levels: ['Official docs', 'Reproduced in a lab VM', 'Measured on real hardware'],
+    tested: 'Tested', untested: 'Not tested',
+    verified: 'Last lab run', record: 'Test record',
+    warning: 'These steps have not been tested on the device described above. Back up first and keep a management path open.',
+    unspecified: 'Not specified',
+  },
+  zh: {
+    heading: '适用环境',
+    firmware: '固件', version: '版本', pm: '包管理器', device: '设备',
+    levels: ['依据官方文档', '实验 VM 复现', '真实设备实测'],
+    tested: '已实测', untested: '未实测',
+    verified: '最近一次实验', record: '测试记录',
+    warning: '本页步骤尚未在本文所述设备上实测，请先备份并保留管理入口。',
+    unspecified: '未注明',
+  },
+  es: {
+    heading: 'Entorno aplicable',
+    firmware: 'Firmware', version: 'Versión', pm: 'Gestor de paquetes', device: 'Equipo',
+    levels: ['Documentación oficial', 'Reproducido en una VM de laboratorio', 'Medido en hardware real'],
+    tested: 'Probado', untested: 'Sin probar',
+    verified: 'Última prueba en laboratorio', record: 'Registro de pruebas',
+    warning: 'Estos pasos no se han probado en el dispositivo descrito arriba. Haga primero una copia de seguridad y mantenga abierta una vía de administración.',
+    unspecified: 'No especificado',
+  },
+  de: {
+    heading: 'Geltende Umgebung',
+    firmware: 'Firmware', version: 'Version', pm: 'Paket\u00admanager', device: 'Gerät',
+    levels: ['Offizielle Dokumentation', 'In einer Labor-VM nachgestellt', 'Auf echter Hardware gemessen'],
+    tested: 'Getestet', untested: 'Nicht getestet',
+    verified: 'Letzter Laborlauf', record: 'Testprotokoll',
+    warning: 'Diese Schritte wurden auf dem oben beschriebenen Gerät nicht getestet. Legen Sie zuerst ein Backup an und halten Sie einen Verwaltungszugang offen.',
+    unspecified: 'Nicht angegeben',
+  },
+  ja: {
+    heading: '対象環境',
+    firmware: 'ファームウェア', version: 'バージョン', pm: 'パッケージ管理', device: 'デバイス',
+    levels: ['公式ドキュメント', 'ラボ VM で再現', '実機で計測'],
+    tested: 'テスト済み', untested: '未テスト',
+    verified: '直近のラボ実行', record: 'テスト記録',
+    warning: 'この手順は、上記のデバイスではテストしていません。先にバックアップを取り、管理用の接続経路を確保してください。',
+    unspecified: '未指定',
+  },
+  fr: {
+    heading: 'Environnement concerné',
+    firmware: 'Firmware', version: 'Version', pm: 'Paquets', device: 'Appareil',
+    levels: ['Documentation officielle', 'Reproduit dans une VM de laboratoire', 'Mesuré sur du matériel réel'],
+    tested: 'Testé', untested: 'Non testé',
+    verified: 'Dernier essai en laboratoire', record: 'Journal de test',
+    warning: 'Ces étapes n’ont pas été testées sur l’appareil décrit ci-dessus. Faites d’abord une sauvegarde et gardez un accès d’administration ouvert.',
+    unspecified: 'Non précisé',
+  },
+  'zh-hant': {
+    heading: '適用環境',
+    firmware: '韌體', version: '版本', pm: '套件管理員', device: '裝置',
+    levels: ['依據官方文件', '實驗 VM 重現', '實體裝置實測'],
+    tested: '已實測', untested: '未實測',
+    verified: '最近一次實驗', record: '測試紀錄',
+    warning: '本頁步驟尚未在上述裝置上實測，請先備份並保留管理入口。',
+    unspecified: '未註明',
+  },
+});
+
 const {
-  firmware = isEn ? 'Not specified' : '未注明',
-  version = isEn ? 'Not specified' : '未注明',
-  packageManager = isEn ? 'Not specified' : '未注明',
-  device = isEn ? 'Not specified' : '未注明',
+  firmware = labels.unspecified,
+  version = labels.unspecified,
+  packageManager = labels.unspecified,
+  device = labels.unspecified,
   tested = false,
   evidence = 'E1',
 } = Astro.props;
@@ -29,24 +95,6 @@ const lastVerified: string | undefined = data.lastVerifiedAt;
 const hasRecord = Boolean(data.testRecipe);
 
 const level = Number(evidence.replace(/\D/g, '')) || 1;
-const labels = isEn
-  ? {
-      heading: 'Applicable environment',
-      firmware: 'Firmware', version: 'Version', pm: 'Package manager', device: 'Device',
-      levels: ['Official docs', 'Reproduced in a lab VM', 'Measured on real hardware'],
-      tested: 'Tested', untested: 'Not tested',
-      verified: 'Last lab run', record: 'Test record',
-      warning: 'These steps have not been tested on the device described above. Back up first and keep a management path open.',
-    }
-  : {
-      heading: '适用环境',
-      firmware: '固件', version: '版本', pm: '包管理器', device: '设备',
-      levels: ['依据官方文档', '实验 VM 复现', '真实设备实测'],
-      tested: '已实测', untested: '未实测',
-      verified: '最近一次实验', record: '测试记录',
-      warning: '本页步骤尚未在本文所述设备上实测，请先备份并保留管理入口。',
-    };
-
 const icons = { firmware: 'cpu-bolt', version: 'tag', pm: 'box', device: 'wi-fi-router' };
 const specs = [
   { k: 'firmware', label: labels.firmware, value: firmware },
@@ -231,6 +279,9 @@ const specs = [
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--sl-color-gray-3);
+    flex-wrap: wrap;
+    min-width: 0;
+    hyphens: manual;
   }
   .env-spec dt :global(.i) {
     width: 1rem;

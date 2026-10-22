@@ -1,5 +1,6 @@
 ---
 import 'asciinema-player/dist/bundle/asciinema-player.css';
+import { pick } from '../i18n';
 
 interface Props {
   src: string;
@@ -8,14 +9,14 @@ interface Props {
 }
 
 const { src, title, caption } = Astro.props;
-const isEn = ((Astro.locals as any).starlightRoute?.locale ?? 'en') === 'en';
+const locale = (Astro.locals as any).starlightRoute?.locale ?? 'en';
 ---
 
 <figure class="terminal-cast">
   <div class="terminal-cast-head">
     <span class="terminal-cast-dots" aria-hidden="true"><i></i><i></i><i></i></span>
     <span class="terminal-cast-title">{title}</span>
-    <a href={src} download class="terminal-cast-download">{isEn ? 'Download .cast' : '下载 cast'}</a>
+    <a href={src} download class="terminal-cast-download">{pick(locale, { en: 'Download .cast', zh: '下载 cast', 'zh-hant': '下載 cast', ja: '.cast をダウンロード', es: 'Descargar cast', de: 'cast herunterladen', fr: 'Télécharger le cast' })}</a>
   </div>
   <div
     class="terminal-cast-player"

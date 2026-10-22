@@ -1,5 +1,7 @@
 ---
 // Override Starlight Search to expand Pagefind terms that its zh-cn tokenizer drops (e.g. 镜像).
+// ja needs no term expansion: the processTerm rules below only match Simplified-Chinese terms and leave Japanese queries untouched.
+// NOTE: processTerm below is Simplified-Chinese only. zh-hant needs its own term expansion review (Pagefind zh tokenizer, 鏡像 etc.) before it is promoted.
 import project from 'virtual:starlight/project-context';
 import Icon from './Icon.astro';
 

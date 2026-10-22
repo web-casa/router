@@ -1,5 +1,6 @@
 ---
 import Icon from './Icon.astro';
+import { pick } from '../i18n';
 
 interface Props {
   where: 'router-shell' | 'luci' | 'client' | 'phone' | 'console' | 'pve' | string;
@@ -7,10 +8,15 @@ interface Props {
   expected?: string;
 }
 const locale = (Astro.locals as any).starlightRoute?.locale ?? 'en';
-const isEn = locale === 'en';
-const labels: Record<string, string> = isEn
-  ? { 'router-shell': 'Router shell', luci: 'LuCI', client: 'Computer', phone: 'Phone', console: 'Console', pve: 'PVE host' }
-  : { 'router-shell': '路由器 Shell', luci: 'LuCI', client: '电脑', phone: '手机', console: '本地控制台', pve: 'PVE 宿主机' };
+const labels: Record<string, string> = pick(locale, {
+  en: { 'router-shell': 'Router shell', luci: 'LuCI', client: 'Computer', phone: 'Phone', console: 'Console', pve: 'PVE host' },
+  zh: { 'router-shell': '路由器 Shell', luci: 'LuCI', client: '电脑', phone: '手机', console: '本地控制台', pve: 'PVE 宿主机' },
+  'zh-hant': { 'router-shell': '路由器 Shell', luci: 'LuCI', client: '電腦', phone: '手機', console: '本機主控台', pve: 'PVE 主機' },
+  ja: { 'router-shell': 'ルーターのシェル', luci: 'LuCI', client: 'パソコン', phone: 'スマートフォン', console: 'ローカルコンソール', pve: 'PVE ホスト' },
+  es: { 'router-shell': 'Shell del router', luci: 'LuCI', client: 'Ordenador', phone: 'Teléfono', console: 'Consola local', pve: 'Host PVE' },
+  de: { 'router-shell': 'Router-Shell', luci: 'LuCI', client: 'Computer', phone: 'Smartphone', console: 'Lokale Konsole', pve: 'PVE-Host' },
+  fr: { 'router-shell': 'Shell du routeur', luci: 'LuCI', client: 'Ordinateur', phone: 'Téléphone', console: 'Console locale', pve: 'Hôte PVE' },
+});
 // Solar icon per execution location.
 const icons: Record<string, string> = {
   'router-shell': 'code-square',
@@ -31,6 +37,6 @@ const icon = icons[where] ?? icons['router-shell'];
       {title && <strong>{title}</strong>}
     </div>
     <div class="step-body"><slot /></div>
-    {expected && <p class="step-expected"><span class="step-expected-label">{isEn ? 'Expected' : '预期'}</span><span>{expected}</span></p>}
+    {expected && <p class="step-expected"><span class="step-expected-label">{pick(locale, { en: 'Expected', zh: '预期', 'zh-hant': '預期', ja: '期待される結果', es: 'Esperado', de: 'Erwartet', fr: 'Attendu' })}</span><span>{expected}</span></p>}
   </div>
 </div>

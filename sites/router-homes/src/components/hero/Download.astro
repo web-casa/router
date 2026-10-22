@@ -4,17 +4,18 @@
 import HeroCopy from './HeroCopy.astro';
 import HeroStats from './HeroStats.astro';
 import type { HeroData } from './data';
+import { pick } from '../../i18n';
 import { RELEASE, RELEASE_DATE, devices } from '../download/devices';
 
 interface Props { hero: HeroData }
 const { hero } = Astro.props;
-const isEn = hero.isEn;
+const l = hero.locale;
 
 type Seg = { k: string; text: string };
 const examples: { id: string; label: string; segs: Seg[] }[] = [
   {
     id: 'router',
-    label: isEn ? 'Router' : '路由器',
+    label: pick(l, { en: 'Router', zh: '路由器', 'zh-hant': '路由器', ja: 'ルーター', es: 'Router', de: 'Router', fr: 'Routeur' }),
     segs: [
       { k: 'project', text: 'openwrt' },
       { k: 'version', text: RELEASE },
@@ -39,40 +40,112 @@ const examples: { id: string; label: string; segs: Seg[] }[] = [
 ];
 const ext = { router: '.bin', x86: '.img.gz' } as Record<string, string>;
 
-const legend: { k: string; name: string; text: string }[] = isEn
-  ? [
+const legend: { k: string; name: string; text: string }[] = pick(l, {
+  en: [
       { k: 'version', name: 'Release', text: `${RELEASE} is the current stable release.` },
       { k: 'target', name: 'Target', text: 'Set by the chip platform. It must match your device exactly.' },
       { k: 'profile', name: 'Profile', text: 'The exact model, and sometimes the flash layout.' },
       { k: 'fs', name: 'Filesystem', text: 'squashfs can reset to defaults; ext4 is fully writable.' },
       { k: 'type', name: 'Image type', text: 'sysupgrade upgrades an existing OpenWrt; combined is a whole-disk image, -efi for UEFI.' },
       { k: 'ext', name: 'Extension', text: '.bin / .itb are flashed as is; .img.gz is unpacked before writing to disk.' },
-    ]
-  : [
+    ],
+  zh: [
       { k: 'version', name: '版本', text: `${RELEASE} 是当前稳定版。` },
       { k: 'target', name: 'target', text: '由芯片平台决定，必须和设备完全一致。' },
       { k: 'profile', name: 'profile', text: '精确到型号，有时还区分分区布局。' },
       { k: 'fs', name: '文件系统', text: 'squashfs 可以恢复出厂；ext4 整体可写。' },
       { k: 'type', name: '镜像类型', text: 'sysupgrade 用于已装 OpenWrt 的升级；combined 是含引导的整盘镜像，-efi 用于 UEFI。' },
       { k: 'ext', name: '扩展名', text: '.bin/.itb 直接刷入；.img.gz 要先解压再写盘。' },
-    ];
+  ],
+  ja: [
+      { k: 'version', name: 'リリース', text: `${RELEASE} は現在の安定版です。` },
+      { k: 'target', name: 'Target', text: 'チップのプラットフォームで決まります。お使いのデバイスと完全に一致している必要があります。' },
+      { k: 'profile', name: 'Profile', text: '正確なモデル名です。フラッシュのレイアウトまで区別する場合もあります。' },
+      { k: 'fs', name: 'ファイルシステム', text: 'squashfs は初期設定に戻せます。ext4 は全体が書き込み可能です。' },
+      { k: 'type', name: 'イメージの種類', text: 'sysupgrade は既存の OpenWrt のアップグレード用です。combined はディスク全体のイメージで、UEFI 用は -efi です。' },
+      { k: 'ext', name: '拡張子', text: '.bin / .itb はそのままフラッシュします。.img.gz は展開してからディスクに書き込みます。' },
+  ],
+  es: [
+      { k: 'version', name: 'Versión', text: `${RELEASE} es la versión estable actual.` },
+      { k: 'target', name: 'Target', text: 'Lo fija la plataforma del chip. Debe coincidir exactamente con su dispositivo.' },
+      { k: 'profile', name: 'Profile', text: 'El modelo exacto y, a veces, la distribución de la flash.' },
+      { k: 'fs', name: 'Sistema de archivos', text: 'squashfs permite restablecer los valores por defecto; ext4 es totalmente escribible.' },
+      { k: 'type', name: 'Tipo de imagen', text: 'sysupgrade actualiza un OpenWrt existente; combined es una imagen de disco completo, -efi para UEFI.' },
+      { k: 'ext', name: 'Extensión', text: '.bin / .itb se flashean tal cual; .img.gz se descomprime antes de escribirla en disco.' },
+  ],
+  de: [
+      { k: 'version', name: 'Release', text: `${RELEASE} ist das aktuelle stabile Release.` },
+      { k: 'target', name: 'Target', text: 'Wird von der Chip-Plattform bestimmt. Es muss exakt zu Ihrem Gerät passen.' },
+      { k: 'profile', name: 'Profile', text: 'Das genaue Modell und manchmal das Flash-Layout.' },
+      { k: 'fs', name: 'Dateisystem', text: 'squashfs erlaubt das Zurücksetzen auf Standardwerte; ext4 ist vollständig beschreibbar.' },
+      { k: 'type', name: 'Image-Typ', text: 'sysupgrade aktualisiert ein vorhandenes OpenWrt; combined ist ein Image des gesamten Datenträgers, -efi für UEFI.' },
+      { k: 'ext', name: 'Dateiendung', text: '.bin / .itb werden unverändert geflasht; .img.gz wird vor dem Schreiben auf den Datenträger entpackt.' },
+  ],
+  fr: [
+      { k: 'version', name: 'Version', text: `${RELEASE} est la version stable actuelle.` },
+      { k: 'target', name: 'Target', text: 'Déterminé par la plateforme de la puce. Il doit correspondre exactement à votre appareil.' },
+      { k: 'profile', name: 'Profile', text: 'Le modèle exact et, parfois, la disposition de la flash.' },
+      { k: 'fs', name: 'Système de fichiers', text: 'squashfs permet le retour aux paramètres par défaut ; ext4 est entièrement accessible en écriture.' },
+      { k: 'type', name: 'Type d’image', text: 'sysupgrade met à jour un OpenWrt existant ; combined est une image de disque complet, -efi pour UEFI.' },
+      { k: 'ext', name: 'Extension', text: '.bin / .itb se flashent tels quels ; .img.gz est décompressé avant l’écriture sur le disque.' },
+  ],
+  'zh-hant': [
+    { k: 'version', name: '版本', text: `${RELEASE} 是目前的穩定版。` },
+    { k: 'target', name: 'target', text: '由晶片平台決定，必須與裝置完全一致。' },
+    { k: 'profile', name: 'profile', text: '精確到型號，有時還會區分分區配置。' },
+    { k: 'fs', name: '檔案系統', text: 'squashfs 可以還原為預設值；ext4 整體可寫入。' },
+    { k: 'type', name: '映像檔類型', text: 'sysupgrade 用於已安裝 OpenWrt 的升級；combined 是含開機載入程式的整碟映像檔，-efi 用於 UEFI。' },
+    { k: 'ext', name: '副檔名', text: '.bin／.itb 直接刷入；.img.gz 需先解壓縮再寫入磁碟。' },
+  ],
+});
 
 const data: HeroData = {
   ...hero,
-  eyebrow: isEn ? `OpenWrt ${RELEASE} · released ${RELEASE_DATE}` : `OpenWrt ${RELEASE} · ${RELEASE_DATE} 发布`,
-  stats: isEn
-    ? [
+  eyebrow: pick(l, { en: `OpenWrt ${RELEASE} · released ${RELEASE_DATE}`, zh: `OpenWrt ${RELEASE} · ${RELEASE_DATE} 发布`, 'zh-hant': `OpenWrt ${RELEASE} · ${RELEASE_DATE} 發布`, ja: `OpenWrt ${RELEASE} · ${RELEASE_DATE} リリース`, es: `OpenWrt ${RELEASE} · publicado el ${RELEASE_DATE}`, de: `OpenWrt ${RELEASE} · veröffentlicht am ${RELEASE_DATE}`, fr: `OpenWrt ${RELEASE} · publié le ${RELEASE_DATE}` }),
+  stats: pick(l, {
+    en: [
         [RELEASE, 'current stable release'],
         [RELEASE_DATE, 'release date'],
         [String(devices.length), 'common devices listed below'],
         ['2026-09', 'end of 24.10 security updates'],
-      ]
-    : [
+      ],
+    zh: [
         [RELEASE, '当前稳定版'],
         [RELEASE_DATE, '发布日期'],
         [String(devices.length), '本页列出的常见设备'],
         ['2026-09', '24.10 安全更新截止'],
       ],
+    ja: [
+        [RELEASE, '現在の安定版'],
+        [RELEASE_DATE, 'リリース日'],
+        [String(devices.length), '下に掲載している主要なデバイス'],
+        ['2026-09', '24.10 のセキュリティ更新の終了'],
+      ],
+    es: [
+        [RELEASE, 'versión estable actual'],
+        [RELEASE_DATE, 'fecha de publicación'],
+        [String(devices.length), 'dispositivos habituales listados abajo'],
+        ['2026-09', 'fin de las actualizaciones de seguridad de 24.10'],
+      ],
+    de: [
+        [RELEASE, 'aktuelles stabiles Release'],
+        [RELEASE_DATE, 'Veröffentlichungsdatum'],
+        [String(devices.length), 'gängige Geräte, unten aufgelistet'],
+        ['2026-09', 'Ende der Sicherheitsupdates für 24.10'],
+      ],
+    fr: [
+        [RELEASE, 'version stable actuelle'],
+        [RELEASE_DATE, 'date de publication'],
+        [String(devices.length), 'appareils courants listés ci-dessous'],
+        ['2026-09', 'fin des mises à jour de sécurité de 24.10'],
+      ],
+    'zh-hant': [
+        [RELEASE, '目前穩定版'],
+        [RELEASE_DATE, '發布日期'],
+        [String(devices.length), '本頁列出的常見裝置'],
+        ['2026-09', '24.10 安全性更新截止'],
+      ],
+  }),
 };
 ---
 
@@ -82,8 +155,8 @@ const data: HeroData = {
 
   <figure class="fa rh-in rh-in-scale" style="--i:3">
     <div class="fa-head">
-      <span class="fa-title">{isEn ? 'Read a firmware filename' : '读懂固件文件名'}</span>
-      <div class="fa-tabs" role="radiogroup" aria-label={isEn ? 'Example' : '示例'}>
+      <span class="fa-title">{pick(l, { en: 'Read a firmware filename', zh: '读懂固件文件名', 'zh-hant': '看懂韌體檔名', ja: 'ファームウェアのファイル名の読み方', es: 'Cómo leer el nombre de un archivo de firmware', de: 'Firmware-Dateinamen lesen', fr: 'Lire un nom de fichier de firmware' })}</span>
+      <div class="fa-tabs" role="radiogroup" aria-label={pick(l, { en: 'Example', zh: '示例', 'zh-hant': '範例', ja: '例', es: 'Ejemplo', de: 'Beispiel', fr: 'Exemple' })}>
         {examples.map((ex, i) => (
           <label>
             <input type="radio" name="fa-example" value={ex.id} checked={i === 0} />

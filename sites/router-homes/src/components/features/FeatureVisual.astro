@@ -4,12 +4,13 @@
 // meaning, so everything here is aria-hidden.
 import Icon from '../Icon.astro';
 import type { FeatureSlug } from './features';
+import { pick } from '../../i18n';
 
 interface Props {
   slug: FeatureSlug;
-  isEn: boolean;
+  locale: string;
 }
-const { slug, isEn } = Astro.props;
+const { slug, locale } = Astro.props;
 ---
 
 <div class:list={['fv', `fv--${slug}`]} aria-hidden="true">
@@ -80,7 +81,7 @@ const { slug, isEn } = Astro.props;
     <ul class="fv-latency">
       <li class="fifo"><span class="n">fifo</span><span class="bar"><i /></span></li>
       <li class="cake"><span class="n">cake</span><span class="bar"><i /></span></li>
-      <li class="cap">{isEn ? 'latency under load' : '满载时的延迟'}</li>
+      <li class="cap">{pick(locale, { en: 'latency under load', zh: '满载时的延迟', 'zh-hant': '滿載時的延遲', ja: '高負荷時のレイテンシ', es: 'latencia bajo carga', de: 'Latenz unter Last', fr: 'latence en charge' })}</li>
     </ul>
   )}
 

@@ -3,16 +3,22 @@
 import Icon from '../Icon.astro';
 import FeatureVisual from './FeatureVisual.astro';
 import { features } from './features';
+import { pick } from '../../i18n';
 
 interface Props {
   locale: string;
   index: string;
 }
 const { locale, index } = Astro.props;
-const isEn = locale === 'en';
-const t = isEn
-  ? { kicker: 'Features', title: 'OpenWrt, feature by feature.', all: 'Everything new in 25.12' }
-  : { kicker: '特性', title: 'OpenWrt 的九个关键特性', all: '查看 25.12 全部变化' };
+const t = pick(locale, {
+  en: { kicker: 'Features', title: 'OpenWrt, feature by feature.', all: 'Everything new in 25.12' },
+  zh: { kicker: '特性', title: 'OpenWrt 的九个关键特性', all: '查看 25.12 全部变化' },
+  'zh-hant': { kicker: '特色', title: 'OpenWrt 的九大關鍵特色', all: '查看 25.12 的所有變更' },
+  ja: { kicker: '機能', title: 'OpenWrt の機能をひとつずつ。', all: '25.12 の新機能をすべて見る' },
+  es: { kicker: 'Funciones', title: 'OpenWrt, función por función.', all: 'Todas las novedades de 25.12' },
+  de: { kicker: 'Funktionen', title: 'OpenWrt, Funktion für Funktion.', all: 'Alle Neuerungen in 25.12' },
+  fr: { kicker: 'Fonctionnalités', title: 'OpenWrt, fonctionnalité par fonctionnalité.', all: 'Toutes les nouveautés de 25.12' },
+});
 const arrow =
   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
 ---
@@ -28,12 +34,12 @@ const arrow =
 
   <ul class="rh-fgrid">
     {features.map((f, i) => {
-      const copy = isEn ? f.en : f.zh;
+      const copy = pick(locale, { en: f.en, zh: f.zh, 'zh-hant': f['zh-hant'], ja: f.ja, es: f.es, de: f.de, fr: f.fr });
       return (
         <li class="rh-reveal" style={`--span:${f.span};--rows:${f.rows ?? 1}`}>
           <a class:list={['rh-fcard', 'rh-spot', { 'rh-fcard-hero': i === 0 }]} href={`/${locale}/features/${f.slug}/`}>
             <div class="rh-fcard-visual">
-              <FeatureVisual slug={f.slug} isEn={isEn} />
+              <FeatureVisual slug={f.slug} locale={locale} />
             </div>
             <div class="rh-fcard-text">
               <h3>

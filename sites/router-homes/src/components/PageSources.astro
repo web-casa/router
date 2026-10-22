@@ -1,11 +1,12 @@
 ---
+import { pick } from '../i18n';
 const route = (Astro.locals as any).starlightRoute;
-const isEn = (route?.locale ?? 'en') === 'en';
+const locale = route?.locale ?? 'en';
 const sources = Array.isArray(route?.entry?.data?.sources) ? route.entry.data.sources : [];
 ---
 {sources.length > 0 && (
   <section class="page-sources">
-    <h2>{isEn ? 'Sources' : '来源'}</h2>
+    <h2>{pick(locale, { en: 'Sources', zh: '来源', 'zh-hant': '來源', ja: '出典', es: 'Fuentes', de: 'Quellen', fr: 'Sources' })}</h2>
     <ul>
       {sources.map((source: { label: string; url: string }) => (
         <li><a href={source.url} rel="noopener noreferrer">{source.label}</a></li>

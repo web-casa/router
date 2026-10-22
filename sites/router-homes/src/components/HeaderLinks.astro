@@ -1,5 +1,6 @@
 ---
 import Icon from './Icon.astro';
+import { pick } from '../i18n';
 
 // Rendered in the header's right-hand group (Starlight's SocialIcons slot):
 // a persistent way into the download page.
@@ -11,7 +12,7 @@ const current = route.id === `${locale}/download`;
 
 <a href={href} class="rh-header-dl" aria-current={current ? 'page' : undefined}>
   <Icon name="download-minimalistic" />
-  {locale === 'en' ? 'Download' : '下载'}
+  {pick(locale, { en: 'Download', zh: '下载', 'zh-hant': '下載', ja: 'ダウンロード', es: 'Descargas', de: 'Download', fr: 'Télécharger' })}
 </a>
 
 <style>

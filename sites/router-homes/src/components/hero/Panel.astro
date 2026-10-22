@@ -4,26 +4,28 @@
 import HeroCopy from './HeroCopy.astro';
 import HeroStats from './HeroStats.astro';
 import type { HeroData } from './data';
+import { pick } from '../../i18n';
 
 interface Props { hero: HeroData }
 const { hero } = Astro.props;
 const l = hero.locale;
-const ports = hero.isEn
-  ? [
-      { id: 'WAN', role: 'Internet · DHCP / PPPoE', href: `/${l}/network/wan-connectivity/`, wan: true },
-      { id: 'LAN1', role: 'Your computer · 192.168.1.x', href: `/${l}/network/lan-address/` },
-      { id: 'LAN2', role: 'Wired / wireless AP', href: `/${l}/network/ap-mode/` },
-      { id: 'LAN3', role: 'Bypass gateway', href: `/${l}/network/bypass-gateway/` },
-      { id: 'LAN4', role: 'Proxmox host', href: `/${l}/installation/proxmox/` },
-    ]
-  : [
-      { id: 'WAN', role: '上网 · DHCP / PPPoE', href: `/${l}/network/wan-connectivity/`, wan: true },
-      { id: 'LAN1', role: '你的电脑 · 192.168.1.x', href: `/${l}/network/lan-address/` },
-      { id: 'LAN2', role: '有线 / 无线 AP', href: `/${l}/network/ap-mode/` },
-      { id: 'LAN3', role: '旁路网关', href: `/${l}/network/bypass-gateway/` },
-      { id: 'LAN4', role: 'PVE 宿主机', href: `/${l}/installation/proxmox/` },
-    ];
-const reset = { label: hero.isEn ? 'Reset · failsafe' : '复位 · failsafe', href: `/${l}/troubleshooting/no-web-ui/` };
+const roles = pick(l, {
+  en: ['Internet · DHCP / PPPoE', 'Your computer · 192.168.1.x', 'Wired / wireless AP', 'Bypass gateway', 'Proxmox host'],
+  zh: ['上网 · DHCP / PPPoE', '你的电脑 · 192.168.1.x', '有线 / 无线 AP', '旁路网关', 'PVE 宿主机'],
+  'zh-hant': ['上網 · DHCP / PPPoE', '你的電腦 · 192.168.1.x', '有線／無線 AP', '旁路閘道', 'PVE 主機'],
+  ja: ['インターネット · DHCP / PPPoE', 'お使いのパソコン · 192.168.1.x', '有線 / 無線 AP', 'バイパスゲートウェイ', 'Proxmox ホスト'],
+  es: ['Internet · DHCP / PPPoE', 'Su ordenador · 192.168.1.x', 'AP por cable / inalámbrico', 'Puerta de enlace en paralelo', 'Host Proxmox'],
+  de: ['Internet · DHCP / PPPoE', 'Ihr Computer · 192.168.1.x', 'Kabelgebundener / WLAN-AP', 'Bypass-Gateway', 'Proxmox-Host'],
+  fr: ['Internet · DHCP / PPPoE', 'Votre ordinateur · 192.168.1.x', 'Point d’accès filaire / Wi-Fi', 'Passerelle en dérivation', 'Hôte Proxmox'],
+});
+const ports = [
+  { id: 'WAN', role: roles[0], href: `/${l}/network/wan-connectivity/`, wan: true },
+  { id: 'LAN1', role: roles[1], href: `/${l}/network/lan-address/` },
+  { id: 'LAN2', role: roles[2], href: `/${l}/network/ap-mode/` },
+  { id: 'LAN3', role: roles[3], href: `/${l}/network/bypass-gateway/` },
+  { id: 'LAN4', role: roles[4], href: `/${l}/installation/proxmox/` },
+];
+const reset = { label: pick(l, { en: 'Reset · failsafe', zh: '复位 · failsafe', 'zh-hant': '重設 · failsafe', ja: 'リセット · failsafe', es: 'Restablecer · failsafe', de: 'Reset · Failsafe', fr: 'Réinit. · failsafe' }), href: `/${l}/troubleshooting/no-web-ui/` };
 const leds = ['PWR', 'SYS', 'WAN', 'LAN'];
 ---
 
@@ -32,7 +34,7 @@ const leds = ['PWR', 'SYS', 'WAN', 'LAN'];
   <HeroCopy hero={hero} align="center" />
 
   <div class="rh-device-wrap rh-in rh-in-scale" style="--i:4">
-    <nav class="rh-device" aria-label={hero.isEn ? 'Router ports — pick what you are connecting' : '路由器网口：选你要接的设备'}>
+    <nav class="rh-device" aria-label={pick(l, { en: 'Router ports — pick what you are connecting', zh: '路由器网口：选你要接的设备', 'zh-hant': '路由器連接埠：選擇你要連接的裝置', ja: 'ルーターのポート：接続する機器を選んでください', es: 'Puertos del router: elija lo que va a conectar', de: 'Router-Ports: Wählen Sie, was Sie anschließen', fr: 'Ports du routeur : choisissez ce que vous branchez' })}>
       <div class="rh-device-brand" aria-hidden="true">
         <span class="rh-device-logo">OpenWrt</span>
         <span class="rh-device-model">x86/64 · {hero.release}</span>
@@ -61,7 +63,7 @@ const leds = ['PWR', 'SYS', 'WAN', 'LAN'];
         <span class="rh-port-role">{reset.label}</span>
       </a>
     </nav>
-    <p class="rh-device-hint" aria-hidden="true">{hero.isEn ? 'Hover a port to see where it leads' : '把鼠标移到网口上，看看它通向哪篇'}</p>
+    <p class="rh-device-hint" aria-hidden="true">{pick(l, { en: 'Hover a port to see where it leads', zh: '把鼠标移到网口上，看看它通向哪篇', 'zh-hant': '把滑鼠移到連接埠上，看看它通向哪一篇', ja: 'ポートにカーソルを合わせると、移動先が表示されます', es: 'Pase el ratón sobre un puerto para ver a dónde lleva', de: 'Fahren Sie über einen Port, um zu sehen, wohin er führt', fr: 'Survolez un port pour voir où il mène' })}</p>
   </div>
 
   <HeroStats hero={hero} />

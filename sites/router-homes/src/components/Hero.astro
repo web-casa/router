@@ -3,6 +3,7 @@
 // `heroVariant` in frontmatter, default "panel"); the download page uses
 // "download"; any other splash page with a hero is the 404.
 import '../styles/hero.css';
+import { pick } from '../i18n';
 import meta from '../../site.meta';
 import { getHeroData, type HeroAction, type HeroVariant } from './hero/data';
 import Signal from './hero/Signal.astro';
@@ -22,9 +23,19 @@ const components = { signal: Signal, console: Console, release: Release, panel: 
 const Variant = components[variant] ?? Signal;
 const hero = isHome ? await getHeroData(locale, { title, tagline, actions }, meta.sidebar as any) : undefined;
 
-const notFound = locale === 'en'
-  ? { cmd: 'ping', lines: ['From 192.168.1.1 icmp_seq=1 Destination Host Unreachable', 'From 192.168.1.1 icmp_seq=2 Destination Host Unreachable'], stat: '2 packets transmitted, 0 received, 100% packet loss', home: 'Back to the start', search: 'Or press Ctrl K to search' }
-  : { cmd: 'ping', lines: ['From 192.168.1.1 icmp_seq=1 Destination Host Unreachable', 'From 192.168.1.1 icmp_seq=2 Destination Host Unreachable'], stat: '2 packets transmitted, 0 received, 100% packet loss', home: '回到首页', search: '或按 Ctrl K 搜索' };
+const ping = { cmd: 'ping', lines: ['From 192.168.1.1 icmp_seq=1 Destination Host Unreachable', 'From 192.168.1.1 icmp_seq=2 Destination Host Unreachable'], stat: '2 packets transmitted, 0 received, 100% packet loss' };
+const notFound = {
+  ...ping,
+  ...pick(locale, {
+    en: { home: 'Back to the start', search: 'Or press Ctrl K to search' },
+    zh: { home: '回到首页', search: '或按 Ctrl K 搜索' },
+    'zh-hant': { home: '回到首頁', search: '或按 Ctrl K 搜尋' },
+    ja: { home: '最初に戻る', search: 'または Ctrl K で検索' },
+    es: { home: 'Volver al inicio', search: 'O pulse Ctrl K para buscar' },
+    de: { home: 'Zurück zum Anfang', search: 'Oder drücken Sie Strg K zum Suchen' },
+    fr: { home: 'Retour à l’accueil', search: 'Ou appuyez sur Ctrl K pour rechercher' },
+  }),
+};
 ---
 
 {

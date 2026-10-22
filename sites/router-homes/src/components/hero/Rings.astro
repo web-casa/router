@@ -4,20 +4,47 @@
 import HeroCopy from './HeroCopy.astro';
 import HeroStats from './HeroStats.astro';
 import type { HeroData } from './data';
+import { pick } from '../../i18n';
 
 interface Props { hero: HeroData }
 const { hero } = Astro.props;
-const orbits = hero.isEn
-  ? [
-      { r: 0.62, dur: 90, items: ['Laptop', 'Phone', 'Smart TV'] },
-      { r: 0.82, dur: 130, items: ['NAS', 'Wi-Fi AP', 'Printer', 'Game console'] },
-      { r: 1, dur: 170, items: ['PVE host', 'Camera', 'Tablet'] },
-    ]
-  : [
-      { r: 0.62, dur: 90, items: ['笔记本', '手机', '电视'] },
-      { r: 0.82, dur: 130, items: ['NAS', 'Wi-Fi AP', '打印机', '游戏机'] },
-      { r: 1, dur: 170, items: ['PVE 宿主机', '摄像头', '平板'] },
-    ];
+const orbits = pick(hero.locale, {
+  en: [
+    { r: 0.62, dur: 90, items: ['Laptop', 'Phone', 'Smart TV'] },
+    { r: 0.82, dur: 130, items: ['NAS', 'Wi-Fi AP', 'Printer', 'Game console'] },
+    { r: 1, dur: 170, items: ['PVE host', 'Camera', 'Tablet'] },
+  ],
+  zh: [
+    { r: 0.62, dur: 90, items: ['笔记本', '手机', '电视'] },
+    { r: 0.82, dur: 130, items: ['NAS', 'Wi-Fi AP', '打印机', '游戏机'] },
+    { r: 1, dur: 170, items: ['PVE 宿主机', '摄像头', '平板'] },
+  ],
+  es: [
+    { r: 0.62, dur: 90, items: ['Portátil', 'Teléfono', 'Smart TV'] },
+    { r: 0.82, dur: 130, items: ['NAS', 'AP Wi-Fi', 'Impresora', 'Consola de juegos'] },
+    { r: 1, dur: 170, items: ['Host PVE', 'Cámara', 'Tableta'] },
+  ],
+  de: [
+    { r: 0.62, dur: 90, items: ['Laptop', 'Smartphone', 'Smart-TV'] },
+    { r: 0.82, dur: 130, items: ['NAS', 'WLAN-AP', 'Drucker', 'Spielkonsole'] },
+    { r: 1, dur: 170, items: ['PVE-Host', 'Kamera', 'Tablet'] },
+  ],
+  fr: [
+    { r: 0.62, dur: 90, items: ['Ordinateur portable', 'Téléphone', 'Smart TV'] },
+    { r: 0.82, dur: 130, items: ['NAS', 'AP Wi-Fi', 'Imprimante', 'Console de jeu'] },
+    { r: 1, dur: 170, items: ['Hôte PVE', 'Caméra', 'Tablette'] },
+  ],
+  ja: [
+    { r: 0.62, dur: 90, items: ['ノートPC', 'スマートフォン', 'スマートTV'] },
+    { r: 0.82, dur: 130, items: ['NAS', 'Wi-Fi AP', 'プリンター', 'ゲーム機'] },
+    { r: 1, dur: 170, items: ['PVE ホスト', 'カメラ', 'タブレット'] },
+  ],
+  'zh-hant': [
+    { r: 0.62, dur: 90, items: ['筆記型電腦', '手機', '電視'] },
+    { r: 0.82, dur: 130, items: ['NAS', 'Wi-Fi AP', '印表機', '遊戲主機'] },
+    { r: 1, dur: 170, items: ['PVE 主機', '攝影機', '平板'] },
+  ],
+});
 ---
 
 <section class="rh-hero rh-v-rings" aria-labelledby="_top">

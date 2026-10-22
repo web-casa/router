@@ -1,4 +1,5 @@
 ---
+import { pick } from '../i18n';
 interface Row {
   physical: string;
   bridge: string;
@@ -8,10 +9,16 @@ interface Row {
 }
 interface Props { rows: Row[] }
 const { rows } = Astro.props;
-const isEn = ((Astro.locals as any).starlightRoute?.locale ?? 'en') === 'en';
-const head = isEn
-  ? ['Physical port', 'PVE bridge', 'Virtual NIC', 'OpenWrt interface', 'Role']
-  : ['物理口', 'PVE bridge', '虚拟网卡', 'OpenWrt 接口', '职责'];
+const locale = (Astro.locals as any).starlightRoute?.locale ?? 'en';
+const head = pick(locale, {
+  en: ['Physical port', 'PVE bridge', 'Virtual NIC', 'OpenWrt interface', 'Role'],
+  zh: ['物理口', 'PVE bridge', '虚拟网卡', 'OpenWrt 接口', '职责'],
+  'zh-hant': ['實體連接埠', 'PVE bridge', '虛擬網路卡', 'OpenWrt 介面', '職責'],
+  ja: ['物理ポート', 'PVE ブリッジ', '仮想 NIC', 'OpenWrt インターフェース', '役割'],
+  es: ['Puerto físico', 'Bridge de PVE', 'NIC virtual', 'Interfaz de OpenWrt', 'Función'],
+  de: ['Physischer Port', 'PVE-Bridge', 'Virtuelle NIC', 'OpenWrt-Schnittstelle', 'Aufgabe'],
+  fr: ['Port physique', 'Bridge PVE', 'Carte réseau virtuelle', 'Interface OpenWrt', 'Rôle'],
+});
 ---
 <table class="topology">
   <thead>

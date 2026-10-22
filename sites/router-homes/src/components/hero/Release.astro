@@ -4,6 +4,7 @@
 import HeroCopy from './HeroCopy.astro';
 import HeroStats from './HeroStats.astro';
 import type { HeroData } from './data';
+import { pick } from '../../i18n';
 
 interface Props { hero: HeroData }
 const { hero } = Astro.props;
@@ -20,7 +21,7 @@ const rows = [hero.guides.slice(0, half), hero.guides.slice(half)];
   </p>
   <HeroCopy hero={hero} />
 
-  <nav class="rh-marquee rh-in" style="--i:7" aria-label={hero.isEn ? 'Guides' : '文档'}>
+  <nav class="rh-marquee rh-in" style="--i:7" aria-label={pick(hero.locale, { en: 'Guides', zh: '文档', 'zh-hant': '文件', ja: 'ガイド', es: 'Guías', de: 'Anleitungen', fr: 'Guides' })}>
     {rows.map((row, r) => (
       <div class:list={['rh-marquee-row', { 'rh-marquee-rev': r === 1 }]}>
         <ul class="rh-marquee-track">
