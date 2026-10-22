@@ -1,0 +1,58 @@
+---
+title: "Linux 6.12 und die Toolchain von 25.12: warum Kernelmodule passen müssen"
+description: "OpenWrt 25.12 wechselt von Linux 6.6 auf 6.12 und von GCC 13.3 auf 14.3. Was das für kmod-Pakete und Drittanbieter-Feeds bedeutet."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt kernel version", "openwrt 25.12 kernel", "openwrt kmod mismatch", "openwrt kernelversion"]
+sources:
+  - label: "Ankündigung OpenWrt 25.12.0"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: "Service-Release OpenWrt 25.12.6"
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: "Ankündigung OpenWrt 24.10.0"
+    url: https://forum.openwrt.org/t/openwrt-24-10-0-first-stable-release/223845
+sourceHash: 'b6196d9a49934dce'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="kernel-toolchain" />
+
+## In einem Satz
+
+25.12 hebt alle Targets von Linux 6.6 auf 6.12 und aktualisiert die Toolchain, daher lassen sich für 24.10 gebaute Kernelmodule unter 25.12 nicht laden.
+
+## Versionen im Vergleich
+
+| Komponente | 24.10.0 | 25.12.0 |
+|---|---|---|
+| Linux-Kernel | 6.6.73 | 6.12.71 |
+| GCC | 13.3.0 | 14.3.0 |
+| binutils | 2.42 | 2.44 |
+| musl | 1.2.5 | 1.2.5 |
+| glibc | 2.38 | 2.41 |
+
+25.12.6 hebt den Kernel auf 6.12.112. In 25.12.0 stammt der WLAN-Stack (cfg80211/mac80211) aus Kernel 6.18.7, zusammen mit dnsmasq 2.91, dropbear 2025.89 und busybox 1.37.0.
+
+## Warum das zu Hause wichtig ist
+
+- `kmod-*`-Pakete werden für genau einen Kernel gebaut. Der Feed-Pfad enthält den Kernel-Hash, etwa `targets/<target>/kmods/<kernel-hash>/`, und er muss zum laufenden Kernel passen.
+- Ein kmod aus einem anderen Release, einem anderen Build oder von einem Mirror mit anderem Hash lässt sich nicht installieren oder laden. Das ist ein häufiger Grund, warum sich ein Paket „nicht installieren lässt“.
+- Builds von Drittanbietern liefern oft ihren eigenen Kernel mit. Offizielle kmods passen dazu womöglich gar nicht.
+
+## Auf dem eigenen Router ansehen
+
+```sh
+uname -r
+grep -E 'RELEASE|TARGET' /etc/openwrt_release
+```
+
+## Verwandte Anleitungen
+
+- [Paketquellen](/de/software/package-sources/)
+- [Paket lässt sich nicht installieren](/de/troubleshooting/plugin-install/)
+- [Welches OpenWrt ist das?](/de/getting-started/which-openwrt/)
+
+<PageSources />

@@ -1,0 +1,227 @@
+---
+title: "Paket-Feeds und China-Mirror: apk und opkg getrennt halten"
+description: Unterscheiden Sie apk (OpenWrt 25.12) von opkg (24.10), stimmen Sie Release/Target/Architektur/kmods ab und wechseln Sie auf einen China-Mirror, ohne die ABI zu brechen.
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; offizielle/TUNA-Feeds, apk update/search/install, offizielle Feeds wiederhergestellt'
+testRecipe: 'tests/recipes/package-sources.md'
+aliases: ['openwrt package feeds', 'openwrt paketquellen', 'openwrt china mirror', 'apk feeds', 'opkg feeds', 'openwrt paket lässt sich nicht installieren']
+symptoms: ['apk update 404', 'opkg update schlägt fehl', 'Abhängigkeitskonflikt', 'Feed-Signaturfehler']
+sources:
+  - label: OpenWrt apk-Paketmanager
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: OpenWrt opkg-Paketmanager
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg
+  - label: OpenWrt 25.12 Release Notes
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: TUNA OpenWrt-Mirror
+    url: https://mirrors.tuna.tsinghua.edu.cn/openwrt/
+sourceHash: '55165ce9cac98759'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86 VM 200" tested={true} evidence="E2" />
+
+Zuerst: Der **Unterschied zwischen apk und opkg** ergibt sich aus dem Firmware-Release, nicht aus der Frage „welcher Mirror ist schneller“. 25.12 verwendet `apk`; 24.10 verwendet `opkg`. Paketformat, Feed-Pfade und Verifikation unterscheiden sich und sind nicht austauschbar.
+
+## Ergebnis
+
+- Sie wissen, ob die Firmware `apk` oder `opkg` verwendet und wo die Feed-Dateien liegen.
+- Sie stimmen Release, Target, Architektur und den kmods-Kernel-Hash ab.
+- Sie wissen, welchen Teil der URL ein China-Mirror ersetzt und welche Pfade exakt bleiben müssen.
+- Sie verstehen, warum „nach dem Mirror-Wechsel Pakete nicht mehr installiert werden“, und wie Sie das beheben.
+- Sie wissen, warum `apk upgrade`/`opkg upgrade` kein Firmware-Upgrade ist.
+
+## Paketmanager und Feeds ermitteln
+
+<Step where="router-shell" title="Version, Target und Architektur auslesen" expected="Sie können die vollständige Kombination aus Release/Target/Architektur angeben.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+uname -m
+cat /etc/apk/arch 2>/dev/null
+opkg print-architecture 2>/dev/null
+```
+
+Wichtige Felder: `release.version`, `release.target`, `DISTRIB_ARCH`, `release.revision`. Sie müssen zum Mirror-Pfad passen.
+
+</Step>
+
+<Step where="router-shell" title="Die aktuellen Feed-Dateien untersuchen" expected="Sie wissen, wohin jeder Feed zeigt und ob er apk oder opkg ist.">
+
+OpenWrt 25.12 (apk):
+
+```sh
+cat /etc/apk/repositories.d/distfeeds.list
+```
+
+OpenWrt 24.10 (opkg):
+
+```sh
+cat /etc/opkg/distfeeds.conf
+cat /etc/opkg/customfeeds.conf
+```
+
+Sichern Sie vor dem Bearbeiten:
+
+```sh
+cp /etc/apk/repositories.d/distfeeds.list /etc/apk/repositories.d/distfeeds.list.bak.$(date +%F) 2>/dev/null || true
+cp /etc/opkg/distfeeds.conf /etc/opkg/distfeeds.conf.bak.$(date +%F) 2>/dev/null || true
+```
+
+</Step>
+
+## Das apk-Layout in 25.12
+
+OpenWrt 25.12 verwendet `apk`; Indizes sind `.adb`, Pakete sind `.apk`. Typische Feeds:
+
+- `targets/<target>/packages/packages.adb`: Target-spezifische Pakete;
+- `packages/<arch>/base/packages.adb`: Basis;
+- `packages/<arch>/luci/packages.adb`: LuCI;
+- `packages/<arch>/packages/packages.adb`: allgemeine Pakete;
+- `packages/<arch>/routing|telephony|video/packages.adb`: Kategorie-Feeds;
+- `targets/<target>/kmods/<kernel-hash>/packages.adb`: Kernelmodule; der Hash muss zum laufenden Kernel passen.
+
+Befehle:
+
+```sh
+apk update
+apk search <name>
+apk add <name>
+apk info -e <name>
+```
+
+Verwenden Sie nicht `opkg` und benennen Sie keine `.ipk` von 24.10 in `.apk` um.
+
+## Das opkg-Layout in 24.10
+
+OpenWrt 24.10 verwendet `opkg`; Indizes sind `Packages.gz`, Pakete sind `.ipk`:
+
+```sh
+opkg update
+opkg list | grep <name>
+opkg install <name>
+opkg list-installed | grep <name>
+```
+
+Verwenden Sie nicht `apk` und übergeben Sie opkg keine `.apk` von 25.12.
+
+## Auf einen China-Mirror umschreiben
+
+Für den TUNA-Mirror lautet die Wurzel:
+
+```text
+https://mirrors.tuna.tsinghua.edu.cn/openwrt/
+```
+
+Ersetzen Sie nur `https://downloads.openwrt.org` durch diese Wurzel und **behalten Sie den gesamten Pfad**:
+
+```text
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/packages/packages.adb
+→ https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.6/targets/x86/64/packages/packages.adb
+```
+
+Hören Sie nicht bei `.../openwrt/` auf und lassen Sie `releases/25.12.6/targets/x86/64/...` nicht weg; ein unvollständiger Pfad liefert 404.
+
+<Step where="router-shell" title="Den Mirror-Pfad vor dem Bearbeiten prüfen" expected="curl liefert 200 und der Pfad passt zum aktuellen Release/Target.">
+
+```sh
+curl -I https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.6/targets/x86/64/packages/packages.adb
+```
+
+Ersetzen Sie die URL durch Ihr Release/Target; prüfen Sie bei kmods auch den Kernel-Hash. Fehlt dem Mirror der Pfad, erzwingen Sie ihn nicht.
+
+</Step>
+
+<Step where="router-shell" title="Nur Indizes aktualisieren, das System nicht upgraden" expected="apk/opkg update gelingt, ohne Pakete massenhaft zu upgraden.">
+
+```sh
+apk update
+# or
+opkg update
+```
+
+Prüfen Sie mit `apk search`/`opkg list`, dass der Feed lesbar ist, und installieren Sie dann nur, was Sie brauchen. Behandeln Sie `apk upgrade`/`opkg upgrade` **nicht** als Firmware-Upgrade; verwenden Sie für Firmware sysupgrade/ASU/owut.
+
+</Step>
+
+## Häufige Fehler
+
+### 404
+
+- Falsches Release (25.12.6 vs. 24.10.8);
+- Falsches Target (`x86/64`, kein Verzeichnis `x86_64`);
+- Falsche Architektur (`x86_64`, `aarch64`);
+- Der Mirror hat diesen Pfad noch nicht synchronisiert;
+- Die Verzeichnisse `packages` und `targets` wurden verwechselt.
+
+### Signatur-/Verifikationsfehler
+
+- Beschädigter Index oder ein anderes Release;
+- Falsche Systemzeit/Zertifikate;
+- Ein anderer Feed wurde beigemischt;
+- Verlassen Sie sich nicht auf `--allow-untrusted`; beheben Sie stattdessen Feed/Verifikation.
+
+### Abhängigkeits-/ABI-Konflikt
+
+- Der kmods-Kernel-Hash passt nicht;
+- Das Paket wurde für ein anderes Target/eine andere Architektur gebaut;
+- Offizielle und ImmortalWrt-/iStoreOS-Feeds wurden gemischt;
+- Sie brauchen dieselbe Quelle, dasselbe Release und dieselbe Architektur oder einen Neubau.
+
+### Befehl nicht gefunden
+
+- 25.12 hat kein `opkg`; 24.10 hat kein `apk`;
+- Installieren Sie keinen Paketmanager, nur um einen Befehl auszuführen; ermitteln Sie zuerst Firmware/Quelle.
+
+### Paket installiert, aber LuCI zeigt es nicht an
+
+- Es wurde nur das Kernpaket installiert; das Paket `luci-app-*` fehlt;
+- Sprachpaket fehlt;
+- Browser-Cache/Neuladen;
+- Die Paketversion passt nicht zu LuCI.
+
+## Wiederherstellung
+
+```sh
+# apk
+cp /etc/apk/repositories.d/distfeeds.list.bak.YYYY-MM-DD /etc/apk/repositories.d/distfeeds.list
+apk update
+
+# opkg
+cp /etc/opkg/distfeeds.conf.bak.YYYY-MM-DD /etc/opkg/distfeeds.conf
+opkg update
+```
+
+Funktionieren Updates nach einem Mirror-Wechsel nicht mehr, stellen Sie zuerst den offiziellen Feed wieder her, prüfen Sie DNS/Zeit/Zertifikate und versuchen Sie dann den Mirror erneut. Springen Sie nicht zwischen vielen Mirrors.
+
+## E2-Laborlauf (2026-10-20)
+
+- Umgebung: OpenWrt 25.12.6 x86 VM 200; `apk`; offizieller Feed und TUNA-Mirror.
+- Offizielles `apk update`: `OK: 11220 distinct packages available`; `apk search -x sqm-scripts` fand `sqm-scripts-1.7.2-r1`.
+- Wechsel zu TUNA: `apk update` ebenfalls 11220; `apk add sqm-scripts` installierte `1.7.2-r1`.
+- Offiziellen Feed wiederhergestellt: `apk update` funktionierte; der endgültige Feed zeigt wieder auf `downloads.openwrt.org`.
+- Nicht getestet: 24.10 `opkg`, Signaturfehler, gemischte Feeds/ABI-Konflikt, beschädigter Mirror-Index.
+- Rezept: `tests/recipes/package-sources.md`.
+
+## E2-Status und Quellen
+
+- Dies ist E2 partiell: Der 25.12-`apk`-Pfad mit offiziellem Feed/TUNA/Installation/Wiederherstellung wurde getestet; `opkg` und die Zweige mit fehlerhaften Feeds bleiben Dokumentation.
+- Mirror-Pfade ändern sich mit Releases; führen Sie vor der Veröffentlichung `update`/`search` für das Ziel-Release/-Target/-Arch erneut aus.
+- Mischen Sie keine offiziellen, ImmortalWrt- oder iStoreOS-Feeds; ABI, Kernel und Signaturen können alle nicht passen.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; offizielle/TUNA-Feeds, apk update/search/install, offizielle Feeds wiederhergestellt"
+  recipe="tests/recipes/package-sources.md"
+  result="E2 partiell: der offizielle Feed von 25.12.6 x86 meldete 11220 Pakete; TUNA ebenfalls 11220; sqm-scripts 1.7.2 installiert; Wiederherstellung des offiziellen Feeds aktualisierte normal; 24.10 opkg ungetestet"
+/>
+
+<PageSources />

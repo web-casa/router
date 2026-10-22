@@ -1,0 +1,66 @@
+---
+title: "apk in OpenWrt 25.12: der Paketmanager, der opkg ersetzt hat"
+description: "Seit 25.12 installiert OpenWrt Software mit apk statt mit opkg. Befehlsentsprechungen, Dateipfade und der eine Befehl, den Sie nicht ausführen sollten."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt apk", "apk vs opkg", "openwrt opkg ersetzt", "openwrt paketmanager"]
+sources:
+  - label: "OpenWrt apk"
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: "Spickzettel opkg zu apk"
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: "Release-Ankündigung OpenWrt 25.12.0"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+sourceHash: 'b79c99d190d594fd'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="apk" />
+
+## In einem Satz
+
+Ab 25.12 installiert und entfernt OpenWrt Software mit apk (Alpine Package Keeper, Version 3). 24.10 und früher verwenden weiterhin opkg.
+
+## Warum sich das geändert hat
+
+Die Ankündigung zu 25.12.0 erklärt, dass der OpenWrt-Fork von opkg nicht mehr gepflegt wird. Nur wenige Paketnamen haben sich geändert, aber jeder Befehl.
+
+## Befehlsübersicht
+
+| Aufgabe | apk (25.12) | opkg (24.10) |
+|---|---|---|
+| Paketindex aktualisieren | `apk update` | `opkg update` |
+| Installieren | `apk add <pkg>` | `opkg install <pkg>` |
+| Entfernen | `apk del <pkg>` | `opkg remove <pkg>` |
+| Installierte auflisten | `apk list --installed` | `opkg list-installed` |
+| Aktualisierbare auflisten | `apk list --upgradeable` | `opkg list-upgradable` |
+| Welches Paket besitzt eine Datei | `apk info --who-owns <file>` | `opkg search <file>` |
+
+## Was sich sonst unterscheidet
+
+- Paketdateien haben die Endung `.apk`, und der Paketindex heißt `packages.adb`.
+- Repositories sind unter `/etc/apk/repositories.d/` aufgeführt.
+- Selbst gebaute Pakete sind unsigniert, daher benötigt ihre Installation `--allow-untrusted`.
+
+## Achtung
+
+- **Verwenden Sie nicht `apk upgrade`, um das System zu aktualisieren.** Das OpenWrt-Wiki rät davon ab. Aktualisieren Sie die Firmware stattdessen mit einem Attended-Sysupgrade-Client: Die LuCI-App ist unter 25.12 standardmäßig installiert.
+- Fügen Sie keine opkg-Befehle in 25.12 ein und keine apk-Befehle in 24.10. Prüfen Sie zuerst, welchen Paketmanager Sie haben.
+
+## Auf Ihrem Router ansehen
+
+```sh
+apk list --installed | head
+ls /etc/apk/repositories.d/
+```
+
+## Verwandte Anleitungen
+
+- [apk vs opkg](/de/software/apk-vs-opkg/)
+- [Paketquellen](/de/software/package-sources/)
+- [Paket lässt sich nicht installieren](/de/troubleshooting/plugin-install/)
+
+<PageSources />

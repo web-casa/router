@@ -1,0 +1,54 @@
+---
+title: "DSA in OpenWrt: Switch-Ports als Linux-Schnittstellen, VLANs auf br-lan"
+description: "Auf DSA-Targets ist jeder Switch-Port eine eigene Schnittstelle (lan1–lan4) in der Bridge br-lan, und VLANs werden als bridge-vlan-Abschnitte gesetzt. So unterscheiden Sie DSA von swconfig."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt dsa", "openwrt swconfig vs dsa", "openwrt bridge-vlan", "openwrt dsa Switch-Ports"]
+sources:
+  - label: "OpenWrt DSA"
+    url: https://openwrt.org/docs/guide-user/network/dsa/start
+  - label: "DSA-Mini-Tutorial"
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+  - label: "Ankündigung von OpenWrt 21.02.0"
+    url: https://forum.openwrt.org/t/openwrt-21-02-0-first-stable-release/105395
+  - label: "Ankündigung von OpenWrt 22.03.0"
+    url: https://forum.openwrt.org/t/openwrt-22-03-0-first-stable-release/136252
+sourceHash: '94301dc22a784645'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="dsa" />
+
+## In einem Satz
+
+DSA (Distributed Switch Architecture) ist das Linux-Kernel-Subsystem für Netzwerk-Switches. Auf DSA-Geräten erscheint jeder Frontport als eigene Schnittstelle, etwa `lan1`–`lan4`, und diese Ports sind in `br-lan` gebridged.
+
+## Herkunft
+
+- DSA tauchte erstmals in 21.02 auf und ersetzte auf einigen Targets das ältere swconfig.
+- 22.03 stellte weitere Targets um, zum Beispiel alle von bcm53xx und lantiq xrx200.
+- Sysupgrade kann eine swconfig-Konfiguration nicht auf DSA migrieren. Wenn Ihr Gerät umgestellt wurde, richten Sie das Netzwerk neu ein.
+
+## VLANs unter DSA
+
+VLANs sind `config bridge-vlan`-Abschnitte in `/etc/config/network`. Schnittstellen liegen dann mit einem VLAN-Suffix auf der Bridge, wie in `br-lan.1`. Jeder Port ist pro VLAN getaggt oder untagged.
+
+## Auf Ihrem Router ansehen
+
+```sh
+ip -br link
+uci show network | grep -E 'bridge-vlan|=device'
+```
+
+Sehen Sie stattdessen Abschnitte `config switch` und `switch_vlan`, verwendet das Gerät weiterhin swconfig, und DSA-Anleitungen gelten dafür nicht.
+
+## Verwandte Anleitungen
+
+- [DSA VLAN](/de/wireless-vlan/dsa-vlan/)
+- [Gast-WLAN](/de/wireless-vlan/guest-wifi/)
+- [Kabelgebundener/drahtloser AP](/de/network/ap-mode/)
+
+<PageSources />

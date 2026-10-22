@@ -1,0 +1,306 @@
+---
+title: "AdGuard Home: von der Web-Oberfläche bis zur Client-Filterung"
+description: dnsmasq auf Port 5353 verschieben, AdGuard Home Port 53 überlassen und anschließend DHCP-Clients, Filterung und Wiederherstellung nach einem Neustart unter OpenWrt prüfen.
+pageType: app
+tested: true
+testedVersions: ['25.12.6', '0.107.79']
+evidenceLevel: E2
+testEnvironment: 'PVE 9.2.2 mit einer Netzwerkkarte; OpenWrt 25.12.6 VM 201; AGH 0.107.79; vmbr2 192.168.2.0/24'
+testRecipe: 'tests/recipes/agh-25.12-vm201.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['adguard home openwrt', 'openwrt adguardhome', 'adguardhome installieren', 'adguard home openwrt einrichten']
+symptoms: ['Filterung funktioniert nicht', 'DNS-Port-Konflikt', 'Clients ignorieren neuen DNS']
+sources:
+  - label: OpenWrt-Paket adguardhome
+    url: https://openwrt.org/packages/pkgdata/adguardhome
+  - label: AdGuard-Home-Dokumentation
+    url: https://adguard.com/kb/adguard-home/overview/
+  - label: OpenWrt dnsmasq und DHCP
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt fstab / block-mount
+    url: https://openwrt.org/docs/guide-user/storage/fstab
+sourceHash: 'e15c635d6e7fe3ec'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import aghSetup from '@assets/screenshots/agh/setup-welcome.webp';
+import aghDashboard from '@assets/screenshots/agh/dashboard.webp';
+import aghFilters from '@assets/screenshots/agh/filters.webp';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import TopologyTable from '@components/TopologyTable.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE-VM 201 / 1 GB" tested={true} evidence="E2" />
+
+## Ergebnis
+
+- AdGuard Home belegt den OpenWrt-Port `53`; die Web-Oberfläche liegt auf `3000`.
+- `dnsmasq` wechselt auf `5353` und bedient weiterhin DHCP.
+- DHCP-Clients erhalten `192.168.2.1` als DNS.
+- Eine benutzerdefinierte Filterregel blockiert eine Testdomain, während normale Namen weiterhin aufgelöst werden.
+- Die Datenplatte, die AGH-Konfiguration und der Filter überstehen einen Neustart.
+
+## Geltende Umgebung und Topologie
+
+- PVE 9.2.2 mit einer Netzwerkkarte; OpenWrt 25.12.6 x86_64 VM 201 (1 GB RAM, 2-GB-Datenplatte).
+- WAN `net0` an `vmbr0` (DHCP); LAN `net1` an einer isolierten `vmbr2` (`192.168.2.0/24`).
+- AGH 0.107.79 aus dem `apk`-Feed von OpenWrt.
+- **Teilen Sie sich keine Bridge zwischen zwei OpenWrt-VMs, die beide DHCP betreiben**: In diesem Labor liegt VM 200 an `vmbr1` (192.168.1.0/24), daher muss VM 201 `vmbr2` (192.168.2.0/24) verwenden. Andernfalls erhält ein Client möglicherweise eine Lease aus dem falschen Subnetz.
+
+<TopologyTable rows={[
+  { physical: 'nic0', bridge: 'vmbr0', vnic: 'net0', iface: 'wan DHCP', role: 'Upstream 192.168.50.1' },
+  { physical: '—', bridge: 'vmbr2', vnic: 'net1', iface: 'lan 192.168.2.1', role: 'AGH + DHCP-Clients' },
+]} />
+
+## Ports und Zuständigkeiten
+
+| Port | Komponente | Rolle |
+|---|---|---|
+| 53 | AdGuard Home | Client-DNS, Filterung, Upstream-Weiterleitung |
+| 3000 | AdGuard Home | Web-Oberfläche |
+| 5353 | dnsmasq | DHCP und lokales DNS; nicht mehr auf 53 |
+
+Binden Sie AGH und dnsmasq nicht gleichzeitig an Port 53. Richten Sie DHCP-Option 6 nicht auf eine Adresse, die nicht auf Port 53 lauscht.
+
+## Bevor Sie etwas ändern
+
+<Step where="router-shell" title="Konfiguration sichern und die Datenplatte vorbereiten" expected="Sie können die dnsmasq-/AGH-Konfiguration wiederherstellen.">
+
+```sh
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+cp /etc/config/adguardhome /etc/config/adguardhome.bak.$(date +%F) 2>/dev/null || true
+cat /etc/config/dhcp
+```
+
+Behalten Sie Konsolen- oder LAN-Zugang zu OpenWrt. Machen Sie den einzigen Verwaltungsweg nicht von dem DNS abhängig, den Sie gerade ändern.
+
+</Step>
+
+## Minimale Schritte
+
+<Figure src={aghSetup} alt="Willkommensseite von AdGuard Home beim ersten Start mit Get Started und Step 1/5" caption="Die Willkommensseite von AGH 0.107.79 beim ersten Start. Klicken Sie auf Get Started, um den Einrichtungsassistenten zu öffnen. Aufgenommen in einem temporären Labor; als Sprache ist Chinesisch ausgewählt." />
+
+<Step where="router-shell" title="AGH, Datenplatten-Werkzeuge und fstab-Unterstützung installieren" expected="adguardhome, block-mount und e2fsprogs sind installiert.">
+
+```sh
+apk update
+apk add adguardhome block-mount e2fsprogs
+```
+
+`e2fsprogs` liefert `mkfs.ext4`; `block-mount` liefert den Dienst `fstab`. Ein lokaler OpenWrt-Mirror ist in Ordnung, die Pakete müssen aber weiterhin die Signaturprüfung bestehen.
+
+</Step>
+
+<Step where="router-shell" title="Die Datenplatte formatieren und dauerhaft einbinden" expected="/opt/agh liegt auf einer separaten Platte und übersteht einen Neustart.">
+
+Führen Sie dies nur auf einer Labor-Datenplatte aus, von der Sie bestätigt haben, dass sie leer ist:
+
+```sh
+mkfs.ext4 -F /dev/sdb
+mkdir -p /opt/agh
+mount /dev/sdb /opt/agh
+block info /dev/sdb
+```
+
+Verwenden Sie die UUID, die `block info` ausgibt. Setzen Sie in LuCI unter Mount Points das Ziel dieser Platte auf `/opt/agh` und aktivieren Sie sie; oder suchen Sie in der CLI den passenden `@mount[n]`:
+
+```sh
+uci show fstab
+# find the @mount[n] whose uuid is <your-UUID>
+uci set fstab.@mount[n].target='/opt/agh'
+uci set fstab.@mount[n].enabled='1'
+uci commit fstab
+/etc/init.d/fstab enable
+block mount
+mount | grep /opt/agh
+```
+
+In diesem Labor wurde der automatisch erkannte Eintrag `fstab.@mount[2]` für die 2-GB-Datenplatte verwendet; sein Ziel auf `/opt/agh` zu ändern und ihn zu aktivieren, funktionierte. Übernehmen Sie nicht `[2]`; ordnen Sie Ihre UUID zu.
+
+</Step>
+
+<Step where="router-shell" title="dnsmasq auf 5353 verschieben" expected="Port 53 ist frei und DHCP funktioniert weiterhin.">
+
+```sh
+uci set dhcp.@dnsmasq[0].port='5353'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+netstat -lnp | grep -E ':53|:5353'
+```
+
+Clients können auf Port 53 nichts auflösen, bis AGH gestartet ist.
+
+</Step>
+
+<Step where="router-shell" title="AGH starten und die Ersteinrichtung abschließen" expected="Die Web-Oberfläche ist auf Port 3000 erreichbar.">
+
+```sh
+uci set adguardhome.config.work_dir='/opt/agh/work'
+uci commit adguardhome
+mkdir -p /opt/agh/work
+chown -R adguardhome:adguardhome /opt/agh /etc/adguardhome
+/etc/init.d/adguardhome enable
+/etc/init.d/adguardhome start
+sleep 3
+netstat -lnp | grep -E ':3000|:53'
+```
+
+Öffnen Sie `http://192.168.2.1:3000/` und legen Sie fest:
+
+- Web-Port `3000`;
+- DNS-Port `53`;
+- Benutzername und Passwort für den Administrator;
+- Upstream-DNS `192.168.50.1` für dieses Labor;
+- DNSSEC deaktivieren, falls der Upstream es nicht validiert.
+
+Haben Sie keinen Browser, verwenden Sie die AGH-Setup-API; committen Sie niemals das Administratorpasswort.
+
+</Step>
+
+<Step where="router-shell" title="AGH über DHCP bekannt machen" expected="Clients erhalten 192.168.2.1 als DNS.">
+
+```sh
+uci add_list dhcp.lan.dhcp_option='6,192.168.2.1'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+uci show dhcp.lan | grep dhcp_option
+```
+
+Wird nur der dnsmasq-Port geändert, erhalten manche Clients möglicherweise keinen DNS mehr; setzen Sie Option 6 ausdrücklich.
+
+</Step>
+
+<Step where="luci" title="Eine deterministische Filterregel hinzufügen" expected="blocked.example liefert 0.0.0.0; normale Namen werden weiterhin aufgelöst.">
+
+Fügen Sie unter **Filters → Custom filtering rules** hinzu:
+
+```text
+||blocked.example^
+```
+
+Dies ist eine reservierte Testdomain. Fügen Sie für den echten Einsatz später gepflegte Filterlisten hinzu. Prüfen Sie mit `nslookup`, nicht danach, ob „die Seite kaputt aussieht“.
+
+</Step>
+
+## Überprüfung
+
+<Figure src={aghDashboard} alt="AdGuard-Home-Dashboard mit DNS-Anfragen und Filterstatistiken" caption="Das Dashboard nach der Einrichtung. Null Anfragen unmittelbar nach der Konfiguration sind normal; prüfen Sie zuerst den DNS-Port und den Upstream." />
+
+<Step where="router-shell" title="Ports und lokale Namensauflösung prüfen" expected="AGH lauscht auf 53/3000; dnsmasq auf 5353.">
+
+```sh
+netstat -lnp | grep -E ':53|:3000|:5353'
+nslookup blocked.example 192.168.2.1
+nslookup openwrt.org 192.168.2.1
+```
+
+Erwartet: `blocked.example` liefert `0.0.0.0` (IPv6 kann zusätzlich `::` anzeigen); `openwrt.org` liefert eine echte Adresse.
+
+</Step>
+
+<Step where="client" title="Von einem DHCP-Client aus prüfen" expected="Der Client erhält 192.168.2.x und DNS 192.168.2.1.">
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+nslookup blocked.example
+nslookup openwrt.org
+```
+
+Ist der DNS des Clients nicht `192.168.2.1`, gehen Sie zurück zu DHCP-Option 6 und dem dnsmasq-Port.
+
+</Step>
+
+<Step where="router-shell" title="Nach dem Neustart erneut prüfen" expected="Die Datenplatte wird eingebunden, AGH startet und die Regel bleibt erhalten.">
+
+```sh
+reboot
+```
+
+Nach dem Neustart:
+
+```sh
+mount | grep /opt/agh
+netstat -lnp | grep -E ':53|:3000'
+nslookup blocked.example 192.168.2.1
+nslookup openwrt.org 192.168.2.1
+```
+
+</Step>
+
+## Fehlerzweige und Wiederherstellung
+
+### AGH startet nicht / Port 53 ist belegt
+
+```sh
+logread | grep -i adguard | tail -50
+netstat -lnp | grep ':53'
+/usr/bin/AdGuardHome --check-config -c /etc/adguardhome/adguardhome.yaml
+```
+
+Belegt dnsmasq weiterhin Port 53, vergewissern Sie sich, dass `dhcp.@dnsmasq[0].port='5353'` gesetzt ist. Bei einer fehlerhaften Konfiguration stellen Sie das Backup wieder her:
+
+```sh
+cp /etc/adguardhome/adguardhome.bak.YYYY-MM-DD /etc/adguardhome/adguardhome.yaml
+/etc/init.d/adguardhome restart
+```
+
+### Clients können gar nichts auflösen
+
+Geben Sie den DNS vorübergehend an dnsmasq zurück:
+
+```sh
+uci set dhcp.@dnsmasq[0].port='53'
+uci -q delete dhcp.lan.dhcp_option
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+/etc/init.d/adguardhome stop
+```
+
+Stellen Sie zuerst die grundlegende Namensauflösung wieder her und suchen Sie dann Schicht für Schicht den Fehler in AGH.
+
+### Die Datenplatte ist nicht eingebunden
+
+```sh
+mount | grep /opt/agh
+block info /dev/sdb
+logread | grep -i fstab
+```
+
+Prüfen Sie UUID, Ziel und Aktiviert-Flag in fstab; binden Sie die Platte manuell ein und starten Sie dann AGH neu.
+
+### Die Filterung funktioniert nicht
+
+<Figure src={aghFilters} alt="AdGuard-Home-Filterseite mit den standardmäßigen Blocklisten" caption="Die Filterseite listet die aktivierten Blocklisten auf. Diese Aufnahme zeigt nur die Standardlisten ohne Drittanbieter-Abonnement; fügen Sie eine Testregel separat hinzu." />
+
+- Vergewissern Sie sich, dass der Client tatsächlich AGH als DNS verwendet.
+- Vergewissern Sie sich, dass die Regel unter **Custom filtering rules** steht, nicht in einem Abonnement.
+- Fragen Sie AGH direkt ab: `nslookup blocked.example 192.168.2.1`.
+- DoH im Browser oder Betriebssystem kann AGH umgehen.
+
+## E2-Laborlauf (2026-10-20)
+
+- Umgebung: PVE 9.2.2 mit einer Netzwerkkarte; OpenWrt 25.12.6 VM 201 (1 GB/2-GB-Datenplatte); AGH 0.107.79.
+- Ports: AGH `53` + Web `3000`; dnsmasq `5353`; DHCP-Option 6 `192.168.2.1`.
+- Client: DHCP `192.168.2.166/24`, DNS `192.168.2.1`; `blocked.example` → `0.0.0.0`, `openwrt.org` → `64.226.122.113`.
+- Neustart: `/opt/agh` per fstab eingebunden; AGH, dnsmasq und Filterregeln wiederhergestellt; Web lieferte 302.
+- Nicht getestet: echte Bedienung der Browser-Oberfläche, externe Abonnementlisten, physische LAN-Clients, IPv6, Langzeitstabilität.
+
+## Quellen und Review
+
+- Dies ist ein E2-Laborprotokoll; es wurde weder unabhängig geprüft noch in einem physischen LAN getestet.
+- Rezept: `tests/recipes/agh-25.12-vm201.md`; Umgebungsnotizen: `docs/agh-e2-run.md`.
+- Aktualisieren Sie `testedVersions`, wenn sich Paket/Version ändern; kopieren Sie Init-Skripte nicht zwischen Firmware-Versionen.
+
+<TestRecord
+  status="partial"
+  environment="PVE 9.2.2 mit einer Netzwerkkarte; OpenWrt 25.12.6 VM 201; AGH 0.107.79; vmbr2 192.168.2.0/24"
+  recipe="tests/recipes/agh-25.12-vm201.md"
+  result="AGH 53 + Web 3000; dnsmasq 5353; DHCP-Option 6 → 192.168.2.1; Client: blocked.example=0.0.0.0, openwrt.org wird aufgelöst; fstab/Regeln/Dienst überstanden den Neustart"
+  date="2026-10-20"
+/>
+
+<PageSources />

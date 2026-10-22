@@ -1,0 +1,208 @@
+---
+title: "Vor dem Firmware-Download: Modell, Revision, Target/Profil und Wiederherstellung"
+description: Bestätigen Sie vor dem Herunterladen oder Flashen von Firmware mit schreibgeschützten Prüfungen das genaue Modell bzw. die Revision, das Target, das Profil, den Image-Typ und den Wiederherstellungsweg.
+pageType: overview
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Konkretes Gerät steht noch aus; schreibgeschützte Checkliste, kein Flashen'
+testRecipe: 'tests/recipes/firmware-download-check.md'
+aliases: ['openwrt firmware download', 'openwrt modell', 'openwrt hardware revision', 'sysupgrade image', 'factory image', 'falsche firmware', 'prüfsumme']
+symptoms: ['falsche Firmware', 'unklar, welches Image', 'Modell passt nicht', 'Prüfsummenfehler']
+sources:
+  - label: OpenWrt Firmware Selector
+    url: https://firmware-selector.openwrt.org/
+  - label: OpenWrt-sysupgrade-Dokumentation
+    url: https://openwrt.org/docs/guide-user/installation/sysupgrade
+  - label: Release Notes zu OpenWrt 25.12
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: OpenWrt-Geräteseiten
+    url: https://openwrt.org/toh/start
+sourceHash: 'c06b58c12c079954'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="—" device="Gerät steht noch aus" tested={false} evidence="E1" />
+
+## Ergebnis
+
+- Sie kennen das genaue Modell und die Hardware-Revision, nicht ein Modell, das „genauso aussieht“.
+- Sie kennen Target/Subtarget/Profil von OpenWrt und wissen, welches Image Sie herunterladen müssen.
+- Sie wählen `sysupgrade`, `factory` oder ein kombiniertes x86-Image korrekt aus.
+- Sie verifizieren Dateiquelle und Prüfsumme.
+- Sie kennen vor dem Flashen den Wiederherstellungsweg und wissen, welchen Weg Sie bei einem Fehlschlag einschlagen.
+
+> Dies ist eine Checkliste für die Zeit vor dem Download, keine Flash-Anleitung. Bare-Metal-Flashen, Bootloader-Wiederherstellung und Migrationen über Hauptversionen hinweg sind R2: Nutzen Sie unabhängige Prüfung und die Gerätedokumentation. Betrachten Sie diese Seite nicht als allgemeines Flash-Tutorial.
+
+## Beginnen Sie mit dem Typenschild
+
+<Step where="client" title="Modell und Hardware-Revision notieren" expected="Modell, Revision, Region und Details des Typenschilds sind notiert.">
+
+Prüfen Sie das Typenschild an der Unterseite, den Karton und das Handbuch; notieren Sie:
+
+- Hersteller + vollständiges Modell (nicht nur die Serie);
+- Hardware-Revision (v1, v2, V2.1 usw.);
+- Region bzw. Anbieter-Variante;
+- FCC-ID und Präfix der Seriennummer, falls vorhanden (veröffentlichen Sie sie nicht);
+- Wiederherstellungsmethode (Reset-Taste, TFTP, Seriell, Herstellerwerkzeug).
+
+Ein Modell kann mehrere Revisionen mit unterschiedlichem Flash, anderen WLAN-Chips oder anderen Partitionslayouts haben. **Derselbe Modellname bedeutet nicht, dass es ein universelles Image gibt.**
+
+</Step>
+
+<Step where="router-shell" title="Unter vorhandenem OpenWrt die Board-Daten auslesen" expected="distribution/target/model/board_name stimmen mit der Geräteseite überein.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+cat /tmp/sysinfo/model 2>/dev/null
+cat /tmp/sysinfo/board_name 2>/dev/null
+```
+
+Wichtige Felder: `release.distribution`, `release.version`, `release.target`, `model`, `board_name`. `model` ist nicht die Hardware-Revision; wählen Sie ein Image nicht allein anhand dieser Zeile aus.
+
+</Step>
+
+<Step where="router-shell" title="Auf x86 DMI/BIOS auslesen" expected="Sie kennen das Board- bzw. Gerätemodell und vermischen keine PC- und VM-Images.">
+
+```sh
+cat /sys/class/dmi/id/sys_vendor
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/board_version
+cat /sys/class/dmi/id/bios_version
+```
+
+Bestätigen Sie außerdem BIOS/Legacy gegenüber UEFI, die Festplattenschnittstelle und ob das Image combined/ext4 ist. Davon hängt ab, ob es bootet; „x86/64“ allein genügt nicht.
+
+</Step>
+
+## Den Firmware Selector prüfen
+
+<Step where="client" title="Nach Target/Profil auswählen, nicht nach Dateiname" expected="Sie finden die genaue Geräteseite und das passende Image.">
+
+Öffnen Sie den [OpenWrt Firmware Selector](https://firmware-selector.openwrt.org/):
+
+1. Wählen Sie das richtige Release (z. B. 25.12.6).
+2. Suchen Sie nach dem vollständigen Modell und öffnen Sie dessen Geräteseite.
+3. Prüfen Sie Target/Subtarget, Profil und Hardware-Revision.
+4. Lesen Sie den Abschnitt „Installation“ der Geräteseite für die Image-Typen bei Erstinstallation und Upgrade.
+5. Laden Sie herunter und verifizieren Sie SHA-256; benennen Sie eine Datei nicht einfach um.
+
+Widersprechen sich Selector und Geräteseite, brechen Sie ab und prüfen Sie Modell/Revision; wählen Sie nicht die nächstliegende Übereinstimmung.
+
+</Step>
+
+## Image-Typen
+
+| Image/Szenario | Verwendung | Hauptrisiko |
+|---|---|---|
+| `sysupgrade` | Vorhandenes OpenWrt, Upgrade mit/ohne Konfiguration | Inkompatibilität von Paketen/Kernel-Modulen über Versionen hinweg |
+| `factory` / Herstellerübergang | Erstinstallation von Hersteller-Firmware | abweichende Partitionierung bzw. Flash-Methode kann das Gerät unbrauchbar machen |
+| x86 combined/ext4 | Image für die ganze x86-Festplatte/VM | BIOS/UEFI, Festplattenlayout, Schreibmethode |
+| Hersteller-Firmware | Web-Oberfläche des Herstellers/Wiederherstellungswerkzeug | nicht mit OpenWrt-Images vermischen |
+| „universelle/ohne Zerlegen“-Pakete | Unbekannte Quelle | meiden; Target/Profil/Prüfsumme lassen sich nicht verifizieren |
+
+Ein Dateiname mit `sysupgrade` ist kein Beweis; Target, Profil, Revision und Prüfsumme müssen alle passen.
+
+## Herunterladen und verifizieren
+
+<Step where="client" title="Nur offizielle Quellen bzw. Herstellerquellen verwenden" expected="Die Dateiquelle ist nachvollziehbar und besitzt eine Prüfsumme.">
+
+Bevorzugen Sie:
+
+- OpenWrt `downloads.openwrt.org` oder den Firmware Selector;
+- die offizielle Download-Seite des Geräteherstellers;
+- die offizielle Release-Seite eines Projekts (bei Firmware von Drittanbietern sind zusätzliche Prüfungen von Maintainer/Signatur nötig).
+
+Verwenden Sie keine Cloud-Speicher-Spiegel, Forenanhänge oder „vorab modifizierten“ Pakete aus Chats. Neu gepackte Images können Skripte, alte Kernel oder nicht passende Treiber enthalten.
+
+</Step>
+
+<Step where="client" title="SHA-256 und Dateigröße verifizieren" expected="Die Prüfsumme stimmt mit der offiziellen Release-Seite überein.">
+
+Linux:
+
+```sh
+sha256sum openwrt-*.img.gz
+```
+
+macOS:
+
+```sh
+shasum -a 256 openwrt-*.img.gz
+```
+
+Windows:
+
+```powershell
+certutil -hashfile openwrt-*.img.gz SHA256
+```
+
+Vergleichen Sie mit den offiziellen `sha256sums` bzw. der Release-Seite. Weicht sie ab, laden Sie erneut herunter; flashen Sie nicht nach dem Motto „mal sehen, was passiert“.
+
+</Step>
+
+## Wiederherstellung vor dem Flashen
+
+<Step where="client" title="Den Wiederherstellungsweg notieren" expected="Sie wissen, wie Sie bei einem Fehlschlag Failsafe/Recovery aufrufen.">
+
+Bestätigen Sie mindestens:
+
+- wie Sie Failsafe aufrufen (Tastenzeitpunkt/Seriell/IP);
+- ob TFTP/Seriell/Herstellerwiederherstellung verfügbar ist;
+- die LAN-Verwaltungsadresse, das Gateway und das root-Passwort;
+- die Konfigurationssicherung: `sysupgrade -b` unter vorhandenem OpenWrt oder der Export des Herstellers;
+- installierte Pakete/Kernel-Module, die nach dem Upgrade neu aufgebaut werden müssen;
+- eine stabile Stromversorgung; trennen Sie das Gerät während des Flashens nicht.
+
+Kein Wiederherstellungsweg, keine Prüfsumme, keine Sicherung: Beginnen Sie nicht.
+
+</Step>
+
+## Häufige Fehler
+
+- Nur das Modell prüfen, nicht die Revision;
+- `sysupgrade` als `factory` verwenden oder umgekehrt;
+- das Image eines anderen Targets umbenennen und flashen;
+- trotz abweichender Prüfsumme fortfahren;
+- unbekannte „universelle/erweiterte“ Pakete verwenden;
+- während des Flashens den Strom verlieren oder das Kabel ziehen;
+- nach dem Upgrade von Erfolg ausgehen, ohne DNS/Firewall/Pakete zu prüfen.
+
+## Fehlerfälle
+
+### Falsches Modell heruntergeladen
+
+Löschen Sie es und laden Sie von der Geräteseite herunter; probieren Sie es nicht „einfach aus“. Haben Sie bereits geflasht, nutzen Sie die Wiederherstellungsdokumentation des Geräts (Failsafe/TFTP/Seriell); flashen Sie nicht immer weiter verschiedene Images.
+
+### Prüfsumme stimmt nicht überein
+
+Laden Sie erneut herunter; prüfen Sie, ob Proxy oder Spiegel die Datei abgeschnitten haben; wechseln Sie zur offiziellen Quelle. Deaktivieren Sie die Verifizierung nicht.
+
+### Ihre Revision ist nicht aufgeführt
+
+Prüfen Sie die Herstellerseite bzw. das Typenschild oder das OpenWrt-Forum bzw. die Geräteseite. Ohne ausdrückliche Unterstützung gehen Sie nicht von Kompatibilität aus.
+
+### Hersteller-Firmware ist gesperrt
+
+Verwenden Sie das Verfahren des Herstellers; umgehen Sie Signaturen oder Sperren nicht, nur um OpenWrt zu installieren. Klären Sie vorher die Abwägung zwischen Garantie und Herstellerfunktionen.
+
+## E1-Status und Quellen
+
+- Dies ist E1: Felder, Image-Typen und Wiederherstellung beruhen auf öffentlicher Dokumentation; auf einem Gerät wurde weder heruntergeladen noch geflasht.
+- Modell/Revision stammen vom Typenschild und der Herstellerseite; übertragen Sie Erfahrungen mit x86-VMs nicht auf Router.
+- Recipe: `tests/recipes/firmware-download-check.md`; Flash-Schritte liegen außerhalb des Umfangs.
+
+<TestRecord
+  status="planned"
+  environment="Konkretes Gerät steht noch aus; schreibgeschützte Checkliste, kein Flashen"
+  recipe="tests/recipes/firmware-download-check.md"
+  result="E1: Modell/Revision, Target/Profil, Image-Typen, Prüfsummen und Wiederherstellungsweg dokumentiert; nicht auf einem Gerät ausgeführt"
+/>
+
+<PageSources />

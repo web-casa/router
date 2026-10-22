@@ -1,0 +1,176 @@
+---
+title: "Welches OpenWrt ist das: offiziell, ImmortalWrt, iStoreOS oder Hersteller-Firmware?"
+description: Distribution, Version, Target, Paketmanager und Hardwaremodell mit rein lesenden Befehlen auslesen, damit Sie das passende Image und die richtigen Feeds wählen.
+pageType: troubleshoot
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Geräteaufnahme steht aus; die Befehle sind rein lesend und hängen nicht vom Labor ab'
+testRecipe: 'tests/recipes/which-openwrt.md'
+aliases: ['openwrt version', 'immortalwrt vs openwrt', 'istoreos openwrt', 'openwrt firmware erkennen']
+symptoms: ['weiß nicht, welches Image ich flashen soll', 'Paket lässt sich nicht installieren', 'unbekannte Firmware-Quelle']
+sources:
+  - label: OpenWrt Release Notes 25.12
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: OpenWrt Firmware Selector
+    url: https://firmware-selector.openwrt.org/
+  - label: OpenWrt-Paketmanager (apk)
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: ImmortalWrt
+    url: https://immortalwrt.org/
+  - label: iStoreOS
+    url: https://www.istoreos.com/
+sourceHash: 'c81d8dfe3c689c0e'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="unknown" version="—" packageManager="—" device="beliebiges OpenWrt-ähnliches Gerät" tested={false} evidence="E1" />
+
+## Ergebnis
+
+- Sie erkennen, ob das Gerät **offizielles OpenWrt, ImmortalWrt, iStoreOS oder Hersteller-Firmware** betreibt.
+- Sie lesen Distribution, Version, Revision, Target, Architektur und Hardwaremodell aus.
+- Sie wissen, ob der Paketmanager `apk` oder `opkg` ist und welche Feeds dazu gehören.
+- Sie wählen das passende sysupgrade-/Hersteller-Image, statt das falsche zu flashen.
+
+## Beginnen Sie mit drei rein lesenden Befehlen
+
+<Step where="router-shell" title="Die Systemdaten des Boards auslesen" expected="Sie sehen Distribution, Version, Target und Modell.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+```
+
+Die vier wichtigsten Felder sind `release.distribution`, `release.version`, `release.target` und `model`.
+
+</Step>
+
+<Step where="router-shell" title="Paketmanager und Architektur auslesen" expected="Sie wissen, ob es apk oder opkg ist, und kennen die CPU-Architektur.">
+
+```sh
+command -v apk
+command -v opkg
+cat /etc/apk/arch 2>/dev/null
+opkg print-architecture 2>/dev/null
+uname -a
+```
+
+Schließen Sie nicht aus der Versionsnummer auf den Paketmanager: Offizielles 25.12 verwendet in der Regel `apk`, 24.10 verwendet `opkg`, aber Forks und Hersteller-Images können abweichen. Vertrauen Sie dem Befehl, der existiert.
+
+</Step>
+
+<Step where="router-shell" title="Modell und Hardware-Revision auslesen" expected="Modell und Board-Name stimmen mit dem Aufkleber auf dem Gerät überein.">
+
+x86:
+
+```sh
+cat /sys/class/dmi/id/sys_vendor
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/board_name
+cat /sys/class/dmi/id/board_version
+cat /sys/class/dmi/id/bios_version
+```
+
+ARM/Router:
+
+```sh
+cat /tmp/sysinfo/model
+cat /tmp/sysinfo/board_name
+```
+
+`model` ist nicht die Hardware-Revision; ein Modell kann mehrere Revisionen haben. Verwenden Sie vor dem Flashen den Aufkleber, `board_name` und die Download-Seite des Herstellers.
+
+</Step>
+
+## Entscheidungstabelle
+
+| Feld/Merkmal | Offizielles OpenWrt | ImmortalWrt | iStoreOS | Hersteller-Firmware |
+|---|---|---|---|---|
+| `release.distribution` | `OpenWrt` | meist `ImmortalWrt` | meist `iStoreOS`/Hersteller | Hersteller |
+| Feeds | `downloads.openwrt.org` | ImmortalWrt-Feeds | iStoreOS-Feeds | Hersteller-Store |
+| Paketmanager | `apk` (25.12) oder `opkg` (24.10) | Befehl prüfen | meist `opkg` | evtl. nicht vorhanden/eingeschränkt |
+| Web-Oberfläche | LuCI | LuCI + angepasst | iStoreOS-Oberfläche | Hersteller-Oberfläche |
+| Upgrade-Image | OpenWrt sysupgrade | ImmortalWrt-Image | iStoreOS-Image | Hersteller-Firmware |
+| Support | OpenWrt-Community | ImmortalWrt-Community | iStoreOS-Community | Hersteller |
+
+**Mischen Sie nicht** die offiziellen OpenWrt-Feeds in ImmortalWrt/iStoreOS und flashen Sie kein sysupgrade eines anderen Modells; ABI, Kernel und Partitionslayout passen möglicherweise nicht.
+
+## Warum die Seite „About“ nicht ausreicht
+
+- Manche Hersteller-Images ändern nur das Aussehen von LuCI, sind darunter aber kein offizielles OpenWrt.
+- `DISTRIB_DESCRIPTION` kann angepasst werden und reicht allein nicht aus.
+- Dieselbe Versionsnummer bedeutet nicht dasselbe Target bzw. Profil.
+- Beim Installieren von Plugins zählen tatsächlich der Paketmanager und die Feeds.
+
+Gleichen Sie `ubus call system board`, `/etc/openwrt_release` und den Paketmanager gegeneinander ab.
+
+## Das Upgrade-Image wählen
+
+<Step where="router-shell" title="Target und board_name festhalten" expected="Sie finden im Firmware Selector bzw. auf der Herstellerseite eine exakte Übereinstimmung.">
+
+```sh
+ubus call system board
+```
+
+Achten Sie auf:
+
+- `release.target` (z. B. `x86/64`, `mediatek/filogic`);
+- `board_name`;
+- `model`;
+- aktuelle Version/Revision.
+
+Verwenden Sie bei offiziellen Geräten den [OpenWrt Firmware Selector](https://firmware-selector.openwrt.org/) mit exaktem Target/Modell. Geräte mit ImmortalWrt/iStoreOS/Hersteller-Firmware nutzen deren eigene Download-Seiten. **Flashen Sie nie ein sysupgrade eines anderen Modells oder Targets.**
+
+</Step>
+
+<Step where="router-shell" title="Den Image-Typ bestätigen" expected="Sie wissen, ob es ein sysupgrade- oder ein factory-/Hersteller-Image ist.">
+
+- Für das Upgrade eines bestehenden OpenWrt wird meist `sysupgrade` verwendet.
+- Die Erstinstallation aus der Hersteller-Firmware nutzt meist ein `factory`-/Hersteller-Übergangsimage.
+- Bei x86 kommen unter Umständen combined-/ext4-Images zum Einsatz, die anders geschrieben werden.
+- Im Zweifel lesen Sie die Geräteseite; raten Sie nicht anhand des Dateinamens.
+
+</Step>
+
+## Fehlerzweige und Wiederherstellung
+
+### `ubus` fehlt oder schlägt fehl
+
+Es kann sich um Hersteller-Firmware oder ein Nicht-OpenWrt-System handeln. Prüfen Sie in der Web-Oberfläche „About/System“ und den Aufkleber auf dem Gerät; flashen Sie OpenWrt nicht blind.
+
+### Nur Web-Oberfläche, kein SSH
+
+Hersteller-Firmware kann SSH deaktivieren. Prüfen Sie zuerst die Herstellerdokumentation und die Garantie; flashen Sie nicht nur, um Root-Zugriff zu erhalten. Wenn Sie Herstellerfunktionen benötigen, nutzen Sie den Upgrade-Pfad des Herstellers.
+
+### Pakete lassen sich nicht installieren
+
+- Der Paketmanager passt nicht zur Firmware (`apk` vs. `opkg`);
+- Architektur/Version des Feeds passt nicht;
+- ABI der Kernelmodule passt nicht;
+- Feeds eines anderen Forks sind eingemischt.
+
+Gehen Sie zurück zu `ubus call system board` und dem Paketmanager, bestätigen Sie die Quelle und suchen Sie dann den Fehler.
+
+### Falsches Image / Gerät unbrauchbar
+
+Hören Sie auf zu flashen. Verwenden Sie Failsafe, TFTP oder das Hersteller-Wiederherstellungsverfahren des Geräts. Wenn Sie keinen Wiederherstellungsweg haben, versuchen Sie es nicht mit „noch einem Image“.
+
+## E1-Status und Quellen
+
+- Dies ist E1: Felder, Entscheidungstabelle und Methode zur Image-Auswahl beruhen auf öffentlicher Dokumentation; in dieser Umgebung wurde kein Gerät aufgenommen.
+- Ausgaben von Forks/Herstellern können abweichen; führen Sie `tests/recipes/which-openwrt.md` auf einem echten Gerät aus, halten Sie Felder und Screenshots fest und heben Sie dann auf E2 an.
+- Diese Seite identifiziert nur die Firmware; sie bietet keine Anleitung zum Flashen über Modellgrenzen hinweg und keine Umgehung von Herstellerbeschränkungen.
+
+<TestRecord
+  status="planned"
+  environment="Geräteaufnahme steht aus; rein lesende Befehle, keine Abhängigkeit vom Labor"
+  recipe="tests/recipes/which-openwrt.md"
+  result="E1: Felder, Entscheidungstabelle und Methode zur Image-Auswahl dokumentiert; noch keine Geräteaufnahme"
+/>
+
+<PageSources />

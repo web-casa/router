@@ -1,0 +1,230 @@
+---
+title: "WireGuard-Heimzugriff: Server, Peer, Firewall und Tunnelprüfung"
+description: Konfigurieren Sie unter OpenWrt 25.12 einen WireGuard-Server, einen Peer und die Firewall und prüfen Sie Handshake, Tunnel-IP und HTTP; WAN-Portweiterleitung, DDNS und echtes Roaming mit dem Smartphone sind separate Prüfungen.
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200 + PVE-netns-Client; wg0 10.10.0.1/24, UDP 51820; Handshake/Ping/HTTP bestanden; keine WAN-Portweiterleitung/DDNS/Smartphone-Roaming'
+testRecipe: 'tests/recipes/wireguard-server-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt wireguard', 'openwrt wireguard server', 'wireguard home access', 'openwrt wg0', 'openwrt wireguard einrichten', 'wireguard Heimzugriff']
+symptoms: ['wireguard kein Handshake', 'wg0 fehlt', 'wireguard Verbindung nicht möglich', 'Tunnel-Ping schlägt fehl']
+sources:
+  - label: OpenWrt-WireGuard-Server
+    url: https://openwrt.org/docs/guide-user/services/vpn/wireguard/server
+  - label: WireGuard-Schnellstart
+    url: https://www.wireguard.com/quickstart/
+  - label: OpenWrt-Firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: WireGuard-Protokoll
+    url: https://www.wireguard.com/protocol/
+sourceHash: '37c1b278e3300bba'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200 + PVE netns" tested={true} evidence="E2" />
+
+## Umfang
+
+Diese Seite prüft:
+
+- das Erstellen einer WireGuard-Server-Schnittstelle `wg0` unter OpenWrt;
+- das Hinzufügen eines Client-Peers;
+- das Einordnen von `wg0` in die LAN-Firewall-Zone;
+- Handshake, Ping auf die Tunnel-IP und LuCI über den Tunnel.
+
+Sie prüft **nicht**:
+
+- öffentliche UDP-Portweiterleitung/Firewall am WAN;
+- DDNS/Domain;
+- Roaming mit Smartphone-/Windows-Clients;
+- Weiterleitung/NAT in das gesamte LAN.
+
+Diese Punkte hängen von der Einsatzumgebung ab; dieser LAN-Test ersetzt sie nicht.
+
+## Topologie
+
+```text
+Client 192.168.1.251
+   │  vmbr5 (Test-LAN)
+   ▼
+OpenWrt VM 200 192.168.1.2
+   wg0 10.10.0.1/24, UDP 51820
+   │
+   └── Tunnel 10.10.0.0/24
+       Client wg0 10.10.0.2/24
+```
+
+Beim echten Heimzugriff befindet sich der Client im Internet; am OpenWrt-WAN muss UDP 51820 weitergeleitet/erlaubt sein. Dieser Test findet nur auf der LAN-Seite statt.
+
+## Vorbereitung
+
+<Step where="router-shell" title="Kernel und Werkzeuge prüfen" expected="wg ist vorhanden und das Modul wireguard ist geladen.">
+
+```sh
+apk add wireguard-tools kmod-wireguard
+wg --version
+cat /proc/modules | grep wireguard
+```
+
+Im Test: `wireguard-tools v1.0.20260223`; Modul `wireguard` geladen.
+
+</Step>
+
+<Step where="router-shell" title="Server-Schlüssel erzeugen (niemals in Chat/Repository einfügen)" expected="Der private Schlüssel bleibt auf dem Gerät; der öffentliche Schlüssel geht an den Client.">
+
+```sh
+umask 077
+wg genkey > /tmp/wg-server.key
+wg pubkey < /tmp/wg-server.key > /tmp/wg-server.pub
+cat /tmp/wg-server.pub   # only the public key goes to the client
+```
+
+Der Client erzeugt ebenfalls sein eigenes Schlüsselpaar; **senden Sie dessen privaten Schlüssel niemals an den Server**. Der Server benötigt nur den öffentlichen Schlüssel des Clients.
+
+</Step>
+
+## Server konfigurieren
+
+<Step where="router-shell" title="wg0 und den Peer erstellen" expected="netifd erkennt proto=wireguard und wg0 hat seine Adresse.">
+
+```sh
+uci set network.wg0=interface
+uci set network.wg0.proto='wireguard'
+uci set network.wg0.private_key='<server-private-key>'
+uci set network.wg0.listen_port='51820'
+uci set network.wg0.addresses='10.10.0.1/24'
+uci set network.wg0.auto='1'
+
+uci set network.wg0_client=wireguard_wg0
+uci set network.wg0_client.public_key='<client-public-key>'
+uci set network.wg0_client.allowed_ips='10.10.0.2/32'
+uci set network.wg0_client.persistent_keepalive='25'
+
+uci commit network
+/etc/init.d/network restart
+```
+
+Die Benennung ist wichtig:
+
+- Schnittstellenabschnitt `wg0`, Peer-Typ `wireguard_wg0`; die Suffixe müssen übereinstimmen;
+- im Test führte die Benennung der Schnittstelle als `wg` dazu, dass netifd `proto: none` meldete und das Gerät `wg0` fehlte; nach der Umbenennung in `wg0` funktionierte es. **Verwenden Sie wg0.**
+
+Prüfen:
+
+```sh
+wg show
+ip -4 addr show wg0
+ubus call network.interface.wg0 status
+```
+
+</Step>
+
+<Step where="router-shell" title="Firewall: wg0 in die LAN-Zone aufnehmen" expected="UDP 51820 ist erreichbar und Tunnel-IPs können kommunizieren.">
+
+```sh
+uci show firewall | grep -E "zone.*name|zone.*network"
+uci add_list firewall.@zone[0].network='wg0'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+`@zone[0]` war im Test die LAN-Zone; Ihr Index kann abweichen – suchen Sie den Abschnitt mit `name='lan'`.
+
+Nach dem Hinzufügen von `wg0` zum LAN konnte der Client `10.10.0.1` pingen und LuCI erreichen.
+
+</Step>
+
+## Minimale Client-Prüfung
+
+Die Client-Konfiguration steht in 022. Auf dem Server:
+
+```sh
+wg show
+```
+
+Nachdem der Client den Handshake durchgeführt hat, sollte der Server Folgendes anzeigen:
+
+```text
+peer: <client-public-key>
+  endpoint: 192.168.1.251:44421
+  allowed ips: 10.10.0.2/32
+  latest handshake: ...
+  transfer: ...
+```
+
+Dieser Test-Client:
+
+- Handshake vor 3 Sekunden;
+- `transfer 124 B received, 180 B sent`;
+- Ping auf `10.10.0.1` 4/4;
+- HTTP `http://10.10.0.1/` lieferte LuCI.
+
+## Was für ein echtes WAN noch fehlt
+
+- Öffentliche IP/Portweiterleitung: WAN-UDP 51820 → OpenWrt;
+- die WAN-Eingangs-Firewall erlaubt dieses UDP;
+- DDNS/fester Hostname;
+- der `Endpoint` des Clients verwendet die öffentliche Adresse, nicht 192.168.1.2;
+- für den Zugriff auf das gesamte LAN müssen `allowed_ips` des Server-Peers und `AllowedIPs` des Clients das LAN-Präfix enthalten, dazu Rückrouting/NAT;
+- machen Sie aus „Tunnel-IP antwortet auf Ping“ nicht „das gesamte Heim-LAN ist erreichbar“.
+
+## Häufige Fehler
+
+### wg0 fehlt / proto none
+
+- Name des Schnittstellenabschnitts und Suffix des Peer-Typs stimmen nicht überein;
+- `wireguard-tools`/`kmod-wireguard` fehlen;
+- das Netzwerk wurde nicht neu gestartet;
+- prüfen Sie `wg show`, `ubus status`, `logread`.
+
+### Kein Handshake
+
+- öffentliche Schlüssel von Client und Server vertauscht;
+- falscher Endpoint/Port;
+- die Firewall erlaubt UDP nicht;
+- Berechtigungen/Inhalt des privaten Schlüssels falsch;
+- WireGuard benötigt für Handshakes keine Zeitsynchronisation, aber ein falscher Schlüssel schlägt trotzdem fehl.
+
+### Tunnel-Ping schlägt fehl
+
+- `allowed_ips` enthält die Tunnel-IP des Peers nicht;
+- die Schnittstelle hat keine Adresse / ist down;
+- Firewall-Zone;
+- die Client-Route leitet den Endpoint selbst in den Tunnel (Schleife).
+
+### Tunnel-IP antwortet, LAN nicht erreichbar
+
+- dem Client-AllowedIPs fehlt das LAN-Präfix;
+- dem Server fehlen Weiterleitung/NAT/Rückroute;
+- Firewall-Weiterleitung nicht erlaubt;
+- setzen Sie einen funktionierenden Tunnel nicht mit einem funktionierenden LAN gleich.
+
+## E2-Testlauf (2026-10-20)
+
+- Umgebung: OpenWrt 25.12.6 x86 VM 200; `wg0` `10.10.0.1/24`, UDP 51820; PVE-netns-Client `10.10.0.2/24`.
+- Server: `wg show` listete den Peer auf, der Handshake gelang, Transfer 1,47 KiB/1,90 KiB; `wg0` aktiv.
+- Client: Handshake, Tunnel-Ping 4/4, HTTP 200 (LuCI).
+- Nicht getestet: WAN-Portweiterleitung/-Firewall, DDNS, Smartphone/Windows, LAN-Weiterleitung, NAT/Rückroute.
+- Rezept: `tests/recipes/wireguard-server-25.12.md`.
+
+## Quellen und Review
+
+- Dies ist E2 partiell: LAN-seitiger Server und Tunnel wurden getestet; echtes WAN, mobile Clients und LAN-Weiterleitung nicht.
+- Private Schlüssel bleiben auf den Geräten; legen Sie sie niemals im Repository, in Screenshots oder im Chat ab.
+- Es gab keinen unabhängigen Reviewer; die Schlussfolgerungen gelten nur für diese VM-/netns-Umgebung.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200 + PVE-netns-Client; wg0 10.10.0.1/24, UDP 51820; Handshake/Ping/HTTP bestanden; keine WAN-Portweiterleitung/DDNS/Smartphone-Roaming"
+  recipe="tests/recipes/wireguard-server-25.12.md"
+  result="E2 partiell: Server wg0 10.10.0.1/24 auf UDP 51820; Client 10.10.0.2/24 führte den Handshake durch, Tunnel-Ping 4/4, HTTP 200; WAN-Portweiterleitung, DDNS, echtes Smartphone/Roaming und LAN-Weiterleitung nicht getestet"
+  date="2026-10-20"
+/>
+
+<PageSources />

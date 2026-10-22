@@ -1,0 +1,241 @@
+---
+title: "LAN-Adresse ändern und wieder Zugriff erhalten: altes/neues Subnetz, DHCP und Wiederherstellung"
+description: OpenWrt-LAN von 192.168.1.1 auf 192.168.10.1 umstellen, prüfen, dass die alte Adresse nicht mehr antwortet, die neue erreichen und DHCP sowie den Konsolen-Rollback bereithalten.
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86-VM 200; LAN 192.168.1.1→192.168.10.1; DHCP-Lease nach Neustart verifiziert'
+testRecipe: 'tests/recipes/lan-address-change-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt lan ip ändern', 'openwrt luci nicht erreichbar nach lan änderung', 'lan ip change', 'dhcp neues subnetz', 'openwrt change lan ip']
+symptoms: ['Zugriff nach LAN-Änderung verloren', 'alte Adresse lässt sich nicht öffnen', 'Client hat kein Netzwerk']
+sources:
+  - label: OpenWrt-Netzwerkkonfiguration
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP und DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt LuCI Netzwerk
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt Failsafe
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+sourceHash: '1c7601a56e42e0af'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import lanEdit from '@assets/screenshots/luci/lan-edit-192-168-10.webp';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE-VM 200" tested={true} evidence="E2" />
+
+## Ergebnis
+
+- Ein neues LAN-Subnetz wählen, das sich nicht mit WAN/Upstream/VPN überschneidet;
+- Verstehen, warum die alte Adresse sofort ausfällt und wie Sie die neue erreichen;
+- Clients und Verwaltung in das neue Subnetz verschieben;
+- DHCP-Bereich, Gateway und DNS gemeinsam anpassen;
+- Bei Problemen über die neue Adresse, die Konsole oder ein Backup wiederherstellen.
+
+## Das neue Subnetz wählen
+
+- Verwenden Sie einen privaten RFC1918-Bereich: `192.168.10.0/24`, `10.10.0.0/24` usw.;
+- Keine Überschneidung mit dem WAN-Upstream, einem VPN oder einem anderen LAN/VLAN;
+- Vermeiden Sie `192.168.1.0/24`, wenn das vorgelagerte ONT bzw. der Hauptrouter es bereits nutzt;
+- Neues Gateway: `192.168.10.1`; DHCP-Pool: `192.168.10.100–199`;
+- Notieren Sie die alte Adresse, das Gateway und den DHCP-Bereich.
+
+Diese Seite verwendet `192.168.1.1/24 → 192.168.10.1/24`.
+
+## Bevor Sie etwas ändern
+
+<Step where="router-shell" title="LAN/DHCP notieren und sichern" expected="Sie können die alte Adresse und den DHCP-Bereich wiederherstellen.">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+ip -4 addr show br-lan
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+Stellen Sie den Zugriff per LuCI/SSH sicher; idealerweise haben Sie zusätzlich eine serielle bzw. PVE-Konsole. Verlassen Sie sich beim Ändern des LAN nicht auf eine einzelne Web-Sitzung.
+
+</Step>
+
+## LAN ändern
+
+<Step where="luci" title="IPv4-Adresse in LuCI bearbeiten" expected="LAN nutzt das neue Subnetz und der DHCP-Bereich folgt.">
+
+Öffnen Sie **Netzwerk → Schnittstellen → LAN → Bearbeitung**:
+
+1. Lassen Sie Protokoll auf `Statische Adresse`.
+2. Setzen Sie IPv4 Adresse auf `192.168.10.1/24`.
+3. Lassen Sie das IPv4 Gateway leer (LAN ist nicht das WAN-Gateway).
+4. Setzen Sie unter **DHCP-Server** Start `100`, Limit `100`, Lease-Zeit `12h`.
+5. Speichern & Anwenden.
+
+<Figure src={lanEdit} alt="LuCI-Bearbeitungsdialog für LAN mit der IPv4-Adresse 192.168.10.1/24" caption="Beispiel für die LAN-Bearbeitungsseite. MAC/IPv6 sind geschwärzt; verwenden Sie Ihr eigenes Subnetz, nicht dieses Beispiel." />
+
+</Step>
+
+<Step where="router-shell" title="Entsprechung per CLI" expected="uci enthält das neue Subnetz für network.lan und dhcp.lan.">
+
+```sh
+uci set network.lan.ipaddr='192.168.10.1/24'
+uci commit network
+
+uci set dhcp.lan.start='100'
+uci set dhcp.lan.limit='100'
+uci set dhcp.lan.leasetime='12h'
+uci commit dhcp
+
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+`network reload` beendet die alte SSH-/Web-Sitzung sofort; das ist erwartet. Der Befehl kann mit einem Timeout bzw. einer Trennung enden, was nicht bedeutet, dass er fehlgeschlagen ist.
+
+Beim ersten Durchlauf lieferten `network reload` + `dnsmasq restart` allein dem DHCP-Client keinen Lease; **nach einem Neustart von OpenWrt** erhielt derselbe Client `192.168.10.191/24`. Wenn DHCP keinen Lease vergibt, planen Sie einen Neustart ein, statt dnsmasq wiederholt neu zu starten.
+
+</Step>
+
+## Wieder Zugriff erhalten
+
+<Step where="client" title="In das neue Subnetz wechseln" expected="Die neue Adresse öffnet LuCI/SSH; die alte Adresse antwortet nicht mehr.">
+
+- Geben Sie dem Verwaltungsrechner vorübergehend die statische Adresse `192.168.10.2/24` mit Gateway `192.168.10.1`;
+- oder geben Sie den DHCP-Lease frei und erneuern Sie ihn, damit der Client `192.168.10.x` erhält;
+- öffnen Sie `http://192.168.10.1/`;
+- die alte Adresse `192.168.1.1` sollte in einen Timeout laufen, statt die alte Seite zu öffnen.
+
+```sh
+curl -I http://192.168.10.1/
+ssh root@192.168.10.1
+```
+
+Wenn sich die alte Adresse noch öffnen lässt, prüfen Sie den Browser-Cache, einen veralteten Tab, ein anderes Gerät mit der alten IP oder ob Sie tatsächlich das aktuelle LAN geändert haben.
+
+</Step>
+
+## Prüfen
+
+<Step where="router-shell" title="Schnittstelle und DHCP-Konfiguration bestätigen" expected="br-lan nutzt die neue Adresse und dhcp-range das neue Subnetz.">
+
+```sh
+ip -4 addr show br-lan
+uci show network.lan
+uci show dhcp.lan
+ubus call network.interface.lan status | head -20
+grep -R "dhcp-range" /var/etc/dnsmasq.conf* /tmp/etc/dnsmasq.conf* 2>/dev/null
+```
+
+`dhcp-range` sollte `192.168.10.100,192.168.10.199` und `/24` enthalten.
+
+</Step>
+
+<Step where="client" title="DHCP getrennt prüfen" expected="Der Client erhält 192.168.10.x und Gateway/DNS 192.168.10.1.">
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.10.1
+```
+
+Geben Sie den alten Lease frei bzw. verbinden Sie neu. Erhält der Client weiterhin `192.168.1.x`, prüfen Sie den DHCP-Bereich, einen zweiten DHCP-Server und ob der Client noch im alten Segment hängt.
+
+> Dieser E2-Lauf testete DHCP in zwei Stufen: Mit nur `network reload` + `dnsmasq restart` erhielt der netns-Client keinen Lease; nach `reboot` erhielt derselbe netns-Client `192.168.10.191/24` und das Gateway `192.168.10.1`. Die Seite behandelt „Neustart, dann DHCP erneut testen“ daher als verpflichtenden Schritt, statt anzunehmen, dass ein Reload genügt.
+
+</Step>
+
+<Step where="router-shell" title="Prüfen, dass WAN intakt ist" expected="WAN funktioniert weiter; die LAN-Änderung hat es nicht zurückgesetzt.">
+
+```sh
+ip -4 addr show eth1
+ping -c 3 192.168.50.1
+nslookup openwrt.org 192.168.10.1
+```
+
+Eine reine LAN-Änderung sollte WAN-DHCP/PPPoE nicht zurücksetzen. Haben Sie auch WAN geändert, prüfen Sie es separat.
+
+</Step>
+
+## Rollback
+
+<Step where="router-shell" title="Von der neuen Adresse zurückändern" expected="Die alte Adresse funktioniert wieder und die neue läuft in einen Timeout.">
+
+```sh
+uci set network.lan.ipaddr='192.168.1.1/24'
+uci commit network
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+Die Verwaltungssitzung bricht erneut ab; stellen Sie den Client zurück auf `192.168.1.x` oder DHCP und bestätigen Sie die alte Adresse.
+
+</Step>
+
+<Step where="console" title="Wenn Sie gar nicht mehr hineinkommen" expected="Wiederherstellung ohne Werksreset.">
+
+- Melden Sie sich über die serielle/HDMI-/PVE-Konsole an;
+- prüfen Sie `uci show network.lan` und `ip -4 addr show br-lan`;
+- ändern Sie zurück auf die alte Adresse oder ein Subnetz, das Sie erreichen können;
+- ist die Konfiguration durcheinander, stellen Sie `/etc/config/network.bak.*` und `/etc/config/dhcp.bak.*` wieder her;
+- ein Werksreset ist der letzte Ausweg und löscht die Konfiguration.
+
+</Step>
+
+## Häufige Fehler
+
+### Die alte Adresse öffnet sich weiterhin
+
+Browser-Cache, ein veralteter Tab, ein anderes Gerät mit der alten IP oder der Client befindet sich noch im alten Segment. Verwenden Sie ein privates Fenster bzw. ein neues Terminal und bestätigen Sie, dass `curl` die neue IP erreicht.
+
+### Die neue Adresse öffnet sich nicht
+
+- Der Client befindet sich nicht in `192.168.10.0/24`;
+- falsche statische Adresse bzw. falsches Gateway;
+- veralteter ARP-Eintrag: `ip neigh flush dev <iface>`;
+- die Firewall blockiert die LAN-Verwaltung;
+- Sie haben WAN oder eine andere Schnittstelle geändert.
+
+### DHCP funktioniert nicht
+
+- `dhcp.lan.start/limit` liegt außerhalb des neuen Subnetzes;
+- `dnsmasq` wurde nicht neu gestartet, oder `/var/etc/dnsmasq.conf*` enthält noch den alten Bereich;
+- ein Reload allein vergibt weiterhin keinen Lease: OpenWrt neu starten und erneut testen (im Labor funktionierte das);
+- es existiert ein zweiter DHCP-Server (anderer Router/andere VM);
+- der Client hat den alten Lease nicht freigegeben;
+- prüfen Sie `logread | grep dnsmasq` auf `no address range`-/Schnittstellenfehler.
+
+### Das neue Subnetz kollidiert
+
+Eine Überschneidung mit dem vorgelagerten ONT, einem VPN oder einem anderen LAN/VLAN verursacht Routing-/Auflösungsprobleme. Wählen Sie ein anderes Subnetz; erzwingen Sie es nicht.
+
+## E2-Laborlauf (2026-10-20)
+
+- Umgebung: PVE 9.2.2; OpenWrt 25.12.6 x86-VM 200; LAN `192.168.1.1/24` → `192.168.10.1/24`; DHCP `100–199`.
+- Nach der Änderung: alte `192.168.1.1` 100 % Verlust; neue `192.168.10.1` Ping/HTTP 200; LuCI/SSH funktionierten.
+- Rollback: alte Adresse HTTP 200; neue Adresse Timeout.
+- DHCP: Reload allein vergab keinen Lease; nach dem Neustart erhielt der netns-Client `192.168.10.191/24` und das Gateway `192.168.10.1`.
+- Nicht verifiziert: physische Clients, IPv6, Upstream-Konfliktszenarien.
+- Screenshot: `src/assets/screenshots/luci/lan-edit-192-168-10.webp` (MAC/IPv6 geschwärzt).
+
+## Quellen und Review
+
+- Dies ist E2: Adresswechsel, Ausfall der alten Adresse, DHCP-Lease nach Neustart und Rollback wurden getestet; physische Clients, IPv6 und Upstream-Konflikte nicht.
+- Rezept: `tests/recipes/lan-address-change-25.12.md`.
+- Kein unabhängiger Reviewer; die Schlussfolgerungen gelten nur für diese VM-Umgebung.
+
+<TestRecord
+  status="verified"
+  environment="OpenWrt 25.12.6 x86-VM 200; LAN 192.168.1.1→192.168.10.1; DHCP-Lease nach Neustart verifiziert"
+  recipe="tests/recipes/lan-address-change-25.12.md"
+  result="E2: alte Adresse lief in einen Timeout und neues LuCI/SSH funktionierte; Reload allein vergab keinen DHCP-Lease, aber nach dem Neustart erhielt der netns-Client 192.168.10.191/24; Rollback stellte die alte Adresse wieder her und die neue lief in einen Timeout"
+  date="2026-10-20"
+/>
+
+<PageSources />

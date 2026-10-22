@@ -1,0 +1,53 @@
+---
+title: "UCI: wie OpenWrt jede Einstellung in /etc/config ablegt"
+description: "UCI ist das Konfigurationssystem hinter OpenWrt. Wo die Dateien liegen, wie Änderungen vorgemerkt und übernommen werden und wie es mit LuCI zusammenhängt."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt uci", "uci commit", "openwrt /etc/config", "openwrt uci Konfiguration"]
+sources:
+  - label: "OpenWrt UCI"
+    url: https://openwrt.org/docs/guide-user/base-system/uci
+  - label: "LuCI-Grundlagen"
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+sourceHash: 'af6a6bb6c4e60fdd'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="uci" />
+
+## In einem Satz
+
+UCI (Unified Configuration Interface) speichert die Konfiguration der OpenWrt-Dienste in Klartextdateien unter `/etc/config/`. LuCI und der Befehl `uci` bearbeiten dieselben Dateien.
+
+## So funktioniert es
+
+- Es gibt eine Datei pro Subsystem, etwa `network`, `wireless`, `dhcp`, `firewall` und `system`.
+- `uci set`, `uci add`, `uci rename` und `uci delete` werden zunächst nur vorgemerkt. `uci commit` schreibt sie in einem Zug in den Flash.
+- Eine übernommene Änderung wirkt erst, nachdem der Dienst über sein Init-Skript neu geladen oder neu gestartet wurde. Das offizielle Beispiel ändert den uhttpd-Port, führt commit aus und startet dann `/etc/init.d/uhttpd restart`.
+- LuCI ist ein Frontend: Seine Seiten lesen und schreiben dieselben UCI-Dateien über APIs.
+
+## Auf Ihrem Router ansehen
+
+Diese Befehle lesen nur:
+
+```sh
+uci show network.lan
+uci get network.lan.ipaddr
+uci export dhcp
+```
+
+## Achtung
+
+- Eine Änderung, die Sie übernehmen, aber nie neu laden, ist noch nicht aktiv. Sie wirkt erst beim nächsten Neustart des Dienstes oder des Geräts, möglicherweise erst lange, nachdem Sie sie vergessen haben.
+- Kopieren Sie `/etc/config` an einen sicheren Ort, bevor Sie von Hand bearbeiten. [Backup und Wiederherstellung](/de/recovery/backup-restore/) beschreibt ein vollständiges Backup.
+
+## Verwandte Anleitungen
+
+- [LAN-Adresse](/de/network/lan-address/)
+- [DNS](/de/network/dns/)
+- [Backup und Wiederherstellung](/de/recovery/backup-restore/)
+
+<PageSources />

@@ -1,0 +1,210 @@
+---
+title: "Paket lässt sich nicht installieren: Download, Architektur, Abhängigkeiten, LuCI und postinst"
+description: apk-Feeds, Paketformat, Architektur, Abhängigkeiten, LuCI-Menüdateien und postinst-Logs der Reihe nach prüfen, statt der Firmware die Schuld zu geben.
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86-VM 200; apk; sqm-scripts 1.7.2 / luci-app-sqm'
+testRecipe: 'tests/recipes/plugin-install-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt paket lässt sich nicht installieren', 'apk install fehlgeschlagen', 'luci app wird nicht angezeigt', 'apk dependency conflict', 'openwrt package will not install']
+symptoms: ['apk add schlägt fehl', 'kein LuCI-Menü', 'Abhängigkeit nicht erfüllt', 'postinst-Fehler']
+sources:
+  - label: OpenWrt-Paketmanager apk
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: OpenWrt opkg-zu-apk-Spickzettel
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: OpenWrt LuCI
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt-Paketformat
+    url: https://openwrt.org/docs/guide-user/additional-software/package-format
+sourceHash: '03807ef4db3c6db5'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE-VM 200" tested={true} evidence="E2" />
+
+## Ergebnis
+
+- Unterscheiden, ob das Paket im Feed fehlt oder vorhanden ist, aber nicht installiert werden kann;
+- Architektur-, ABI-, Abhängigkeits-, LuCI-Frontend- oder postinst-Fehler identifizieren;
+- Verstehen, warum das Hauptprogramm installiert wurde, LuCI aber kein Menü zeigt;
+- Wiederherstellen, ohne die Firmware neu zu flashen.
+
+## Ebene 0: Umgebung erfassen
+
+<Step where="router-shell" title="Firmware, Architektur, Paketmanager und Feeds erfassen" expected="Sie wissen, ob apk oder opkg gilt, sowie Release/Target/Architektur.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+command -v apk
+command -v opkg
+cat /etc/apk/repositories.d/distfeeds.list 2>/dev/null
+```
+
+25.12 verwendet `apk`; 24.10 verwendet `opkg`. Benennen Sie `.ipk` nicht in `.apk` um und erzwingen Sie keine andere Architektur.
+
+</Step>
+
+## Ebene 1: Download und Feeds
+
+<Step where="router-shell" title="Bestätigen, dass das Paket im Feed existiert" expected="apk search/update findet es, oder Sie wissen, dass es fehlt.">
+
+```sh
+apk update
+apk search <package>
+apk info -e <package>
+```
+
+Schlägt `apk update` fehl, prüfen Sie zuerst 404/Signatur/Uhrzeit/Zertifikate. Findet die Suche nichts, ist der Feed womöglich veraltet, der Name falsch oder das Paket nicht in diesem Release/dieser Architektur enthalten.
+
+</Step>
+
+<Step where="router-shell" title="Format/Prüfsumme vor der Installation prüfen" expected="Die Quelle ist vertrauenswürdig und Format/Architektur passen.">
+
+- 25.12: `.apk`; 24.10: `.ipk`;
+- Bevorzugen Sie Feeds gegenüber „Repacks“ von Cloud-Laufwerken bzw. aus Foren;
+- Prüfen Sie bei lokalen Dateien SHA-256/Signatur;
+- **Verwenden Sie `--allow-untrusted` nicht routinemäßig**; es umgeht Vertrauensprüfungen und beweist keine Kompatibilität.
+
+</Step>
+
+## Ebene 2: Architektur und ABI
+
+<Step where="router-shell" title="Paketarchitektur prüfen, nicht den Dateinamen" expected="Die Paketarchitektur entspricht /etc/apk/arch; kmods passen zusätzlich zum Kernel.">
+
+```sh
+cat /etc/apk/arch
+apk info -a <package> | grep -E "arch|depends|provides" | head
+```
+
+- `x86_64`, `aarch64_cortex-a53` usw. sind nicht austauschbar;
+- Kernelmodule (kmod) müssen zu Kernelversion/ABI passen;
+- reine Skriptpakete können `any`/`noarch` sein und beweisen keine Architekturablehnung.
+
+> In diesem Labor wurde ein aarch64-`sqm-scripts` heruntergeladen, das aber `sqm-scripts-any` ist (keine architekturspezifische Binärdatei), und ein lokales `--allow-untrusted` ersetzte es trotzdem. Das **beweist nicht, dass die Architekturprüfung bestanden wurde**. Ein echter Ablehnungstest braucht ein Paket mit ELF-Dateien; diese Seite markiert ihn nicht als verifiziert.
+
+</Step>
+
+## Ebene 3: Abhängigkeiten
+
+<Step where="router-shell" title="Abhängigkeitsbaum und Installationsausgabe lesen" expected="Fehlende Abhängigkeiten haben konkrete Paketnamen.">
+
+```sh
+apk add <package> 2>&1 | tail -20
+apk info -R <package> 2>/dev/null | head -20
+apk info -e <dependency>
+```
+
+Häufige Fälle:
+
+- Hauptprogramm installiert, `luci-app-*` fehlt;
+- `kmod-*` passt nicht zum Kernel;
+- Abhängigkeiten liegen in einem anderen Feed bzw. einer anderen Version;
+- offizielle, ImmortalWrt- und iStoreOS-Feeds sind gemischt.
+
+</Step>
+
+## Ebene 4: LuCI-Menü
+
+<Step where="router-shell" title="Hauptprogramm ≠ LuCI-Frontend" expected="Nach der Installation von luci-app erscheinen Menü- und statische Dateien.">
+
+```sh
+apk info -L <luci-app-name> | head -20
+ls -l /usr/share/luci/menu.d/ 2>/dev/null | grep <name>
+```
+
+In diesem Labor:
+
+- nur `sqm-scripts`: installiert, aber kein LuCI-Menü;
+- `luci-app-sqm` hinzugefügt: `/usr/share/luci/menu.d/luci-app-sqm.json` und `/www/luci-static/resources/view/network/sqm.js` erschienen;
+- `luci-app-sqm` entfernt: Menüdatei verschwand; Neuinstallation stellte sie wieder her.
+
+Erscheint das Menü weiterhin nicht: Browser-Cache leeren, ab- und wieder anmelden, `luci-base`/Sprachpaket/rpcd prüfen; flashen Sie nicht als Erstes neu.
+
+</Step>
+
+## Aufgezeichnete Demo (Labor 017)
+
+<TerminalCast
+  src="/casts/017-plugin-install.cast"
+  title="Labor 017: sqm-scripts → luci-app-sqm"
+  caption="Echte OpenWrt-25.12.6-VM-Sitzung: sqm-scripts installieren (kein LuCI-Menü), luci-app-sqm hinzufügen (Menüdatei erscheint), entfernen (Menü verschwindet), neu installieren (wiederhergestellt). Der Player ist eine Ergänzung; maßgeblich sind die Codeblöcke auf dieser Seite."
+/>
+
+## Ebene 5: postinst-/Setup-Skripte
+
+<Step where="router-shell" title="Paket installiert, Dienst/Konfiguration aber nicht" expected="Sie wissen, ob postinst fehlgeschlagen ist und was es geändert hat.">
+
+```sh
+logread | tail -50
+apk info -L <package> | head -20
+ls /etc/uci-defaults/ 2>/dev/null | tail
+```
+
+- Ein fehlgeschlagenes postinst setzt das Paket nicht zwingend zurück;
+- prüfen Sie `/etc/uci-defaults`, `/etc/init.d/<service>`, `/etc/config/<service>`;
+- installieren Sie nicht wiederholt neu, nur um postinst erneut auszuführen; lesen Sie zuerst Log und Skripte.
+
+</Step>
+
+## Ebene 6: Wiederherstellung
+
+<Step where="router-shell" title="Deinstallieren/Feeds wiederherstellen/neu starten statt neu flashen" expected="Zurück im vorherigen Zustand oder zumindest in der Lage, weiter zu debuggen.">
+
+```sh
+apk del <package>
+# if feeds were changed:
+cp /etc/apk/repositories.d/distfeeds.list.bak.YYYY-MM-DD /etc/apk/repositories.d/distfeeds.list
+apk update
+reboot
+```
+
+Wenn das Paket die Verwaltung beeinträchtigt, stoppen Sie zuerst den Dienst bzw. stellen Sie Konfigurationsbackups wieder her; ein Neuflashen ist der letzte Ausweg.
+
+</Step>
+
+## Häufige Fehler
+
+| Symptom | Wahrscheinlichere Ursache | Zuerst prüfen |
+|---|---|---|
+| `apk update` 404 | falsches Release/Target/Architektur/Mirror-Pfad | Feed-Dateien + `curl -I` |
+| Paket nicht gefunden | falscher Name/Feed/falsche Version | `apk search` |
+| Heruntergeladen, lässt sich aber nicht installieren | Architektur/Abhängigkeit/Signatur | `apk info -a`, Installationsausgabe |
+| Installiert, aber kein Menü | nur Hauptprogramm, kein `luci-app-*` | `apk info -L` |
+| Menü vorhanden, öffnet sich aber nicht | LuCI/Sprache/rpcd/Cache | Browser-Konsole, `logread` |
+| postinst-Fehler | Skript/Berechtigungen/Abhängigkeit/Konfiguration | `logread`, `/etc/uci-defaults` |
+| Nach der Installation kein Internet | Dienst hat DNS/Firewall/Schnittstelle geändert | Dienst stoppen, Backups wiederherstellen |
+
+## E2-Laborlauf (2026-10-20)
+
+- Umgebung: OpenWrt 25.12.6 x86-VM 200; x86_64; apk; TUNA-Mirror aus Geschwindigkeitsgründen (die Seite setzt ihn nicht voraus).
+- `sqm-scripts 1.7.2-r1`: installiert; kein LuCI-Menü/Controller.
+- `luci-app-sqm`: installiert; `/usr/share/luci/menu.d/luci-app-sqm.json` erschien; `/www/luci-static/resources/view/network/sqm.js` existiert.
+- `apk del luci-app-sqm`: Menüdatei verschwand; Neuinstallation stellte sie wieder her.
+- aarch64-`sqm-scripts`: Das Paket ist `sqm-scripts-any` (noarch); lokales `--allow-untrusted` akzeptierte es; **kein Test der Architekturablehnung**.
+- Nicht destruktiv reproduziert: postinst-Fehler, kmod-ABI-Abweichung, echte architekturspezifische Ablehnung.
+
+## E2-Status und Quellen
+
+- Dies ist E2 teilweise: Installation/Abhängigkeiten/LuCI-Menü/Entfernen und Neuinstallation wurden getestet; Architekturablehnung und postinst-Fehler wurden nicht vollständig reproduziert.
+- Rezept: `tests/recipes/plugin-install-25.12.md`.
+- Machen Sie daraus nicht „jedes Paket lässt sich installieren“; prüfen Sie Release/Target/Architektur pro Paket.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86-VM 200; apk; sqm-scripts 1.7.2 / luci-app-sqm"
+  recipe="tests/recipes/plugin-install-25.12.md"
+  result="E2 teilweise: sqm-scripts installiert, aber kein LuCI-Menü; luci-app-sqm fügte /usr/share/luci/menu.d/luci-app-sqm.json hinzu; Entfernen löschte das Menü und Neuinstallation stellte es wieder her; Architektur-/postinst-Fehler wurden nicht destruktiv reproduziert"
+  date="2026-10-20"
+/>
+
+<PageSources />

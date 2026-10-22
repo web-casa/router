@@ -1,0 +1,243 @@
+---
+title: "LuCI nicht erreichbar: IP, Port, DHCP und Wiederherstellung per Konsole"
+description: Vom LAN-Port und der Client-Adresse zur tatsächlichen Verwaltungs-IP, zu uhttpd/SSH/Firewall vorarbeiten und Konsole/Failsafe als Wiederherstellung behalten, ohne blind auf Werkseinstellungen zurückzusetzen.
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86-VM 200; uhttpd stoppen/wiederherstellen, HTTP-80-Prüfung, SSH bleibt erhalten'
+testRecipe: 'tests/recipes/troubleshooting-no-web-ui.md'
+aliases: ['openwrt luci lässt sich nicht öffnen', 'luci lädt nicht', '192.168.1.1 funktioniert nicht', 'openwrt nicht erreichbar']
+symptoms: ['192.168.1.1 lässt sich nicht öffnen', 'Anmeldeseite läuft in ein Timeout', 'Zugriff nach LAN-Änderung verloren', 'keine DHCP-Adresse']
+sources:
+  - label: OpenWrt Failsafe und Werksreset
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+  - label: OpenWrt LuCI Essentials
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: OpenWrt-Netzwerkkonfiguration
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP und DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+sourceHash: 'bfd0c331078d3002'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86-VM 200" tested={true} evidence="E2" />
+
+## Ergebnis
+
+- Sie erkennen, ob das Problem bei der physischen Verbindung, der Client-Adresse, der Verwaltungs-IP, dem HTTP-Dienst oder bei SSH/Firewall liegt.
+- Sie stellen fest, ob LuCI tatsächlich lauscht, ohne die Konfiguration zu ändern.
+- Sie stellen den Zugang mit einer statischen Client-Adresse, über die Konsole oder per Failsafe wieder her, statt blind auf Werkseinstellungen zurückzusetzen.
+- Sie wissen, wann Sie anhalten, sichern oder die Gerätedokumentation lesen sollten.
+
+## Triage-Tabelle
+
+| Symptom | Zuerst prüfen | Nicht zuerst tun |
+|---|---|---|
+| Keine Link-LED | Kabel, LAN-Port, Stromversorgung | Firmware neu flashen |
+| Client hat 169.254.x.x | DHCP/Kabel/LAN-Port | Router-LAN ändern |
+| Ping funktioniert, Web nicht | 80/443, uhttpd, Firewall, HTTPS | Werksreset |
+| Ping schlägt fehl | Client-Subnetz, Verwaltungs-IP, VLAN/Port | ständig IPs ändern |
+| SSH funktioniert, LuCI nicht | uhttpd/LuCI-Paket/Port | Netzwerkkonfiguration ändern |
+| Keine Konsolenausgabe | Seriell-Einstellungen, Videoausgang, Stromversorgung | Pins kurzschließen/blind neu flashen |
+
+## Ebene 1: physischer Port und Link
+
+<Step where="client" title="Einen LAN-Port verwenden, nicht WAN" expected="Die LAN-LED leuchtet und der Client sieht einen Link.">
+
+Verbinden Sie sich mit einem Port, der mit **LAN** beschriftet ist; der WAN-Port bietet in der Regel keinen Verwaltungszugang. Probieren Sie ein anderes Kabel und einen anderen LAN-Port aus; prüfen Sie die LEDs und den Zustand der Netzwerkkarte des Clients.
+
+Leuchtet die LED nie: Prüfen Sie Stromversorgung, Kabel und Port, bevor Sie die Firmware anfassen.
+
+</Step>
+
+## Ebene 2: Client-Adresse und Gateway
+
+<Step where="client" title="Bestätigen, dass der Client im LAN-Subnetz liegt" expected="Der Client hat 192.168.1.x oder eine andere bekannte LAN-Adresse.">
+
+Linux:
+
+```sh
+ip addr show
+ip route
+```
+
+Windows:
+
+```powershell
+ipconfig /all
+```
+
+macOS:
+
+```sh
+ifconfig
+netstat -rn
+```
+
+Eine Adresse `169.254.x.x` bedeutet, dass DHCP fehlgeschlagen ist. Prüfen Sie zuerst Kabel/LAN und setzen Sie dann vorübergehend eine statische Adresse:
+
+- IP: `192.168.1.2`
+- Maske: `255.255.255.0`
+- Gateway: `192.168.1.1`
+
+Verwenden Sie sie nur für die Anmeldung; kollidieren Sie nicht mit der LAN-Adresse des Routers.
+
+</Step>
+
+<Step where="client" title="Das Gateway anpingen" expected="Es antwortet, oder Sie wissen, dass die Verwaltungs-IP nicht 192.168.1.1 ist.">
+
+```sh
+ping 192.168.1.1
+```
+
+- Antwort: weiter mit Ebene 3.
+- Keine Antwort: Prüfen Sie das Client-Subnetz, den LAN-Port und ob die Standardadresse geändert wurde.
+- Erklären Sie das Gerät nicht allein wegen eines fehlgeschlagenen Pings für defekt.
+
+</Step>
+
+## Ebene 3: Wurde die Verwaltungs-IP geändert?
+
+<Step where="client" title="Die tatsächliche LAN-Adresse finden" expected="Sie haben mindestens zwei Kandidatenadressen und testen sie.">
+
+Übliche Quellen:
+
+- Aufkleber/Handbuch des Geräts;
+- eine gespeicherte Konfiguration bzw. ein Screenshot;
+- die DHCP-Lease-Tabelle des vorgelagerten Routers, falls erreichbar;
+- `uci show network` an der Konsole;
+- eine LAN-Adresse, die Sie selbst geändert haben.
+
+Prüfen Sie in **Ihrem eigenen Subnetz** den ARP-Cache:
+
+```sh
+ip neigh
+```
+
+Scannen Sie kein unbekanntes Netzwerk breitflächig und raten Sie anhand von Scan-Ergebnissen kein Gerät.
+
+</Step>
+
+## Ebene 4: HTTP/HTTPS und SSH
+
+<Step where="client" title="„Ping funktioniert, Web nicht“ von einem Link-Ausfall unterscheiden" expected="Sie wissen, ob es ein Problem mit Port, Dienst oder Protokoll ist.">
+
+```sh
+curl -v http://192.168.1.1/
+curl -k -v https://192.168.1.1/
+ssh root@192.168.1.1
+```
+
+- HTTP und HTTPS laufen beide in ein Timeout: uhttpd/LuCI lauscht nicht, oder die Firewall blockiert es.
+- HTTP 404/Weiterleitung: Port-/Pfad-/HTTPS-Konfiguration.
+- SSH funktioniert: Suchen Sie die Dienste per SSH; ändern Sie das LAN nicht.
+
+</Step>
+
+<Step where="router-shell" title="Wenn SSH funktioniert, uhttpd und Ports prüfen" expected="Sie wissen, ob LuCI läuft und 80/443 lauschen.">
+
+```sh
+netstat -lnp | grep -E ':80|:443|:22'
+ps w | grep -E 'uhttpd|rpcd' | grep -v grep
+logread -e uhttpd | tail -30
+uci show uhttpd
+```
+
+Läuft uhttpd nicht, versuchen Sie:
+
+```sh
+/etc/init.d/uhttpd restart
+```
+
+Schlägt es weiterhin fehl, lesen Sie die Logs und die Firewall; starten Sie nicht wiederholt das gesamte Netzwerk neu.
+
+</Step>
+
+<Step where="router-shell" title="Prüfen, ob die Firewall das Management blockiert" expected="LAN zu Router 80/443/22 ist nicht versehentlich blockiert.">
+
+```sh
+uci show firewall
+logread | grep -i firewall | tail -20
+```
+
+Wenn Sie gerade eine Firewall-Zone geändert haben, stellen Sie das Backup wieder her oder korrigieren Sie sie an der Konsole; ändern Sie ohne Konsolenzugang nicht ständig weiter.
+
+</Step>
+
+## Ebene 5: lokale Konsole / Failsafe
+
+<Step where="console" title="An der Konsole bestätigen, dass das System lebt" expected="Sie sehen einen Login-Prompt oder das Kernel-Log.">
+
+Verwenden Sie Seriell/HDMI/Tastatur, IPMI oder eine Cloud-Konsole. Seriell ist oft `115200 8N1`, prüfen Sie es aber am Gerät. Gibt es keine Ausgabe, prüfen Sie zuerst Kabel/Baudrate/Stromversorgung.
+
+Sobald Sie drin sind:
+
+```sh
+ip addr show
+ip route
+uci show network
+uci show dhcp
+logread | tail -50
+```
+
+</Step>
+
+<Step where="console" title="Failsafe nur bei Bedarf verwenden" expected="Sie können LAN/DHCP ohne Werksreset wiederherstellen.">
+
+Das Timing der Failsafe-Taste ist geräteabhängig; folgen Sie der OpenWrt-Geräteseite bzw. dem Herstellerhandbuch. Sehen Sie sich nach dem Einstieg zuerst alles an:
+
+```sh
+uci show network
+uci show dhcp
+```
+
+Ist nur die LAN-Adresse falsch, ändern Sie sie zurück und starten Sie nach der Prüfung neu. Im Zweifel notieren/sichern Sie zuerst die Konfiguration; führen Sie nicht `firstboot` aus. Ein Zurücksetzen auf Werkseinstellungen löscht die Konfiguration.
+
+</Step>
+
+## Reihenfolge der Wiederherstellung
+
+1. **Nichts ändern**: Kabel/LAN-Port/statische Client-Adresse.
+2. **Ping funktioniert, Web nicht**: uhttpd/Firewall/HTTPS.
+3. **SSH funktioniert**: Dienste per SSH untersuchen; das LAN nicht ändern.
+4. **Kein SSH**: Konsole/Failsafe.
+5. **Werksreset zuletzt**: Bestätigen Sie, dass keine wichtige Konfiguration/kein Backup verloren geht, und denken Sie daran, dass Sie WAN/LAN/WLAN neu konfigurieren müssen.
+
+## Häufige Fehldiagnosen
+
+- Den WAN-Port als Management-Port verwenden.
+- Der Client hat noch ein altes Subnetz bzw. eine alte statische IP.
+- Der Browser erzwingt HTTPS, während LuCI HTTP verwendet.
+- Annehmen, LuCI sei in Ordnung, weil der Ping funktioniert.
+- Die LAN-Adresse ändern, ohne DHCP/Gateway anzupassen.
+- Eine Firewall-Regel blockiert das LAN-Management.
+- uhttpd fehlt bzw. wurde entfernt, aber das Netzwerk wird immer wieder neu gestartet.
+
+## E2-Laborlauf (2026-10-20)
+
+- Umgebung: OpenWrt 25.12.6 x86-VM 200; LAN `192.168.1.2`; HTTP vom PVE-Host aus geprüft.
+- `/etc/init.d/uhttpd stop`: curl auf `http://192.168.1.2/` lieferte `http=000` (Verbindung fehlgeschlagen); SSH blieb verfügbar.
+- `/etc/init.d/uhttpd start`: HTTP lieferte `200`.
+- Nicht getestet: Firewall-Drop, Änderung des uhttpd-Ports, fehlendes LuCI-Paket, echte serielle/Failsafe-Tastenfolge.
+- Rezept: `tests/recipes/troubleshooting-no-web-ui.md`.
+
+## E2-Status und Quellen
+
+- Dies ist E2 teilweise: uhttpd stoppen/wiederherstellen und der Erhalt von SSH wurden getestet; Firewall, Port und Failsafe bleiben Dokumentation.
+- Entscheiden Sie zuerst, ob es Link, Adresse, uhttpd oder Firewall ist; setzen Sie nicht auf Werkseinstellungen zurück, statt die Diagnose in Ebenen durchzuführen.
+- Konsolen-/Failsafe-Verfahren unterscheiden sich je nach Gerät/Firmware; lesen Sie zuerst die Gerätedokumentation.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86-VM 200; uhttpd stoppen/wiederherstellen, HTTP-80-Prüfung, SSH bleibt erhalten"
+  recipe="tests/recipes/troubleshooting-no-web-ui.md"
+  result="E2 teilweise: nach dem Stoppen von uhttpd wurde HTTP 80 verweigert und SSH blieb verfügbar; Start stellte HTTP 200 wieder her; Firewall/Portänderung/Failsafe ungetestet"
+/>
+
+<PageSources />

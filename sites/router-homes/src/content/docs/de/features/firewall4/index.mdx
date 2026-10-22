@@ -1,0 +1,51 @@
+---
+title: "firewall4: Die nftables-Firewall von OpenWrt und ihre Zonen"
+description: "Seit 22.03 ist die Firewall von OpenWrt firewall4 auf Basis von nftables, konfiguriert mit derselben zonenbasierten UCI-Syntax wie zuvor. Wie Sie sie lesen und was nicht mehr gilt."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt firewall4", "openwrt fw4", "openwrt nftables", "openwrt Firewall Zonen"]
+sources:
+  - label: "Release-Ankündigung OpenWrt 22.03.0"
+    url: https://forum.openwrt.org/t/openwrt-22-03-0-first-stable-release/136252
+  - label: "OpenWrt-Firewall-Konfiguration"
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: 'df759f219b1c8f62'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="firewall4" />
+
+## In einem Satz
+
+Seit 22.03 ist die Standard-Firewall von OpenWrt firewall4 (fw4). Sie erzeugt nftables-Regeln statt iptables und behält in `/etc/config/firewall` die UCI-Syntax des älteren fw3 bei.
+
+## Zonen statt Regellisten
+
+- Schnittstellen werden in Zonen zusammengefasst, meist `lan` und `wan`. Richtlinien und Weiterleitungen werden zwischen Zonen festgelegt.
+- In der Standardeinrichtung sind LAN und WAN getrennte Zonen, und LAN-Verkehr wird ins WAN weitergeleitet. Verbindungen aus dem WAN in Ihr Netzwerk werden nicht weitergeleitet, solange Sie keine Regel hinzufügen.
+- Neue Schnittstellen, etwa ein Gastnetz oder ein WireGuard-Tunnel, brauchen normalerweise eine eigene Zone oder müssen einer bestehenden Zone beitreten.
+
+## Auf dem eigenen Router ansehen
+
+```sh
+uci show firewall | grep '=zone'
+fw4 print
+```
+
+`fw4 print` gibt die Tabellen-, Chain- und Regelstruktur aus, die fw4 laden würde, ohne etwas anzuwenden. Nachdem Sie die Konfiguration bearbeitet haben, wendet `fw4 reload` sie an.
+
+## Achtung
+
+- Anleitungen, die auf `iptables -A …`-Befehlen beruhen, gelten für fw4 nicht. Formulieren Sie die Regel stattdessen in UCI.
+- Eine falsche Zone bei einer neuen Schnittstelle ist ein häufiger Grund dafür, dass ein Tunnel oder ein Gastnetz „verbunden ist, aber kein Internet hat“.
+
+## Verwandte Anleitungen
+
+- [WireGuard-Server](/de/remote-access/wireguard-server/)
+- [Gast-WLAN](/de/wireless-vlan/guest-wifi/)
+- [Bypass-Gateway](/de/network/bypass-gateway/)
+
+<PageSources />

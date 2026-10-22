@@ -1,0 +1,154 @@
+---
+title: "DSA-VLAN: Ports, PVID, tagged/untagged und Rollback"
+description: Port-VLANs mit bridge-vlan unter DSA konfigurieren, tagged/untagged/PVID und Trunk verstehen, einen Management-Port behalten und jeweils nur einen Port ändern. Nur Dokumentation; nicht auf echter Switching-Hardware verifiziert.
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Aus der OpenWrt-25.12-DSA/VLAN-Dokumentation zusammengestellt; nicht auf echter Multiport-DSA-Hardware bzw. einem echten Switch verifiziert'
+testRecipe: 'tests/recipes/dsa-vlan-25.12.md'
+aliases: ['openwrt dsa vlan', 'openwrt vlan einrichten', 'bridge-vlan', 'openwrt tagged untagged']
+symptoms: ['VLAN funktioniert nicht', 'Zugriff nach VLAN-Änderung verloren', 'Trunk wird nicht erkannt', 'falsche Port-PVID']
+sources:
+  - label: OpenWrt DSA Mini-Tutorial
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+  - label: OpenWrt-VLAN-Konfiguration
+    url: https://openwrt.org/docs/guide-user/network/vlan/switch_configuration
+  - label: OpenWrt-Netzwerkkonfiguration
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt-Firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: 'ffd770023be30d71'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="DSA-Gerät mit mehreren Ports (ungetestet)" tested={false} evidence="E1" />
+
+> **Status**: E1-Dokumentation. Die VLAN-Konfiguration hängt von den genauen DSA-Portnamen, dem CPU-Port und der Gegenstelle am Switch ab; ohne echte Hardware sollten Sie das Beispiel nicht als verifiziert betrachten.
+
+## DSA vs. swconfig
+
+- Ältere Geräte verwenden oft `swconfig`: `switch0`, Ports 0/1/2;
+- DSA stellt jeden Port als `lan1`, `lan2`, `wan` usw. bereit;
+- Modernes OpenWrt verwendet **Bridge VLAN filtering**, nicht die `vid/ports`-Syntax von `swconfig`;
+- Die Portnamen unterscheiden sich je nach Gerät: `ip -d link show`, `ls /sys/class/net`.
+
+## Vor der Änderung festhalten
+
+<Step where="router-shell" title="DSA, Portnamen und Management-Zugang bestätigen" expected="Sie wissen, welcher Port LAN/WAN ist und worüber Sie das Gerät verwalten.">
+
+```sh
+ip -d link show
+ls /sys/class/net
+uci show network
+uci show firewall | grep -E 'zone.*name|zone.*network'
+bridge vlan show
+```
+
+- Hat `br-lan` bereits ein `bridge-vlan`?
+- Welcher physische Port trägt das Management?
+- Ist die Gegenstelle am Switch bereits als Trunk/tagged konfiguriert?
+- Sichern: `cp /etc/config/network /etc/config/network.bak.$(date +%F)`.
+
+</Step>
+
+## bridge-vlan-Beispiel
+
+Angenommen, die DSA-Ports sind `lan1`, `lan2`, `lan3`; machen Sie `lan1` zu einem Trunk (VLAN 1 + 20 tagged) und `lan2/lan3` zu VLAN-1-Access-Ports:
+
+```uci
+config device
+    option name 'br-lan'
+    option type 'bridge'
+    list ports 'lan1'
+    list ports 'lan2'
+    list ports 'lan3'
+
+config bridge-vlan
+    option device 'br-lan'
+    option vlan '1'
+    list ports 'lan1:u*'
+    list ports 'lan2:u*'
+    list ports 'lan3:u*'
+
+config bridge-vlan
+    option device 'br-lan'
+    option vlan '20'
+    list ports 'lan1:t'
+```
+
+Wichtige Punkte:
+
+- `u*`: untagged und die PVID dieses Ports für das VLAN;
+- `t`: tagged, über einen Trunk übertragen;
+- ein Access-Port hat normalerweise nur eine untagged PVID;
+- beide Enden eines Trunks zwischen Switches müssen tagged sein und dieselben VLANs zulassen;
+- behalten Sie keine alte `swconfig`-Konfiguration daneben.
+
+> Ersetzen Sie Portnamen und CPU-Port durch die Ihres Geräts; testen Sie im Zweifel an einem freien Port bzw. Gerät.
+
+## Anwenden und prüfen
+
+```sh
+uci commit network
+/etc/init.d/network reload
+bridge vlan show
+ip -d link show br-lan
+```
+
+Prüfen:
+
+- das Management erreicht weiterhin LuCI/SSH;
+- ein Access-Client erhält DHCP aus dem richtigen VLAN;
+- die Trunk-Gegenstelle sieht die getaggten VLANs;
+- `bridge vlan show` entspricht dem PVID-/Tagged-Entwurf.
+
+## Wiederherstellung nach verlorenem Zugriff
+
+1. Verwenden Sie Konsole/Seriell; verlassen Sie sich nicht allein auf das Netzwerk;
+2. Stellen Sie `/etc/config/network.bak.*` wieder her;
+3. Oder setzen Sie den Management-Port vorübergehend zurück auf untagged VLAN 1;
+4. Starten Sie das Netzwerk neu und bestätigen Sie das Management;
+5. Fügen Sie VLANs einzeln, Port für Port, hinzu.
+
+## Häufige Fehler
+
+### Zugriff sofort verloren
+
+- Management-Port auf tagged bzw. falsche PVID geändert;
+- die Trunk-Gegenstelle lässt das VLAN nicht zu;
+- CPU-/Uplink-Port wurde auf einmal geändert;
+- über die Konsole wiederherstellen; nicht blind auf Werkseinstellungen zurücksetzen.
+
+### VLAN 20 nicht erreichbar
+
+- tagged/untagged passt an den beiden Enden nicht zusammen;
+- PVID nicht gesetzt;
+- keine Schnittstelle/kein DHCP/keine Firewall für dieses VLAN;
+- VLAN am Switch nicht angelegt bzw. nicht zugelassen.
+
+### Adresse vorhanden, aber kein Internet
+
+- dem Gast-/Dienst-VLAN fehlen DHCP/DNS;
+- Firewall-Zone/Weiterleitung passt nicht;
+- NAT/Rückroute fehlt;
+- VLAN-Konnektivität ist kein Routing/NAT.
+
+## E1-Status
+
+- Nur Dokumentation; nicht auf echter DSA-Hardware bzw. einem echten Switch verifiziert; keine Aussage „erfolgreich konfiguriert“.
+- Echte Tests erfordern ein DSA-Gerät mit mehreren Ports, einen Managed Switch, Konsolenzugang, eine Rollback-Konfiguration und mindestens zwei Clients.
+- Erst nach Aufzeichnung von Gerätemodell, Portnamen, Switch-Konfiguration und Fehlerwiederherstellung auf E2 anheben.
+
+<TestRecord
+  status="planned"
+  environment="Aus der OpenWrt-25.12-DSA/VLAN-Dokumentation zusammengestellt; nicht auf echter Multiport-DSA-Hardware bzw. einem echten Switch verifiziert"
+  recipe="tests/recipes/dsa-vlan-25.12.md"
+  result="E1: DSA-Ports, bridge-vlan, tagged/untagged/PVID und Rollback dokumentiert; keine Validierung auf echter Hardware und keine Aussage „es funktioniert“"
+/>
+
+<PageSources />

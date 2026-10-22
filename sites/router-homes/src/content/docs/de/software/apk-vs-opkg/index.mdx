@@ -1,0 +1,178 @@
+---
+title: "25.12 apk vs. 24.10 opkg: Befehle, Paketformat und Migrationsgrenzen"
+description: 25.12 verwendet apk und 24.10 verwendet opkg; Vergleich von Paketformat, Feed-Dateien und Update-/Installations-/Abfragebefehlen und warum ein Upgrade eine Neuinstallation der Pakete statt einer Paketkonvertierung erfordert.
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86 VM 200; apk offizielle/TUNA-Feeds mit 11220 Paketen; SQM installiert; 24.10 opkg nicht ausgeführt'
+testRecipe: 'tests/recipes/apk-vs-opkg.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['apk vs opkg', 'openwrt apk', 'openwrt opkg', 'openwrt paketmanager']
+symptoms: ['apk-Befehl nicht gefunden', 'opkg-Befehl nicht gefunden', 'ipk lässt sich nicht installieren', 'Paketmanager nach Upgrade geändert']
+sources:
+  - label: OpenWrt apk-Paketmanager
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+  - label: OpenWrt opkg-Paketmanager
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg
+  - label: OpenWrt opkg-zu-apk-Spickzettel
+    url: https://openwrt.org/docs/guide-user/additional-software/opkg-to-apk-cheatsheet
+  - label: OpenWrt 25.12 Release Notes
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+sourceHash: '6add07f476cef0f1'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## In einer Zeile
+
+- **25.12+**: `apk`, Pakete sind `.apk`;
+- **24.10 und älter**: `opkg`, Pakete sind `.ipk`;
+- Sie sind nicht durch Umbenennen verwandt; **benennen Sie `.ipk` nicht in `.apk` um**;
+- Installieren Sie nach dem Upgrade auf 25.12 Plugins aus den `apk`-Feeds neu; die Konfiguration kann gesichert/wiederhergestellt werden.
+
+## Prüfen, auf welcher Seite Sie sind
+
+```sh
+cat /etc/openwrt_release
+command -v apk
+command -v opkg
+```
+
+In diesem Labor: 25.12.6, `apk` ist vorhanden, `opkg` nicht.
+
+## Vergleich
+
+| Punkt | 25.12 `apk` | 24.10 `opkg` |
+|---|---|---|
+| Format | `.apk` | `.ipk` |
+| Feed-Datei | `/etc/apk/repositories.d/distfeeds.list` | `/etc/opkg/distfeeds.conf` |
+| Index aktualisieren | `apk update` | `opkg update` |
+| Installieren | `apk add <pkg>` | `opkg install <pkg>` |
+| Entfernen | `apk del <pkg>` | `opkg remove <pkg>` |
+| Suchen | `apk search <term>` | `opkg list \| grep <term>` |
+| Installiert | `apk list --installed` | `opkg list-installed` |
+| Paketinfo | `apk info -a <pkg>` | `opkg info <pkg>` |
+| Cache leeren | `apk cache clean` | `opkg clean` |
+
+## Feeds und Architektur
+
+25.12:
+
+```text
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/packages/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/packages/x86_64/base/packages.adb
+https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/kmods/<kernel-hash>/packages.adb
+```
+
+24.10:
+
+```text
+src/gz openwrt_core https://downloads.openwrt.org/releases/24.10.8/targets/x86/64/packages
+src/gz openwrt_base https://downloads.openwrt.org/releases/24.10.8/packages/x86_64/base
+```
+
+- `release`, `target`, `arch` und kmod-Hash müssen übereinstimmen;
+- Das Mischen von offiziellen/ImmortalWrt-/iStoreOS-Feeds kann ABI/Signaturen/Namen brechen;
+- Ein China-Mirror ändert nur Host/Pfadpräfix; ändern Sie nicht Target/Arch.
+
+## Häufige Operationen
+
+<Step where="router-shell" title="Ein Paket unter 25.12 installieren" expected="Update, Suche, Installation und Verifikation verwenden alle apk.">
+
+```sh
+apk update
+apk search -x sqm-scripts
+apk add sqm-scripts
+apk info -e sqm-scripts
+apk list --installed | wc -l
+```
+
+In diesem Labor: offizieller Feed/TUNA beide mit 11220 Paketen; `sqm-scripts 1.7.2-r1` installiert.
+
+</Step>
+
+<Step where="router-shell" title="Äquivalent unter 24.10" expected="Befehle und Format sind opkg/ipk; mischen Sie kein apk hinein.">
+
+```sh
+opkg update
+opkg list | grep sqm-scripts
+opkg install sqm-scripts
+opkg list-installed | grep sqm-scripts
+```
+
+Dies sind offizielle Entsprechungen, **hier nicht ausgeführt** (kein 24.10-Gerät); geben Sie sie nicht als gemessene Ausgabe aus.
+
+</Step>
+
+## Beim Upgrade auf 25.12
+
+1. Sichern Sie `/etc/config` und die Paketliste (siehe 018);
+2. Notieren Sie `opkg list-installed` von 24.10;
+3. Führen Sie das Upgrade durch bzw. flashen Sie 25.12 neu (siehe 019);
+4. Installieren Sie Plugins aus den `apk`-Feeds neu;
+5. Stellen Sie die Konfiguration wieder her und prüfen Sie LuCI/Dienste/DNS;
+6. Konvertieren Sie `.ipk` nicht in `.apk` und kopieren Sie keine alten Paketverzeichnisse.
+
+Das 25.12-sysupgrade in diesem Labor behielt die Konfiguration, verlor aber Pakete (239→182); SQM/OpenClash mussten neu installiert werden.
+
+## Häufige Fehler
+
+### `apk: not found`
+
+- Die Firmware ist 24.10 oder älter; verwenden Sie `opkg`;
+- „Einen apk-Paketmanager installieren“ ist nicht die Lösung; prüfen Sie zuerst das Release.
+
+### `opkg: not found`
+
+- Die Firmware ist 25.12+; verwenden Sie `apk`;
+- Alte Anleitungen/Skripte mit `opkg` sind nicht direkt anwendbar.
+
+### `.ipk` lässt sich nicht installieren
+
+- 25.12 verwendet `.apk`;
+- Umbenennen ändert das Format nicht;
+- Suchen Sie die `.apk` für Release/Target/Arch oder bauen Sie neu.
+
+### 404-/Signatur-/Abhängigkeitsfehler
+
+- Release/Target/Arch/kmod-Hash passen nicht;
+- gemischte Feeds;
+- Systemzeit/Zertifikate;
+- umgehen Sie das nicht routinemäßig mit `--allow-untrusted`.
+
+### Nach dem Upgrade kein LuCI-Menü
+
+- Das Hauptprogramm wurde ohne `luci-app-*` installiert;
+- das alte Plugin wurde nicht neu installiert;
+- Browser-Cache/erneut anmelden;
+- siehe 017.
+
+## E2-Laborlauf (2026-10-20)
+
+- Umgebung: OpenWrt 25.12.6 x86 VM 200; `apk`; offizielle/TUNA-Feeds.
+- Offizielles/TUNA-`apk update`: beide 11220 Pakete; `apk add sqm-scripts` gelang.
+- Nach 25.12-`sysupgrade`: Pakete 239→182; SQM/OpenClash verschwanden und mussten neu installiert werden.
+- Nicht ausgeführt: 24.10 `opkg` update/install/list, echte Migration 24.10→25.12, architekturübergreifende Pakete.
+- Rezept: `tests/recipes/apk-vs-opkg.md`.
+
+## Quellen und Review
+
+- Dies ist E2 partiell: 25.12 apk wurde getestet; 24.10 opkg ist eine offizielle Befehlsreferenz und hier nicht ausgeführt.
+- Machen Sie aus einem Befehlsvergleich keine „verifizierte Migration“; sichern Sie und testen Sie zuerst in einer VM.
+- Kein unabhängiger Reviewer; die Schlussfolgerungen beschränken sich auf diese 25.12-x86-Umgebung.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86 VM 200; apk offizielle/TUNA-Feeds mit 11220 Paketen; SQM installiert; 24.10 opkg nicht ausgeführt"
+  recipe="tests/recipes/apk-vs-opkg.md"
+  result="E2 partiell: 25.12 apk update/search/install und Mirror-Wechsel wurden getestet; 25.12-sysupgrade verlor Pakete 239→182; 24.10-opkg-Befehle/-Format sind nur Dokumentation, nicht ausgeführt"
+  date="2026-10-20"
+/>
+
+<PageSources />

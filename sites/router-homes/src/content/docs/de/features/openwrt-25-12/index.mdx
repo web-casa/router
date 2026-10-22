@@ -1,0 +1,65 @@
+---
+title: "OpenWrt 25.12: Was sich seit 24.10 geändert hat und wann Sie upgraden sollten"
+description: "OpenWrt 25.12 „Dave’s Guitar“ wechselt zu apk, stellt alle Targets auf Linux 6.12 um und unterstützt über 2200 Geräte. Was sich geändert hat und was Sie vor dem Upgrade prüfen sollten."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt 25.12", "openwrt 25.12 release", "was ist neu in openwrt 25.12", "openwrt 25.12 Upgrade"]
+sources:
+  - label: "Release-Ankündigung OpenWrt 25.12.0"
+    url: https://forum.openwrt.org/t/openwrt-25-12-0-stable-release/247228
+  - label: "Service-Release OpenWrt 25.12.6"
+    url: https://forum.openwrt.org/t/openwrt-25-12-6-service-release/254604
+  - label: "Release Notes OpenWrt 25.12.0"
+    url: https://openwrt.org/releases/25.12/notes-25.12.0
+  - label: "Release-Ankündigung OpenWrt 24.10.0"
+    url: https://forum.openwrt.org/t/openwrt-24-10-0-first-stable-release/223845
+sourceHash: 'bf464024aeedffe3'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="openwrt-25-12" />
+
+## In einem Satz
+
+OpenWrt 25.12 ist die aktuelle stabile Serie. Die Images von 25.12.0 sind auf den 2026-03-03 datiert, und 25.12.6 (2026-10-18) ist zum Zeitpunkt der Erstellung das neueste Service-Release.
+
+## Was sich seit 24.10 geändert hat
+
+- **Paketmanager.** apk ersetzt opkg. Nur wenige Paketnamen haben sich geändert, die Kommandozeilenargumente sind jedoch andere. Siehe [apk ersetzt opkg](/de/features/apk/).
+- **Kernel.** Jedes Target läuft mit Linux 6.12: 6.12.71 in 25.12.0 und 6.12.112 in 25.12.6. 24.10 verwendete 6.6. Siehe [Kernel und Toolchain](/de/features/kernel-toolchain/).
+- **Toolchain.** GCC 14.3.0, binutils 2.44, musl 1.2.5, glibc 2.41.
+- **Upgrades.** Die LuCI-App „attended sysupgrade“ ist standardmäßig installiert. Auf Geräten mit größerem Flash-Speicher ist zusätzlich `owut` enthalten.
+- **Unter der Haube.** Die WLAN-Skripte wurden in ucode neu geschrieben, und die Shell-Historie wird jetzt in einem RAM-basierten Dateisystem gehalten.
+- **Hardware.** Über 2200 unterstützte Geräte, davon mehr als 180 neu. Neue Targets sind unter anderem siflower, sunxi/arm926ejs und microchipsw/lan969x.
+
+Das Release trägt zu Ehren von Dave Täht den Namen „Dave’s Guitar“ und bringt über 4700 Commits seit 24.10 mit.
+
+## Sollten Sie upgraden?
+
+- **Unter 24.10:** Laut der Ankündigung von 25.12.0 erhält 24.10 nach September 2026 keine Sicherheitsupdates mehr. Planen Sie den Wechsel.
+- **Unter 23.05:** Ein Upgrade direkt von 23.05 auf 25.12 mit sysupgrade wird offiziell nicht unterstützt. Lesen Sie die Release Notes, bevor Sie einen Weg wählen.
+- **Mit Hersteller- oder Drittanbieter-Firmware:** Prüfen Sie zuerst, was tatsächlich läuft, mit [Welches OpenWrt ist das?](/de/getting-started/which-openwrt/).
+
+Erstellen Sie vor jedem Upgrade ein Backup und halten Sie einen kabelgebundenen Zugang zum Router bereit. [Firmware-Upgrade](/de/recovery/firmware-upgrade/) führt Sie Schritt für Schritt durch den Ablauf.
+
+## Auf dem eigenen Router ansehen
+
+Diese Befehle lesen nur:
+
+```sh
+cat /etc/openwrt_release
+uname -r
+```
+
+`DISTRIB_RELEASE` zeigt das Release, und `uname -r` zeigt die Kernel-Version.
+
+## Verwandte Anleitungen
+
+- [Firmware-Upgrade](/de/recovery/firmware-upgrade/)
+- [Sichern und Wiederherstellen](/de/recovery/backup-restore/)
+- [apk vs. opkg](/de/software/apk-vs-opkg/)
+
+<PageSources />

@@ -1,0 +1,193 @@
+---
+title: "Gast-WLAN: separate SSID, VLAN, DHCP und Isolation"
+description: Isolieren Sie Gäste mit einer separaten SSID, einem eigenen Subnetz, DHCP und einer eigenen Firewall-Zone, erlauben Sie nur Internetzugriff und sperren Sie den Zugriff auf das Haupt-LAN. WLAN und VLAN sind auf echter Hardware nicht verifiziert.
+pageType: network
+tested: false
+testedVersions: ['25.12.6']
+evidenceLevel: E1
+testEnvironment: 'Zusammengestellt aus der OpenWrt-25.12-Dokumentation zu WLAN/VLAN/Firewall; keine Validierung mit echter WLAN-/Switch-Hardware'
+testRecipe: 'tests/recipes/guest-wifi-25.12.md'
+aliases: ['openwrt guest wifi', 'openwrt guest network', 'openwrt wifi isolation', 'openwrt guest wi-fi', 'openwrt Gast-WLAN', 'openwrt Gastnetz']
+symptoms: ['Gäste erreichen das LAN', 'Gast hat kein Internet', 'Gast-WLAN erhält keine Adresse', 'VLAN-Isolation schlägt fehl']
+sources:
+  - label: OpenWrt-Gast-WLAN
+    url: https://openwrt.org/docs/guide-user/network/wifi/guestwifi/guest-wlan
+  - label: OpenWrt-WLAN-Konfiguration
+    url: https://openwrt.org/docs/guide-user/network/wifi/basic
+  - label: OpenWrt-Firewall-Zonen
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt DSA VLAN
+    url: https://openwrt.org/docs/guide-user/network/dsa/dsa-mini-tutorial
+sourceHash: 'b918dd049823d2a8'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="Gerät mit WLAN + DSA (ungetestet)" tested={false} evidence="E1" />
+
+> **Status**: E1-Dokumentation. Die Gastisolation umfasst WLAN, VLAN, DHCP und Firewall; ohne echte WLAN-Hardware sollten Sie nicht behaupten, das Netz sei „isoliert“.
+
+## Ziele
+
+- Gäste nutzen eine separate SSID;
+- Gäste erhalten ein separates Subnetz;
+- Gäste erreichen das Internet, nicht aber das Haupt-LAN bzw. die Verwaltungsoberfläche;
+- das Haupt-LAN kann keinen Zugriff auf Gäste initiieren (je nach Richtlinie);
+- das Gastnetz lässt sich schnell abschalten.
+
+## Optionen
+
+| Option | Isolation | Voraussetzungen |
+|---|---|---|
+| gleiche Bridge + separate SSID/Zone | mittel | mehrere SSIDs; Firewall |
+| separates VLAN + SSID | stärker | DSA/Switch-VLAN; AP-Tagging |
+| separater AP/physische Isolation | am stärksten | separates Gerät/separater Port |
+
+Diese Seite behandelt „separate SSID + Gast-Zone“ und wie ein VLAN dies verstärkt; Details zu VLAN stehen in 023.
+
+## 1. Gast-Subnetz erstellen
+
+```sh
+uci set network.guest=interface
+uci set network.guest.proto='static'
+uci set network.guest.device='br-guest'
+uci set network.guest.ipaddr='192.168.50.1/24'
+uci set network.guest.ip6assign='60'
+uci commit network
+```
+
+`br-guest` kann eine separate Bridge sein (mit hinzugefügter WLAN-Schnittstelle) oder eine VLAN-Schnittstelle; mischen Sie es nicht in `br-lan` und verlassen Sie sich nicht allein auf die Firewall.
+
+## 2. DHCP/DNS für Gäste
+
+```sh
+uci set dhcp.guest=dhcp
+uci set dhcp.guest.interface='guest'
+uci set dhcp.guest.start='100'
+uci set dhcp.guest.limit='100'
+uci set dhcp.guest.leasetime='1h'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+```
+
+Ist das Gastnetz ein VLAN, binden Sie DHCP an diese Schnittstelle; vergeben Sie nicht den Adresspool des Haupt-LANs.
+
+## 3. Firewall: nur Internet
+
+```sh
+uci add firewall zone
+uci set firewall.@zone[-1].name='guest'
+uci set firewall.@zone[-1].input='REJECT'
+uci set firewall.@zone[-1].output='ACCEPT'
+uci set firewall.@zone[-1].forward='REJECT'
+uci add_list firewall.@zone[-1].network='guest'
+uci commit firewall
+
+uci add firewall forwarding
+uci set firewall.@forwarding[-1].src='guest'
+uci set firewall.@forwarding[-1].dest='wan'
+uci commit firewall
+/etc/init.d/firewall reload
+```
+
+Wichtige Punkte:
+
+- fügen Sie **keine** Weiterleitung von guest nach lan hinzu;
+- die Weiterleitung von guest nach wan ist erlaubt; NAT hängt vom Masquerading der wan-Zone ab;
+- werden DHCP/DNS durch input REJECT blockiert, fügen Sie Regeln von guest zum Router für 53/67 hinzu, statt input auf ACCEPT zu setzen;
+- das Haupt-LAN kann standardmäßig keinen Zugriff auf das Gastnetz initiieren; erlauben Sie Drucken/Casting bei Bedarf separat.
+
+## 4. Gast-SSID hinzufügen
+
+```sh
+uci set wireless.guest=wifi-iface
+uci set wireless.guest.device='radio0'
+uci set wireless.guest.network='guest'
+uci set wireless.guest.mode='ap'
+uci set wireless.guest.ssid='OpenWrt-Guest'
+uci set wireless.guest.encryption='psk2'
+uci set wireless.guest.key='<guest-password>'
+uci set wireless.guest.isolate='1'
+uci commit wireless
+wifi reload
+```
+
+- `network='guest'` muss zur Gast-Schnittstelle passen;
+- `isolate='1'` isoliert WLAN-Clients untereinander, nicht vom Haupt-LAN; die Isolation vom LAN erfordert weiterhin Firewall/VLAN;
+- passen Sie 2,4/5 GHz, Kanal und Breite an das Gerät an;
+- mehrere APs: gleiche SSID/gleiches Passwort/gleiche Sicherheit, versetzte Kanäle.
+
+## 5. Bei Verwendung von VLAN
+
+- erstellen Sie ein dediziertes Gast-VLAN (z. B. 20) auf DSA/Switch;
+- binden Sie die Gast-SSID an dieses VLAN;
+- taggen Sie den Trunk auf beiden Seiten und erlauben Sie VLAN 20;
+- binden Sie Gast-Schnittstelle/DHCP an VLAN 20;
+- setzen Sie das Gast-VLAN nicht als untagged PVID auf dem Verwaltungs-VLAN.
+
+Die Syntax von `bridge-vlan` finden Sie in 023.
+
+## Prüfung (mit Hardware)
+
+```sh
+iwinfo
+ip -4 addr show
+bridge vlan show
+```
+
+Client:
+
+- verbindet sich mit `OpenWrt-Guest`, erhält `192.168.50.x`;
+- erreicht Internet/DNS;
+- kann das Haupt-LAN `192.168.1.0/24`, die LuCI-Verwaltung und NAS/Drucker **nicht** erreichen;
+- das Haupt-LAN kann keinen Zugriff auf das Gastnetz initiieren (je nach Richtlinie);
+- das Abschalten der Gast-SSID stört das Haupt-LAN nicht.
+
+Ohne WLAN-/VLAN-Hardware ist nichts davon „verifiziert“.
+
+## Häufige Fehler
+
+### Gäste erreichen das Haupt-LAN
+
+- keine separate Zone/Weiterleitung;
+- Gast und lan teilen sich eine Bridge;
+- Firewall-Regel/Reihenfolge/Zone falsch;
+- das VLAN ist nicht isoliert, nur die SSID wurde geändert.
+
+### Gast erhält keine Adresse
+
+- DHCP ist nicht an die Gast-Schnittstelle gebunden;
+- die Gast-Schnittstelle ist down;
+- falsches VLAN-Tag/falsche PVID;
+- die Firewall blockiert DHCP/DNS.
+
+### Gast hat kein Internet
+
+- keine Weiterleitung von guest nach wan;
+- WAN-Masquerading/NAT;
+- DNS nicht erlaubt;
+- Upstream-Route.
+
+### Das Abschalten des Gastnetzes stört das Haupt-LAN
+
+- Gast und lan teilen sich eine Bridge/ein VLAN;
+- PVID/Tag des Verwaltungsports geändert;
+- stellen Sie den Zugriff über die Konsole wieder her; setzen Sie nicht auf Werkseinstellungen zurück.
+
+## E1-Status
+
+- Nur Dokumentation; nicht auf echter WLAN-/DSA-Hardware verifiziert; keine Aussage „die Gastisolation ist aktiv“.
+- Ein echtes E2 erfordert: AP mit mehreren SSIDs, VLAN-fähigen Switch bzw. DSA-Gerät, zwei Clients, Konsole und Rollback-Konfiguration.
+- Halten Sie nach dem Test Gerätemodell, VLAN/SSID, Firewall-Zone, DHCP und das Isolationsergebnis fest.
+
+<TestRecord
+  status="planned"
+  environment="Zusammengestellt aus der OpenWrt-25.12-Dokumentation zu WLAN/VLAN/Firewall; keine Validierung mit echter WLAN-/Switch-Hardware"
+  recipe="tests/recipes/guest-wifi-25.12.md"
+  result="E1: Separate SSID, eigenes Subnetz, DHCP, Firewall-Zone, Isolation und VLAN-Ansatz dokumentiert; nicht auf echter WLAN-/Switch-Hardware verifiziert"
+/>
+
+<PageSources />

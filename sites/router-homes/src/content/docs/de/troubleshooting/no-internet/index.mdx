@@ -1,0 +1,179 @@
+---
+title: "Kein Internet oder sporadische Abbrüche: alle Geräte, ein Client, eine App"
+description: Unterscheiden Sie anhand von fünf Schichten (WAN, DNS, LAN/DHCP, Client-Route, App-Proxy) einen Ausfall des gesamten Netzwerks von einem Ausfall einzelner Geräte oder einzelner Apps.
+pageType: troubleshoot
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86-VM 200; WAN 192.168.50.191/24; LAN 192.168.1.1; netns-Client 192.168.1.175'
+testRecipe: 'tests/recipes/no-internet-triage-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt kein internet', 'openwrt verbindungsabbrüche', 'nur ein gerät hat kein internet', 'dns-auflösung schlägt fehl', 'openwrt dns']
+symptoms: ['alle Geräte offline', 'nur ein Gerät offline', 'Ping auf IP funktioniert, Webseiten nicht', 'Netzwerk bricht sporadisch ab']
+sources:
+  - label: OpenWrt-Netzwerk-Fehlersuche
+    url: https://openwrt.org/docs/guide-user/network/troubleshooting
+  - label: OpenWrt DHCP und DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt-Firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt Failsafe
+    url: https://openwrt.org/docs/guide-user/troubleshooting/failsafe_and_factory_reset
+sourceHash: 'bd543737b04bca88'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE-VM 200" tested={true} evidence="E2" />
+
+## Festlegen, um welches „Kein Internet“ es sich handelt
+
+| Symptom | Wahrscheinlichere Schicht | Erster Schritt |
+|---|---|---|
+| Alle Geräte können nicht surfen | WAN/Upstream/DNS/NAT | WAN/DNS vom Router aus testen |
+| Nur ein Gerät ist offline | IP/Gateway/DNS/WLAN/VPN dieses Clients | mit einem anderen Client im selben LAN vergleichen |
+| Nur eine App schlägt fehl | DNS/Proxy/QUIC/IPv6 der App | anderen Browser testen, Proxy deaktivieren, DNS prüfen |
+| Sporadisch | Link, DHCP-Lease, WLAN, Upstream | Zeitverlauf festhalten; ein einzelner Ping genügt nicht |
+| Ping auf IP funktioniert, Web nicht | DNS oder Proxy | `nslookup` + alternativer DNS |
+
+## Fünf Schichten
+
+### 1. WAN / Upstream
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+ping -c 3 192.168.50.1
+ping -c 3 1.1.1.1
+```
+
+- Keine WAN-Adresse: Prüfen Sie DHCP/PPPoE (siehe 007);
+- Gateway nicht erreichbar: Kabel/Upstream/ONT;
+- Gateway erreichbar, aber öffentliche IP nicht: Upstream/NAT/Firewall;
+- Teilweiser Paketverlust: Notieren Sie Zeit und Link-Status, bevor Sie die Konfiguration ändern.
+
+### 2. DNS
+
+```sh
+nslookup openwrt.org 127.0.0.1
+nslookup openwrt.org 192.168.50.1
+cat /tmp/resolv.conf.d/resolv.conf.auto
+logread | grep -i dnsmasq | tail -20
+```
+
+Bei gestopptem dnsmasq in diesem Labor:
+
+- der Router-`ping 1.1.1.1` funktionierte weiterhin;
+- `nslookup openwrt.org 127.0.0.1` schlug fehl;
+- der Client-`ping 1.1.1.1` funktionierte, DNS schlug fehl;
+- ein Neustart von dnsmasq stellte den Betrieb wieder her.
+
+Das ist das klassische Muster „IP funktioniert, Namen nicht“.
+
+### 3. LAN / DHCP / Client-Adresse
+
+```sh
+ip -4 addr show br-lan
+cat /tmp/dhcp.leases
+ip neigh
+```
+
+Auf dem Client:
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.1.1
+```
+
+Ein falsches Gateway, ein IP-Konflikt oder ein altes Subnetz wirken alle wie „nur dieses Gerät ist offline“.
+
+### 4. Firewall / NAT / Weiterleitung
+
+```sh
+uci show firewall
+nft list ruleset 2>/dev/null | head -80
+logread | grep -i firewall | tail -20
+```
+
+Hat WAN eine Adresse und DNS ist in Ordnung, aber LAN-Clients erreichen das Internet nicht, prüfen Sie:
+
+- LAN-/WAN-Zonen;
+- WAN-Masquerading;
+- Weiterleitung LAN→WAN;
+- eigene Regeln, die DNS bzw. Weiterleitung blockieren.
+
+### 5. Ein Client / eine App
+
+Ein Client:
+
+- entfernen Sie dessen Default-Route: `ip route del default`; funktioniert das Gateway weiterhin, aber die öffentliche IP nicht, liegt das Problem in der Route dieses Clients;
+- stellen Sie sie wieder her: `ip route add default via 192.168.1.1`;
+- prüfen Sie WLAN, VPN, Proxy, privaten DNS und die IPv6-Präferenz.
+
+Eine App:
+
+- testen Sie einen anderen Browser / deaktivieren Sie den Proxy;
+- vergleichen Sie mit `nslookup`/`curl -v`;
+- DoH/QUIC/Proxy auf App-Ebene können den DNS des Routers umgehen;
+- installieren Sie die App nicht neu, statt die Diagnose schichtweise durchzuführen.
+
+## Aufgezeichnete Demo (Labor 015)
+
+<TerminalCast
+  src="/casts/015-triage.cast"
+  title="Labor 015: DNS, WAN und Route eines einzelnen Clients"
+  caption="Echte OpenWrt-25.12.6-VM + netns-Client: DNS stoppen (IP funktioniert/DNS schlägt fehl), ifdown WAN (Gateway funktioniert/öffentlich schlägt fehl), dann die Default-Route des Clients entfernen (nur dieser Client fällt aus). Maßgeblich sind die Codeblöcke."
+/>
+
+## Sporadische Abbrüche aufzeichnen
+
+Schreiben Sie nicht „bricht manchmal ab“. Notieren Sie:
+
+- Zeitpunkt, Dauer, ob es sich selbst wieder erholt;
+- alle Geräte oder eines;
+- Kabel gegenüber WLAN, 2,4/5 GHz;
+- ob sich die WAN-Adresse bzw. der Lease geändert hat;
+- Zeitstempel zu Link/DHCP/DNS/Firewall in `logread`;
+- ob es bei Download/Upload/Roaming/Ruhezustand auftritt.
+
+Ohne Zeitverlauf lassen sich „sporadische“ Fehler kaum beheben oder verifizieren.
+
+## Reihenfolge der Wiederherstellung
+
+1. Stellen Sie zuerst den WAN-/DNS-Dienst wieder her; setzen Sie nicht auf Werkseinstellungen zurück;
+2. Ändern Sie bei einem einzelnen Client diesen Client, nicht den Router;
+3. Deaktivieren Sie bei einer einzelnen App zuerst Proxy/privaten DNS;
+4. Notieren Sie vor einem Neustart den Zustand;
+5. Das Zurücksetzen auf Werkseinstellungen ist der letzte Ausweg; sichern Sie zuvor.
+
+## E2-Laborlauf (2026-10-20)
+
+- Umgebung: OpenWrt 25.12.6 x86-VM 200; WAN-DHCP `192.168.50.191/24`; LAN `192.168.1.1/24`; netns-Client `192.168.1.175/24`.
+- DNS gestoppt: Der öffentliche Ping des Routers funktionierte; DNS von Router und Client schlug fehl; ein Neustart von dnsmasq stellte den Betrieb wieder her.
+- WAN `ifdown`: Die WAN-Adresse verschwand; der Client erreichte das Gateway per Ping, aber nicht `1.1.1.1`; `ifup wan` stellte den Betrieb wieder her.
+- Default-Route des Clients entfernt: Das Gateway funktionierte, die öffentliche IP war nicht erreichbar; das Wiederherstellen der Route half.
+- Nicht getestet: echtes WLAN, physische Link-Wechsel, Upstream-Jitter, App-Proxy/DoH/QUIC, IPv6-Präferenz.
+- Cast: `public/casts/015-triage.cast`; Recipe: `tests/recipes/no-internet-triage-25.12.md`.
+
+## Quellen und Prüfung
+
+- Dies ist E2 (teilweise): Drei kontrollierte Fehler wurden getestet; sporadische/physische/App-Schichten nicht.
+- Keine unabhängige Prüfung; die Schlussfolgerungen gelten nur für diese VM-/netns-Umgebung.
+- Geben Sie nicht aufgrund eines einzelnen Pings oder einer einzelnen fehlgeschlagenen Seite dem ISP die Schuld.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86-VM 200; WAN 192.168.50.191/24; LAN 192.168.1.1; netns-Client 192.168.1.175"
+  recipe="tests/recipes/no-internet-triage-25.12.md"
+  result="E2 teilweise: Bei gestopptem DNS funktionierte der Ping auf die öffentliche IP, DNS schlug jedoch fehl; nach dem Neustart erholte er sich. Bei WAN-ifdown funktionierte das Client-Gateway, die öffentliche IP jedoch nicht; ifup stellte den Betrieb wieder her. Das Entfernen der Default-Route des Clients störte nur dieses Endgerät. Sporadische Abbrüche/physisches WLAN/App-Proxy nicht getestet."
+  date="2026-10-20"
+/>
+
+<PageSources />

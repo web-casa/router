@@ -1,0 +1,213 @@
+---
+title: "Kabelgebundener/WLAN-AP hinter einem bestehenden Router: DHCP aus, neue LAN-IP, LAN-Port"
+description: "OpenWrt als AP hinter dem Hauptrouter betreiben: nur LAN, DHCP aus, LAN-IP außerhalb des Pools, Clients beziehen ihre Adresse weiter vom Hauptrouter; WLAN wird getrennt geprüft."
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'Kabelgebundener AP E2: AP-LAN 192.168.1.2/24, DHCP aus; Upstream-DHCP 192.168.1.1; Client 192.168.1.136; kein WAN/WLAN'
+testRecipe: 'tests/recipes/ap-mode-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt ap mode', 'openwrt access point modus', 'openwrt wlan ap', 'openwrt dhcp deaktivieren', 'router als ap']
+symptoms: ['AP-Clients erhalten keine Adresse', 'doppeltes DHCP am AP', 'ganzes Netzwerk fällt nach dem AP aus']
+sources:
+  - label: OpenWrt Netzwerkkonfiguration
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP und DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt WLAN-Konfiguration
+    url: https://openwrt.org/docs/guide-user/network/wifi/basic
+  - label: OpenWrt Firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+sourceHash: '9f6d131b15ed3652'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## Was der AP-Modus wirklich bedeutet
+
+Ein AP ist kein „weiterer Router“:
+
+- Schließen Sie den **LAN-Port** an, nicht WAN;
+- deaktivieren Sie DHCP auf dem AP; der Hauptrouter vergibt weiter die Adressen;
+- legen Sie die AP-LAN-IP außerhalb des DHCP-Pools des Hauptrouters;
+- betreiben Sie kein NAT/doppeltes Routing, es sei denn, Sie wollen absichtlich einen zweiten Router.
+
+Dieses Labor verifiziert nur **kabelgebundenen AP + Upstream-DHCP**; WLAN-SSID/Verschlüsselung/Roaming ist mangels Hardware E1.
+
+## Topologie
+
+```text
+Main router 192.168.1.1 (DHCP)
+        │ LAN port
+        │
+   OpenWrt AP
+   LAN br-lan 192.168.1.2/24
+   DHCP: ignore
+        │ LAN port
+        │
+   Client 192.168.1.136/24
+   gateway 192.168.1.1
+```
+
+- Der Client bezieht seine Adresse vom Hauptrouter; das Gateway ist `.1`, nicht die AP-Adresse `.2`;
+- AP `.2` dient nur der Verwaltung;
+- wird das Gateway des Clients `.2`, existiert ein zweiter DHCP-Server oder eine falsche Konfiguration.
+
+## Konfiguration
+
+<Step where="router-shell" title="Sichern und bestätigen, dass WAN nicht benötigt wird" expected="Sie kennen LAN-IP, DHCP-Zustand und wissen, ob WAN verwendet wird.">
+
+```sh
+uci show network.lan
+uci show dhcp.lan
+uci show network.wan 2>/dev/null
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+Der AP-Modus braucht üblicherweise kein WAN; bleibt WAN bestehen, stellen Sie sicher, dass es weder die Default-Route noch NAT übernimmt.
+
+</Step>
+
+<Step where="luci" title="LAN-IP ändern, DHCP deaktivieren" expected="Der AP ist 192.168.1.2/24 und vergibt keine Adressen mehr.">
+
+**Netzwerk → Schnittstellen → LAN → Bearbeitung**:
+
+1. IPv4 Adresse: `192.168.1.2/24` (außerhalb des Pools des Hauptrouters);
+2. **DHCP-Server → Allgemeine Einstellungen → Schnittstelle ignorieren**;
+3. Speichern und anwenden.
+
+CLI:
+
+```sh
+uci set network.lan.ipaddr='192.168.1.2/24'
+uci set dhcp.lan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+Öffnen Sie dann LuCI/SSH erneut unter `192.168.1.2`.
+
+</Step>
+
+<Step where="client" title="Mit dem LAN-Port des Hauptrouters verbinden" expected="Der Client bezieht seine Adresse vom Hauptrouter mit dessen Gateway.">
+
+Verbinden Sie den **LAN-Port** von OpenWrt mit einem **LAN-Port** des Hauptrouters; verwenden Sie nicht WAN.
+
+Verbinden Sie den Client neu bzw. erneuern Sie die Adresse:
+
+```sh
+ip addr show
+ip route
+cat /etc/resolv.conf
+ping 192.168.1.1
+ping 192.168.1.2
+```
+
+Der Labor-Client erhielt `192.168.1.136/24`, Gateway `192.168.1.1`; der AP `.2` war erreichbar.
+
+</Step>
+
+<Step where="client" title="Bestätigen, dass der AP kein DHCP anbietet" expected="Der DHCP-Server ist der Hauptrouter, nicht der AP.">
+
+```sh
+# Linux example
+udhcpc -i eth0 -f -q -n -t 5
+```
+
+Prüfen Sie `server 192.168.1.1`; steht dort `192.168.1.2`, ist das AP-DHCP noch aktiv.
+
+Dieses reine AP-Labor hatte kein Internet, daher ist ein fehlgeschlagenes `ping 1.1.1.1` zu erwarten; echtes Internet hängt vom Hauptrouter ab.
+
+</Step>
+
+## WLAN-AP (E1)
+
+Mangels WLAN-Hardware nicht verifiziert:
+
+- SSID/Passwort/WPA2/WPA3;
+- 2,4-/5-GHz-Kanal, Bandbreite, Sendeleistung;
+- Roaming/802.11r/Rauswurf bei schwachem Signal;
+- WLAN-Client-Isolation;
+- mehrere APs mit einer SSID.
+
+Grundsätze:
+
+- binden Sie die WLAN-Schnittstelle per Bridge in `br-lan` ein;
+- deaktivieren Sie DHCP;
+- verwenden Sie WPA2/WPA3, niemals offen;
+- versetzen Sie die Kanäle, verwenden Sie SSID/Passwort auf allen APs gleich;
+- prüfen Sie zuerst kabelgebunden und fügen Sie danach WLAN hinzu, damit Sie nicht zwei Ebenen gleichzeitig ändern.
+
+## Häufige Fehler
+
+### Das ganze Netzwerk fällt nach dem Hinzufügen des AP aus
+
+- AP-DHCP ist noch aktiv und kollidiert mit dem Hauptrouter;
+- die AP-LAN-IP kollidiert mit dem Hauptrouter;
+- der AP-WAN-Port wurde mit dem Haupt-LAN verbunden;
+- eine Schleife zwischen Hauptrouter und AP.
+
+Trennen Sie den AP, stellen Sie den Hauptrouter wieder her und ändern Sie dann jeweils nur einen Punkt.
+
+### Clients erhalten keine Adresse
+
+- Der AP ist nicht mit dem Haupt-LAN verbunden;
+- AP-DHCP ist aus, aber das Haupt-DHCP ist aus/voll;
+- VLAN/isolierter Port;
+- die WLAN-Schnittstelle ist nicht mit `br-lan` gebridged.
+
+### Clients haben eine Adresse, aber das falsche Gateway
+
+- Ein anderer DHCP-Server vergibt `.2`;
+- der Client hat eine alte Lease behalten;
+- auf dem AP läuft noch ein DHCP-Server;
+- prüfen Sie `cat /tmp/dhcp.leases` (der AP sollte keine neuen Leases haben).
+
+### WLAN verbindet, aber kein Internet
+
+- Die WLAN-Schnittstelle liegt nicht in der LAN-Bridge;
+- die Firewall trennt WLAN- und LAN-Zonen;
+- der Upstream-Hauptrouter blockiert es;
+- Client-Isolation/Gastnetz.
+
+## Aufgezeichnete Demo (Labor 008)
+
+<TerminalCast
+  src="/casts/008-ap.cast"
+  title="Labor 008: kabelgebundener AP, DHCP aus, Client bezieht Adresse vom Upstream"
+  caption="Echte OpenWrt-25.12.6-VM: AP-LAN .2, DHCP deaktiviert; der Client bezog 192.168.1.136/24 vom Upstream 192.168.1.1, Gateway .1, und konnte AP/Upstream anpingen. Dieses Labor hat weder Internet noch WLAN."
+/>
+
+## E2-Laborlauf (2026-10-20)
+
+- Umgebung: OpenWrt 25.12.6 x86 VM 200; AP-LAN `192.168.1.2/24`; `dhcp.lan.ignore=1`; Upstream-netns `192.168.1.1/24` + BusyBox udhcpd; Client `192.168.1.136/24`.
+- Client-DHCP: Server `192.168.1.1`, Lease 864000 s; Gateway `.1`.
+- Der Client pingte AP `.2` und Upstream `.1`; dieses reine AP-Labor hatte kein öffentliches Internet, daher schlug `1.1.1.1` fehl.
+- Nicht getestet: echtes Internet des Hauptrouters, WLAN/SSID/Verschlüsselung/Roaming, Windows-/Handy-Clients, IPv6/RA.
+- Cast: `public/casts/008-ap.cast`; Rezept: `tests/recipes/ap-mode-25.12.md`.
+
+## Quellen und Review
+
+- Dies ist E2 partiell: kabelgebundener AP/L2/DHCP wurden getestet; WLAN und echtes Upstream-Internet nicht.
+- Kein unabhängiger Reviewer; die Schlussfolgerungen beschränken sich auf diese VM-/netns-Umgebung.
+- AP-Modus bedeutet „nur LAN + DHCP aus + LAN-IP außerhalb des Pools“, nicht eine bestimmte Oberfläche.
+
+<TestRecord
+  status="partial"
+  environment="Kabelgebundener AP E2: AP-LAN 192.168.1.2/24, DHCP aus; Upstream-DHCP 192.168.1.1; Client 192.168.1.136; kein WAN/WLAN"
+  recipe="tests/recipes/ap-mode-25.12.md"
+  result="E2 partiell: AP-LAN auf .2 geändert und DHCP ignore=1; der Client bezog 192.168.1.136/24 vom Upstream .1 mit Gateway .1; AP .2 war erreichbar und der Client konnte AP/Upstream anpingen; dieses reine AP-Labor hatte kein Internet; Upstream-Internet und WLAN wurden nicht getestet."
+  date="2026-10-20"
+/>
+
+<PageSources />

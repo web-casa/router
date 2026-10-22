@@ -1,0 +1,199 @@
+---
+title: "OpenClash-Grundlagen: Kompatibilität, DNS-Konflikte und sauberes Deaktivieren"
+description: Prüfen Sie die Kompatibilität von OpenClash mit Firmware, Architektur und Paketformat in einer rechtmäßigen Umgebung, lösen Sie DNS-Konflikte und halten Sie nach dem Deaktivieren die grundlegende Konnektivität wiederherstellbar.
+pageType: app
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86-VM 200; luci-app-openclash 0.48.002 apk-Installation/Start/Stopp; keine Proxy-Endpunkte/Abonnements'
+testRecipe: 'tests/recipes/openclash-25.12.md'
+aliases: ['openclash installieren', 'openclash kompatibilität', 'openclash dns', 'openclash dns konflikt']
+symptoms: ['OpenClash lässt sich nicht installieren', 'kein Internet nach Aktivierung von OpenClash', 'DNS-Konflikt']
+sources:
+  - label: OpenClash-Projekt
+    url: https://github.com/vernesong/OpenClash
+  - label: OpenWrt-Paketformat
+    url: https://openwrt.org/docs/guide-user/additional-software/package-format
+  - label: OpenWrt DHCP und DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: Mihomo-Core
+    url: https://github.com/MetaCubeX/mihomo
+sourceHash: '1fba7eb75b5f204d'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="OpenWrt 25.12.6 x86-VM 200" tested={true} evidence="E2" />
+
+> **Geltungsbereich**: Diese Seite behandelt Kompatibilität, DNS-Konflikte, Start/Stopp und Wiederherstellung in einer rechtmäßigen Umgebung. Sie stellt keine Proxy-Server, Abonnement-Links oder Regelsätze bereit und beschreibt keine Schritte zur Umgehung von Netzwerkkontrollen oder Dienst-/Regionsbeschränkungen. Prüfen Sie vor der Nutzung das örtliche Recht, die Bedingungen Ihres ISP und die Bedingungen des Dienstes, auf den Sie zugreifen.
+
+## Ergebnis
+
+- Sie entscheiden, ob Ihre Firmware, Architektur und Ihr Paketformat zu einem OpenClash-Release passen.
+- Sie prüfen, ob es auf Port 53 mit dnsmasq oder AdGuard Home in Konflikt gerät.
+- Sie verifizieren Prozess-, Log- und Port-Status, statt sich allein auf die LuCI-Seite zu verlassen.
+- Sie stellen nach dem Deaktivieren DNS und die grundlegende Konnektivität wieder her.
+- Sie wissen, was diese Seite bewusst nicht abdeckt.
+
+## Anwendbare Umgebung und Annahmen
+
+- OpenWrt 25.12.6 (`apk`) oder 24.10 (`opkg`); x86/ARM muss zum Release-Paket passen.
+- OpenClash ist eine LuCI-App eines Drittanbieters und benötigt in der Regel einen passenden Mihomo/Meta-Core; Frontend, Core und Firmware müssen zueinander kompatibel sein.
+- `apk` unter 25.12 und `ipk` unter 24.10 sind unterschiedliche Formate. Benennen Sie eine `.ipk` nicht in `.apk` um und erzwingen Sie kein Paket einer anderen Architektur.
+- Identifizieren Sie bei Hersteller-Firmware/ImmortalWrt/iStoreOS zuerst die Quelle und den Paketmanager (siehe die Seite zur Firmware-Identifikation).
+
+## Prüfungen vor der Installation
+
+<Step where="router-shell" title="Firmware, Architektur und freien Speicher prüfen" expected="Sie kennen Paketformat, CPU-Architektur und verfügbaren Speicherplatz.">
+
+```sh
+ubus call system board
+cat /etc/openwrt_release
+uname -m
+command -v apk
+command -v opkg
+df -h /
+free -h
+```
+
+Notieren Sie `release.target`, `DISTRIB_ARCH`, den Paketmanager und den freien Speicher. OpenClash samt Core und Regeldaten kann mehrere Dutzend MB belegen; erzwingen Sie die Installation nicht auf einem vollen Rootfs.
+
+</Step>
+
+<Step where="router-shell" title="Ein passendes Release-Paket finden" expected="Sie finden ein apk/ipk für genau diese Firmware und Architektur.">
+
+Verwenden Sie ausschließlich die offizielle OpenClash-Release-Seite und prüfen Sie:
+
+- Hauptversion der Firmware (25.12 / 24.10);
+- Paketformat (apk / ipk);
+- CPU-Architektur (x86_64, aarch64 usw.);
+- Abhängigkeiten (Kernel-Module, bash/curl, laut Release Notes);
+- SHA-256/Prüfsumme von der Release-Seite.
+
+Gibt es kein passendes Paket, brechen Sie ab. Erzwingen Sie kein „universelles“ Paket und keinen Build eines Dritten.
+
+</Step>
+
+<Step where="router-shell" title="DNS-/Port-Basiswert erfassen" expected="Sie wissen, wer Port 53 belegt und was Wiederherstellung bedeutet.">
+
+```sh
+netstat -lnp | grep -E ':53|:5353|:7874|:9090'
+cat /tmp/resolv.conf.d/resolv.conf.auto
+nslookup openwrt.org 127.0.0.1
+```
+
+Belegt AdGuard Home Port 53 und läuft dnsmasq auf 5353, darf OpenClash nicht ebenfalls Port 53 übernehmen. Legen Sie vor dem Start fest, wer DNS betreibt.
+
+</Step>
+
+## Minimale Einrichtung (ohne Proxy-Endpunkte)
+
+<Step where="luci" title="Zuerst Frontend und Core starten, ohne DNS-Übernahme" expected="Der Dienst startet und LuCI zeigt den Status an.">
+
+Gehen Sie in **Dienste → OpenClash**:
+
+1. Wählen Sie einen Core, der zur Architektur passt.
+2. Lassen Sie DNS-Übernahme/-Hijack vorerst deaktiviert.
+3. Speichern und starten.
+4. Öffnen Sie die Log-Seite und stellen Sie sicher, dass es keine Meldung wie „core mismatch / port in use / missing dependency“ gibt.
+
+Diese Seite stellt keine Proxy-Server, Abonnements oder Regeln bereit. Haben Sie keine rechtmäßige Konfiguration, hören Sie hier auf; fügen Sie kein unbekanntes Abonnement ein, nur damit es „läuft“.
+
+</Step>
+
+<Step where="router-shell" title="Prozess, Ports und Logs bestätigen" expected="OpenClash/Core läuft ohne Konflikt auf Port 53.">
+
+```sh
+ps w | grep -Ei 'openclash|mihomo|clash' | grep -v grep
+netstat -lnp | grep -E ':7874|:9090|:53'
+logread | grep -i openclash | tail -30
+```
+
+Die Ports hängen von Ihrer Konfiguration ab; die entscheidende Regel lautet: **Lassen Sie niemals zwei Prozesse Port 53 belegen**. Meldet das Log einen DNS-Bind-Fehler, deaktivieren Sie OpenClash, statt es wiederholt neu zu starten.
+
+</Step>
+
+## Deaktivieren und Wiederherstellen
+
+<Step where="router-shell" title="Deaktivieren und grundlegende Konnektivität bestätigen" expected="Namensauflösung und Internet funktionieren ohne OpenClash.">
+
+```sh
+/etc/init.d/openclash stop
+/etc/init.d/openclash disable
+uci show openclash
+/etc/init.d/dnsmasq restart
+nslookup openwrt.org 127.0.0.1
+```
+
+Haben Sie zuvor den dnsmasq-Port oder die DHCP-Option 6 geändert, stellen Sie sie gemäß den DNS-/AGH-Seiten wieder her; stellen Sie sicher, dass Clients nicht mehr auf einen gestoppten OpenClash-DNS verweisen.
+
+</Step>
+
+## Fehlerfälle und Wiederherstellung
+
+### Kein Internet nach Aktivierung von OpenClash
+
+1. Erreichen Sie das Gerät über LAN/Konsole.
+2. Stoppen Sie OpenClash.
+3. Stellen Sie dnsmasq auf Port 53 und das DHCP-DNS wieder her.
+4. Prüfen Sie, ob Firewall-/DNS-Hijack-Regeln zurückgeblieben sind.
+5. Starten Sie bei Bedarf neu; stellen Sie die grundlegende Konnektivität wieder her, bevor Sie weiter suchen.
+
+### LuCI ist nicht erreichbar
+
+Klicken Sie nicht wiederholt auf „restart“. Stoppen Sie den Dienst per SSH/Konsole:
+
+```sh
+/etc/init.d/openclash stop
+/etc/init.d/openclash disable
+logread | tail -50
+```
+
+Blockiert eine Firewall-Regel die Verwaltung, stellen Sie den Zugriff über die Konsole wieder her; setzen Sie nicht blind auf Werkseinstellungen zurück.
+
+### Paketformat/Architektur passt nicht
+
+- 25.12 verwendet apk; 24.10 verwendet ipk; sie sind nicht austauschbar.
+- Pakete für x86_64 und aarch64 sind nicht austauschbar.
+- Passen Frontend- und Core-Version nicht zusammen, kehren Sie zur auf der Release-Seite genannten Kombination zurück.
+- Deaktivieren Sie nicht alle Signatur-/Verifizierungsprüfungen, nur um zu installieren.
+
+### DNS-Konflikt/-Schleife
+
+- Nur ein einziger DNS-Haupteinstiegspunkt darf Port 53 belegen.
+- AdGuard Home, dnsmasq und OpenClash-DNS dürfen nicht in einer Schleife aufeinander verweisen.
+- Stoppen Sie OpenClash, stellen Sie dnsmasq/AGH wieder her und fügen Sie die Komponenten dann einzeln wieder hinzu.
+- Testen Sie `127.0.0.1`, die LAN-Adresse und den Upstream jeweils separat mit `nslookup`.
+
+## Compliance und Versionsgrenzen
+
+- Nutzen Sie es nur in Netzwerken und unter Dienstbedingungen, die es erlauben. Diese Seite liefert keine Umgehung, keine Umgehung von Regions-/Zugriffskontrollen und keine Inhalte zu geteilten Konten oder Abonnements.
+- OpenClash/Mihomo sind Drittanbieter-Projekte mit schnell wechselnden Versionen/Abhängigkeiten; lesen Sie die Release Notes und halten Sie ein Rollback-Paket bereit.
+- Dies ist keine Rechtsberatung; klären Sie Compliance-Fragen vor dem Einsatz.
+
+## E2-Laborlauf (2026-10-20)
+
+- Umgebung: OpenWrt 25.12.6 x86-VM 200; offizielle `luci-app-openclash 0.48.002` `.apk`.
+- `apk add --allow-untrusted` installierte 43 Pakete (darunter `luci-compat`, Ruby, unzip); `/etc/init.d/openclash` und der LuCI-Controller sind vorhanden.
+- Ohne Proxy-Konfiguration/-Endpunkt meldete `start` den Zustand `inactive`; diese Seite behauptet nicht, dass „der Proxy funktioniert“.
+- Nach `stop` + `disable` gab `nslookup openwrt.org 127.0.0.1` „connection refused“ zurück; `/etc/init.d/dnsmasq restart` stellte DNS wieder her und der Ping ins öffentliche Netz funktionierte.
+- Nicht getestet: realer Proxy-Endpunkt/Abonnement, Routing-/DNS-Treffer, Mihomo-Core, TUN/Firewall-Regeln, Leistung/Stabilität.
+- Recipe: `tests/recipes/openclash-25.12.md`.
+
+## E2-Status und Quellen
+
+- Dies ist E2 (teilweise): `.apk`-Installation unter 25.12, Start ohne Konfiguration, Deaktivieren und DNS-Wiederherstellung wurden getestet; tatsächlicher Proxy/Routing bleibt E1/E3.
+- Machen Sie ohne rechtmäßigen Endpunkt bzw. ohne rechtmäßige Konfiguration aus „installiert“ kein „Proxy funktioniert“.
+- Erweitern Sie diese Seite nicht zu einer Anleitung für Proxy-Abonnements/Umgehung; das liegt außerhalb des Umfangs.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86-VM 200; luci-app-openclash 0.48.002 apk-Installation/Start/Stopp; keine Proxy-Endpunkte/Abonnements"
+  recipe="tests/recipes/openclash-25.12.md"
+  result="E2 teilweise: 0.48.002 apk installiert (43 Pakete inkl. luci-compat/ruby); Start ohne Konfiguration war inactive; nach stop/disable wurde DNS bis zum dnsmasq-Neustart verweigert; kein Test mit Proxy-Endpunkt oder Routing"
+/>
+
+<PageSources />

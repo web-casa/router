@@ -1,0 +1,192 @@
+---
+title: "Erste LuCI-Anmeldung: Adresse, Passwort und chinesische Oberfläche"
+description: Die Verwaltungsadresse von OpenWrt finden, das Root-Passwort setzen, das chinesische Sprachpaket installieren und einen Wiederherstellungsweg behalten.
+pageType: overview
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86_64 VM 200; LuCI 26.288; offizielles Image, Hersteller-Firmware ungetestet'
+lastVerifiedAt: '2026-10-20'
+testRecipe: 'tests/recipes/luci-first-login.md'
+aliases: ['openwrt login', 'luci standardpasswort', '192.168.1.1', 'openwrt chinesische oberfläche']
+symptoms: ['LuCI lässt sich nicht öffnen', 'Standardpasswort funktioniert nicht', 'LuCI ist auf Englisch']
+sources:
+  - label: OpenWrt-LuCI-Dokumentation
+    url: https://openwrt.org/docs/guide-user/luci/luci.essentials
+  - label: Erste Anmeldung bei OpenWrt
+    url: https://openwrt.org/docs/guide-quick-start/start
+  - label: Chinesisches LuCI-Sprachpaket
+    url: https://openwrt.org/packages/pkgdata/luci-i18n-base-zh-cn
+  - label: OpenWrt-Paketmanager apk
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+sourceHash: '43b9a180741d42b5'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Figure from '@components/Figure.astro';
+import luciPassword from '@assets/screenshots/luci/first-login-password.webp';
+import luciLanguage from '@assets/screenshots/luci/language-zh.webp';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="frisches offizielles Image" tested={true} evidence="E2" />
+
+## Ergebnis
+
+- Sie finden die LAN-Verwaltungsadresse von OpenWrt, nicht den WAN-Port.
+- Sie rufen LuCI zum ersten Mal auf und setzen ein Root-Passwort, das Sie selbst kontrollieren.
+- Sie installieren die Oberfläche in vereinfachtem Chinesisch und wechseln zu ihr.
+- Ist LuCI nicht erreichbar, stellen Sie den Zugang über LAN/Konsole wieder her, statt das Gerät blind zurückzusetzen.
+
+## Geltende Umgebung und Standardwerte
+
+- Offizielles OpenWrt-25.12.6-Image mit `apk`; das Standard-LAN ist meist `192.168.1.1/24`.
+- Bei einem frischen offiziellen Image ist **in der Regel kein Root-Passwort gesetzt**; LuCI fordert Sie auf, eines zu setzen. SSH und LuCI verwenden dasselbe Root-Passwort.
+- Hersteller-/Community-Firmware (ImmortalWrt, iStoreOS, Hersteller-Builds) kann eine völlig andere Adresse und ein anderes Passwort verwenden; prüfen Sie zuerst Aufkleber/Handbuch.
+- Diese Seite ist E1: Standardwerte, Paketname und Wiederherstellung beruhen auf der offiziellen Dokumentation; prüfen Sie es an Ihrem Gerät.
+
+## Verbinden und die Verwaltungsadresse finden
+
+<Step where="client" title="Einen LAN-Port verwenden, nicht WAN" expected="Der Client erhält eine 192.168.1.x-Lease und das Gateway ist OpenWrt.">
+
+Verbinden Sie den Computer mit einem Port, der mit **LAN** beschriftet ist; der WAN-Port stellt die Verwaltungsoberfläche in der Regel nicht bereit. Verwenden Sie DHCP und prüfen Sie das Standard-Gateway:
+
+Linux:
+
+```sh
+ip route
+```
+
+Windows:
+
+```powershell
+ipconfig
+```
+
+macOS:
+
+```sh
+netstat -rn
+```
+
+Wenn DHCP keine Adresse vergibt, setzen Sie vorübergehend nur für die Anmeldung eine statische Adresse `192.168.1.2/24` mit Gateway `192.168.1.1`.
+
+</Step>
+
+<Step where="client" title="LuCI öffnen" expected="Die LuCI-Anmeldung oder die Seite für die Ersteinrichtung erscheint.">
+
+Öffnen Sie:
+
+```text
+http://192.168.1.1/
+```
+
+LuCI verwendet standardmäßig HTTP auf Port 80, nicht HTTPS. Erzwingt der Browser HTTPS und schlägt das fehl, geben Sie `http://` ausdrücklich ein. Verwenden Sie die tatsächliche Gateway-Adresse; sie ist nicht immer `192.168.1.1`.
+
+</Step>
+
+## Das erste Passwort setzen
+
+<Figure src={luciPassword} alt="LuCI-Seite Routerpasswort mit Warnung wegen fehlendem Passwort und den Feldern Passwort/Bestätigung" caption="Die Passwortseite bei einer frischen LuCI-Anmeldung. Ist bereits ein Passwort gesetzt, melden Sie sich an; geben Sie hier kein Beispielpasswort ein." />
+
+<Step where="luci" title="Das Root-Passwort setzen" expected="Sie können sich mit demselben Passwort bei LuCI und per SSH anmelden.">
+
+Ein frisches offizielles Image fordert bei der ersten Anmeldung in der Regel zur Passwortvergabe auf. Falls nicht, öffnen Sie **System → Administration**. Sie können auch zuerst SSH verwenden:
+
+```sh
+ssh root@192.168.1.1
+passwd
+```
+
+Verwenden Sie ein einzigartiges, langes Passwort; verwenden Sie nicht `admin`, `password`, den Modellnamen oder ein Geburtsdatum. LuCI und SSH teilen sich das Root-Passwort.
+
+</Step>
+
+<Step where="client" title="Die Anmeldung prüfen" expected="Sie können sich von LuCI abmelden und mit dem neuen Passwort wieder anmelden.">
+
+Melden Sie sich von LuCI ab und wieder an; bestätigen Sie dann, dass SSH dasselbe Passwort akzeptiert. Speichern Sie Adresse und Passwort in einem Passwortmanager, nicht in einem Artikel oder Repository.
+
+</Step>
+
+## Auf Chinesisch umstellen
+
+<Figure src={luciLanguage} alt="LuCI-Systemeinstellungen, Registerkarte Sprache und Aussehen, mit ausgewähltem vereinfachtem Chinesisch" caption="Wählen Sie nach der Installation des Sprachpakets unter Sprache und Aussehen vereinfachtes Chinesisch aus. Aufgenommen auf einer temporären OpenWrt-25.12.6-Labor-VM." />
+
+<Step where="luci" title="Installierte Sprachen prüfen" expected="Vereinfachtes Chinesisch ist aufgeführt, oder Sie wissen, dass es installiert werden muss.">
+
+Öffnen Sie **System → System → Sprache und Aussehen** und prüfen Sie die Liste unter Sprache. LuCI listet nur installierte Sprachpakete auf.
+
+</Step>
+
+<Step where="router-shell" title="Das Sprachpaket für vereinfachtes Chinesisch installieren" expected="Nach dem Aktualisieren ist vereinfachtes Chinesisch auswählbar.">
+
+OpenWrt 25.12 (apk):
+
+```sh
+apk update
+apk add luci-i18n-base-zh-cn
+```
+
+OpenWrt 24.10 (opkg):
+
+```sh
+opkg update
+opkg install luci-i18n-base-zh-cn
+```
+
+Das Paket heißt `luci-i18n-base-zh-cn`; laden Sie den Browser neu, kehren Sie zu **System → System → Sprache und Aussehen** zurück, wählen Sie 简体中文, speichern und wenden Sie an.
+
+</Step>
+
+<Step where="client" title="Die Beständigkeit prüfen" expected="Die Oberfläche ist nach einer neuen Anmeldung weiterhin auf Chinesisch.">
+
+Melden Sie sich ab und wieder an. Springt die Oberfläche auf Englisch zurück, prüfen Sie, ob die Spracheinstellung gespeichert wurde und ob ein anderer Tab die alte Oberfläche zwischenspeichert.
+
+</Step>
+
+## Wenn LuCI nicht erreichbar ist
+
+### 192.168.1.1 lässt sich nicht öffnen
+
+- Vergewissern Sie sich, dass Sie an einem LAN-Port hängen, nicht am WAN.
+- Vergewissern Sie sich, dass Client-IP und Gateway im selben Subnetz liegen.
+- Prüfen Sie `ping 192.168.1.1`.
+- Das Gerät verwendet möglicherweise eine andere LAN-Adresse, besonders bei Hersteller-Firmware oder geändertem LAN.
+- Der Browser erzwingt möglicherweise HTTPS; verwenden Sie `http://` oder ein privates Fenster.
+
+### Das Passwort funktioniert nicht
+
+- Ein frisches offizielles Image hat in der Regel kein Standardpasswort; es fordert Sie auf, eines zu setzen.
+- Hersteller-Firmware kann ein Passwort auf dem Aufkleber haben; raten Sie nicht wiederholt.
+- Bei vergessenem Passwort stellen Sie den Zugang über LAN plus Konsole/SSH wieder her. Ohne Konsole nutzen Sie das Failsafe-Verfahren des Geräts; setzen Sie nicht zuerst auf Werkseinstellungen zurück.
+- Ein Zurücksetzen auf Werkseinstellungen löscht die Konfiguration; vergewissern Sie sich, dass keine wichtige Konfiguration/kein Backup verloren geht.
+
+### Chinesisch wird nicht aufgeführt
+
+- Prüfen Sie das Paket: `apk info -e luci-i18n-base-zh-cn` (oder `opkg list-installed` unter 24.10).
+- Das Sprachpaket muss zur LuCI-Version passen.
+- Laden Sie die Seite neu oder starten Sie die betreffenden Webdienste neu; starten Sie nicht das gesamte Netzwerk neu.
+
+### SSH schlägt nach dem Setzen des Passworts weiterhin fehl
+
+- SSH läuft auf Port 22 mit Root-Anmeldung.
+- Vergewissern Sie sich, dass die LAN-Adresse nicht geändert wurde.
+- Prüfen Sie unter **System → Administration** den SSH-Zugriff.
+- Nutzen Sie `logread` für dropbear-Fehler; hämmern Sie nicht auf die Anmeldung ein.
+
+## E2-Status und Quellen
+
+- Der Kernablauf ist E2 auf dem offiziellen OpenWrt-25.12.6-x86_64-Image: erste Anmeldung, Passwortvergabe, Installation von `luci-i18n-base-zh-cn`, chinesische Oberfläche, SSH-Anmeldung.
+- Hersteller-/Community-Firmware kann abweichen; Failsafe, Werksreset und Herstellerbeschränkungen bleiben E1. Verallgemeinern Sie die offiziellen Standardwerte nicht.
+- Die Screenshots stammen von der temporären VM 200; Zeit- und Netzwerkwerte hängen von Ihrer Umgebung ab. Rezept: `tests/recipes/luci-first-login.md`.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86_64 VM 200; LuCI 26.288; offizielles Image, Hersteller-Firmware ungetestet"
+  recipe="tests/recipes/luci-first-login.md"
+  result="E2: offizielles Image erreicht; Passwortabfrage beim ersten Start; chinesisches Paket installiert und ausgewählt; SSH akzeptierte dasselbe Passwort; Hersteller-Firmware/Failsafe ungetestet"
+  date="2026-10-20"
+/>
+
+<PageSources />

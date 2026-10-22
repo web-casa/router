@@ -1,0 +1,53 @@
+---
+title: "SQM und CAKE unter OpenWrt: niedrige Latenz bei voller Leitung"
+description: "SQM drosselt den Verkehr knapp unter Ihrer Leitungsrate, damit Warteschlangen kurz bleiben; mit CAKE bekämpft es Bufferbloat. Die vom OpenWrt-Leitfaden empfohlenen Einstellungen."
+pageType: overview
+evidenceLevel: E1
+tested: false
+aliases: ["openwrt sqm", "openwrt cake", "bufferbloat openwrt", "openwrt latenz bei last"]
+sources:
+  - label: "OpenWrt SQM-Leitfaden"
+    url: https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm
+  - label: "Linux 4.19 (kernelnewbies)"
+    url: https://kernelnewbies.org/Linux_4.19
+  - label: "CAKE (bufferbloat.net)"
+    url: https://www.bufferbloat.net/projects/codel/wiki/Cake/
+sourceHash: '97230357bbbdc535'
+---
+
+import FeatureBanner from '@components/features/FeatureBanner.astro';
+import PageSources from '@components/PageSources.astro';
+
+<FeatureBanner slug="sqm" />
+
+## In einem Satz
+
+SQM (Smart Queue Management) drosselt den Verkehr leicht unter Ihrer Leitungsrate, sodass sich die Warteschlange im Router bildet, wo sie verwaltet werden kann, statt im Modem. Zusammen mit der Queueing-Disziplin CAKE hält es die Latenz niedrig, während die Leitung ausgelastet ist. Dieses Problem heißt Bufferbloat.
+
+## Was der OpenWrt-Leitfaden empfiehlt
+
+1. Installieren Sie `luci-app-sqm`, oder `sqm-scripts`, wenn Sie LuCI nicht verwenden.
+2. Messen Sie Ihre tatsächliche Download- und Upload-Geschwindigkeit und setzen Sie beide auf **90 %** des gemessenen Werts.
+3. Wählen Sie `cake` mit `piece_of_cake.qos`.
+4. Testen Sie erneut unter Last und passen Sie an. `fq_codel` mit `simple.qos` ist die leichtere, weniger vollständige Alternative.
+
+CAKE ist seit 4.19 im Linux-Kernel.
+
+## Auf Ihrem Router ansehen
+
+Nach der Installation von SQM:
+
+```sh
+cat /etc/config/sqm
+```
+
+## Achtung
+
+- Das Shaping beansprucht CPU. Auf einer schnellen Leitung kommt ein kleiner Router möglicherweise nicht mit; vergleichen Sie daher Geschwindigkeit und Latenz davor und danach.
+- Legen Sie die Raten anhand einer Messung fest, nicht anhand der beworbenen Geschwindigkeit Ihres Tarifs.
+
+## Verwandte Anleitungen
+
+- [SQM / CAKE](/de/software/sqm/)
+
+<PageSources />

@@ -1,0 +1,199 @@
+---
+title: "Firmware-Upgrade: Konfiguration behalten, Pakete neu aufbauen, DNS/Verwaltung prüfen"
+description: Vor einem Upgrade Konfiguration und Paketlisten sichern, danach LAN/HTTP/SSH, DNS und den Fortbestand der Pakete prüfen; die Wege sysupgrade, Konfiguration behalten und Konfiguration wiederherstellen unterscheiden.
+pageType: recovery
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'OpenWrt 25.12.6 x86-VM 200; sysupgrade in derselben Version; Konfiguration behalten; Pakete 239→182; SQM/OpenClash verloren; DNS/HTTP OK'
+testRecipe: 'tests/recipes/firmware-upgrade-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt upgrade', 'sysupgrade konfiguration behalten', 'openwrt pakete weg nach upgrade', 'openwrt firmware aktualisieren', 'openwrt firmware upgrade']
+symptoms: ['kein Internet nach dem Upgrade', 'Pakete fehlen nach dem Upgrade', 'DNS fällt nach dem Upgrade aus', 'sysupgrade schlägt fehl']
+sources:
+  - label: OpenWrt sysupgrade
+    url: https://openwrt.org/docs/guide-user/installation/generic.backup
+  - label: OpenWrt Backup und Wiederherstellung
+    url: https://openwrt.org/docs/guide-user/troubleshooting/backup_restore
+  - label: OpenWrt Attended Sysupgrade
+    url: https://openwrt.org/docs/guide-user/installation/attended.sysupgrade
+  - label: OpenWrt-Paketmanager
+    url: https://openwrt.org/docs/guide-user/additional-software/apk
+sourceHash: '012dc7ede32ddb47'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE-VM 200" tested={true} evidence="E2" />
+
+## Ein Upgrade ist nicht nur „die Firmware-Datei austauschen“
+
+Trennen Sie vier Dinge:
+
+1. wurde die **Firmware** geflasht und gebootet;
+2. wurde die **Konfiguration** behalten/wiederhergestellt;
+3. sind **Pakete/Plugins** noch vorhanden oder müssen neu installiert werden;
+4. haben sich **Verwaltung/DNS/WAN** erholt.
+
+Das Behalten der Konfiguration behält keine Pakete. Das Behalten der Konfiguration einer App behält nicht deren Binärdatei.
+
+## Vor dem Upgrade
+
+<Step where="router-shell" title="Release, Target, Paketliste und Backup erfassen" expected="Sie können zurückrollen und wissen, was verschwunden ist.">
+
+```sh
+cat /etc/openwrt_release
+cat /etc/apk/arch 2>/dev/null
+apk list --installed > /tmp/packages-$(date +%F).txt
+wc -l /tmp/packages-$(date +%F).txt
+sysupgrade -b /tmp/pre-upgrade-$(date +%F).tar.gz
+sha256sum /tmp/pre-upgrade-$(date +%F).tar.gz
+```
+
+Kopieren Sie das Konfigurationsarchiv vom Gerät; bei einer VM erstellen Sie zusätzlich einen PVE-Snapshot bzw. ein Backup. Lassen Sie es nicht nur in `/tmp`.
+
+</Step>
+
+<Step where="router-shell" title="Image und Prüfsumme verifizieren" expected="Das Image passt zu Release/Target/Architektur und die Prüfsumme ist gültig.">
+
+```sh
+wget -O /tmp/openwrt.img.gz <official-image-url>
+sha256sum /tmp/openwrt.img.gz
+# compare with the matching line in official sha256sums
+gzip -dkf /tmp/openwrt.img.gz
+ls -lh /tmp/openwrt.img
+```
+
+Dieses Labor verwendete das kombinierte ext4-Image 25.12.6 x86/64; die SHA-256 der `.img.gz` stimmte überein, danach wurde es für `sysupgrade` entpackt.
+
+</Step>
+
+<Step where="router-shell" title="Konsole und Rollback bereithalten" expected="Sie können sich von einem unterbrochenen/fehlgeschlagenen Upgrade erholen.">
+
+- Physisches Gerät: seriell/HDMI, Failsafe-Taste, alte Firmware;
+- PVE: Snapshot vor dem Upgrade, `qm rollback` prüfen;
+- LAN-IP, DHCP, WAN, DNS und Verwaltungsport notieren;
+- Trennen Sie während des Upgrades weder den Strom noch entfernen Sie Platten.
+
+</Step>
+
+## Upgrade-Befehl
+
+Standard (Konfiguration behalten):
+
+```sh
+sysupgrade -v /tmp/openwrt.img
+```
+
+Optionen:
+
+- `-n`: Konfiguration nicht behalten (saubere Installation);
+- `-f <backup.tar.gz>`: Konfiguration während des Upgrades wiederherstellen;
+- `-c`/`-o`: mehr geänderte Dateien erhalten; komplexere Grenzen;
+- Verwenden Sie `-F` nicht, um die Kompatibilität zu ignorieren, es sei denn, Sie verstehen die Folgen vollständig.
+
+Das Upgrade beendet SSH-/Web-Sitzungen; warten Sie den Neustart ab und schalten Sie nicht aus, nur weil die Verbindung abbrach.
+
+## Nach dem Upgrade prüfen
+
+<Step where="client" title="Verwaltungszugang" expected="LAN-IP, HTTP und SSH mindestens einmal prüfen.">
+
+```sh
+ping -c 2 192.168.1.2
+curl -sSI --max-time 5 http://192.168.1.2/ | head -3
+ssh root@192.168.1.2 'cat /etc/openwrt_release'
+```
+
+Dieses Labor behielt das LAN `192.168.1.2/24`; HTTP 200 und SSH funktionierten.
+
+</Step>
+
+<Step where="router-shell" title="Konfiguration und DNS/WAN" expected="Die Konfiguration blieb erhalten und DNS/WAN funktionieren tatsächlich.">
+
+```sh
+uci show network.lan.ipaddr
+uci show dhcp.lan
+ip route
+nslookup openwrt.org 127.0.0.1
+logread | grep -Ei 'dnsmasq|netifd|dhcp' | tail -30
+```
+
+In diesem Labor: DNS und HTTP funktionierten nach dem Upgrade; die WAN-Konfiguration blieb erhalten. Prüfen Sie trotzdem erneut die DHCP-Leases der Clients und echtes Internet, nicht nur den Router selbst.
+
+</Step>
+
+<Step where="router-shell" title="Pakete und Plugins" expected="Sie wissen, was verloren ging, und installieren anhand der Liste neu.">
+
+```sh
+apk list --installed | wc -l
+for p in sqm-scripts luci-app-sqm luci-app-openclash; do
+  apk info -e "$p" && echo "$p installed" || echo "$p MISSING"
+done
+```
+
+In diesem Labor: vorher 239 Pakete, nachher 182; `sqm-scripts`, `luci-app-sqm` und `luci-app-openclash` waren alle weg. Die Konfiguration kann erhalten bleiben, aber die Binärdateien müssen neu installiert werden.
+
+Einzeln neu installieren:
+
+```sh
+apk update
+apk add sqm-scripts luci-app-sqm
+# verify menu/service before the next package
+```
+
+Stellen Sie nicht alle Plugins auf einmal wieder her; bringen Sie zuerst Verwaltung/DNS/Grundnetzwerk in Ordnung.
+
+</Step>
+
+## Reihenfolge des Wiederaufbaus
+
+1. Grundnetzwerk: network/dhcp/firewall;
+2. DNS: dnsmasq, danach bei Bedarf AGH;
+3. Verwaltung: luci/uhttpd;
+4. Proxy/Traffic-Shaping: OpenClash, SQM;
+5. Zuletzt: Regeln/Abonnements/Performance-Tuning.
+
+Prüfen Sie bei jedem Paket:
+
+- installiert oder nicht;
+- LuCI-Menü/Controller vorhanden;
+- Dienst startet;
+- DNS/Default-Route wurde nicht verändert;
+- Deaktivieren stellt das Grundnetzwerk wieder her.
+
+## Rollback
+
+- Physisches Gerät: alte Firmware/Recovery-Modus bereithalten;
+- PVE: Snapshot/`vzdump` vor dem Upgrade, bei Fehlschlag die gesamte VM zurückrollen;
+- Konfiguration: das Archiv mit `sysupgrade -r` einspielen;
+- Verwenden Sie nicht „erneut flashen“ anstelle einer Diagnose des Fehlers.
+
+Dieses Labor verwendete den Snapshot `pre-019`; nach der Aufzeichnung der Ergebnisse wurde auf den Zustand vor dem Upgrade zurückgerollt. Die Seite dokumentiert den tatsächlichen Upgrade-Lauf.
+
+## E2-Laborlauf (2026-10-20)
+
+- Umgebung: OpenWrt 25.12.6 x86-VM 200; vorher/nachher dieselbe Version (Neuflashen, nicht versionsübergreifend).
+- Vorher: 239 Pakete; `sqm-scripts`, `luci-app-sqm`, `luci-app-openclash` installiert; LAN `.2`, DHCP ignore.
+- Nach `sysupgrade -v /tmp/openwrt.img`: Gerät startete neu; LAN `.2` und DHCP ignore blieben erhalten; HTTP 200, SSH und DNS funktionierten.
+- Pakete: 239 → 182; SQM/OpenClash gingen verloren; die Konfiguration kann erhalten bleiben, aber die Binärdateien müssen neu installiert werden.
+- Nicht abgeschlossen: versionsübergreifendes Upgrade, Verifikation der SQM-/OpenClash-Neuinstallation, echtes WLAN/PPPoE, Wiederherstellung nach Stromausfall.
+- Rezept: `tests/recipes/firmware-upgrade-25.12.md`.
+
+## Quellen und Review
+
+- Dies ist E2 teilweise: Erhalt der Konfiguration bei sysupgrade in derselben Version, Verwaltung/DNS und Paketverlust wurden getestet; versionsübergreifend und Plugin-Neuaufbau nicht abgeschlossen.
+- Schließen Sie vom Ergebnis in derselben Version nicht auf das Verhalten über Releases hinweg; lesen Sie die Release Notes, sichern Sie und testen Sie in einer VM.
+- Kein unabhängiger Reviewer; die Schlussfolgerungen gelten nur für diese VM-Umgebung.
+
+<TestRecord
+  status="partial"
+  environment="OpenWrt 25.12.6 x86-VM 200; sysupgrade in derselben Version; Konfiguration behalten; Pakete 239→182; SQM/OpenClash verloren; DNS/HTTP OK"
+  recipe="tests/recipes/firmware-upgrade-25.12.md"
+  result="E2 teilweise: nach sysupgrade in derselben Version blieb die LAN-/DHCP-Konfiguration erhalten und HTTP/SSH/DNS funktionierten; Pakete sanken von 239 auf 182 und SQM/OpenClash verschwanden; kein versionsübergreifendes Upgrade; SQM-Neuinstallation nicht abgeschlossen; Snapshot zurückgerollt"
+  date="2026-10-20"
+/>
+
+<PageSources />

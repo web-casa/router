@@ -1,0 +1,234 @@
+---
+title: "Bypass-Gateway: DHCP deaktivieren, Gateway/DNS der Clients setzen und zurückwechseln"
+description: Unterscheiden Sie einen One-Arm-Bypass von einem zweiten Gateway mit WAN, ändern Sie das LAN, deaktivieren Sie DHCP, richten Sie die Clients auf den Bypass aus und behalten Sie einen Rückweg.
+pageType: network
+tested: true
+testedVersions: ['25.12.6']
+evidenceLevel: E2
+testEnvironment: 'E2 für Bypass mit WAN: LAN 192.168.1.2/24, DHCP aus, WAN 192.168.50.5/24; statischer Client 192.168.1.100; reiner One-Arm-Bypass nicht getestet'
+testRecipe: 'tests/recipes/bypass-gateway-25.12.md'
+lastVerifiedAt: '2026-10-20'
+aliases: ['openwrt bypass gateway', 'openwrt bypass router', 'bypass router dhcp', 'openwrt gateway change', 'openwrt Bypass-Router', 'openwrt Gateway ändern']
+symptoms: ['Bypass-Router unterbricht das Internet', 'Client-Gateway einstellen', 'Bypass DHCP-Konflikt']
+sources:
+  - label: OpenWrt-Netzwerkkonfiguration
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+  - label: OpenWrt DHCP und DNS
+    url: https://openwrt.org/docs/guide-user/base-system/dhcp
+  - label: OpenWrt-Firewall
+    url: https://openwrt.org/docs/guide-user/firewall/firewall_configuration
+  - label: OpenWrt Bridging/Relay
+    url: https://openwrt.org/docs/guide-user/network/network_configuration
+sourceHash: '111105920d4777d6'
+---
+
+import EnvCard from '@components/EnvCard.astro';
+import TerminalCast from '@components/TerminalCast.astro';
+import Step from '@components/Step.astro';
+import TestRecord from '@components/TestRecord.astro';
+import PageSources from '@components/PageSources.astro';
+
+<EnvCard firmware="OpenWrt" version="25.12.6" packageManager="apk" device="PVE VM 200" tested={true} evidence="E2" />
+
+## Modus wählen: One-Arm-Bypass oder Gateway mit WAN
+
+| Modus | OpenWrt-Schnittstellen | Wer bietet DHCP an | Gateway/DNS der Clients | Hier getestet |
+|---|---|---|---|---|
+| One-Arm-Bypass | nur LAN, kein WAN | vorgelagerter Hauptrouter | LAN-IP des Bypass | nein (E1-Schritte) |
+| Gateway mit WAN | LAN + WAN | Upstream oder Bypass | LAN-IP des Bypass | **E2** |
+
+Beide können „Clients über OpenWrt leiten“, aber die Fehlerquellen unterscheiden sich:
+
+- One-Arm-Bypass: Ohne DHCP/NAT muss der Hauptrouter die Rückroute kennen, oder der Bypass muss NAT durchführen;
+- mit WAN: OpenWrt erhält eine eigene WAN-Adresse und führt NAT für LAN-Clients durch; das ist der Testmodus.
+
+Sagen Sie nicht „der Bypass funktioniert“, ohne anzugeben, ob er ein WAN hat und wer DHCP anbietet.
+
+## Testtopologie
+
+```text
+Upstream 192.168.50.1
+      │
+  WAN eth1 (DHCP 192.168.50.5/24)
+      │
+  OpenWrt VM 200
+      │
+  LAN br-lan 192.168.1.2/24
+      │  DHCP deaktiviert
+  Client 192.168.1.100/24
+  Gateway/DNS = 192.168.1.2
+```
+
+- In diesem LAN gibt es keine `.1`, um Konflikte mit dem Upstream/Hauptrouter zu vermeiden;
+- Clients müssen statisch konfiguriert sein;
+- bei deaktiviertem DHCP bleiben DHCP-Anfragen absichtlich unbeantwortet.
+
+## Konfiguration
+
+<Step where="router-shell" title="LAN-/WAN-Zustand sichern und festhalten" expected="Sie kennen LAN-IP, WAN-Protokoll und DHCP-Zustand.">
+
+```sh
+uci show network.lan
+uci show network.wan
+uci show dhcp.lan
+cp /etc/config/network /etc/config/network.bak.$(date +%F)
+cp /etc/config/dhcp /etc/config/dhcp.bak.$(date +%F)
+```
+
+Halten Sie den Konsolenzugriff bereit; die alte LAN-IP verschwindet sofort.
+
+</Step>
+
+<Step where="luci" title="LAN-IP ändern und DHCP deaktivieren" expected="Das LAN ist 192.168.1.2/24 und DHCP vergibt keine Adressen mehr.">
+
+**Netzwerk → Schnittstellen → LAN → Bearbeitung**:
+
+1. IPv4 Adresse: `192.168.1.2/24`;
+2. **DHCP-Server → Allgemeine Einstellungen → Schnittstelle ignorieren**;
+3. Speichern & Anwenden.
+
+Entsprechung auf der Kommandozeile:
+
+```sh
+uci set network.lan.ipaddr='192.168.1.2/24'
+uci set dhcp.lan.ignore='1'
+uci commit network
+uci commit dhcp
+/etc/init.d/network reload
+/etc/init.d/dnsmasq restart
+```
+
+Öffnen Sie danach LuCI/SSH erneut unter `192.168.1.2`.
+
+</Step>
+
+<Step where="router-shell" title="WAN und NAT beibehalten (Modus mit WAN)" expected="Das WAN hat eine Adresse und die Weiterleitung/NAT von LAN zu WAN funktioniert.">
+
+```sh
+ubus call network.interface.wan status
+ip -4 addr show eth1
+ip route
+uci show firewall | grep -E 'zone|masquerade|forward'
+```
+
+In diesem Testaufbau war das WAN `192.168.50.5/24` mit dem Gateway `192.168.50.1`; LAN-Clients nutzen NAT über OpenWrt.
+
+</Step>
+
+<Step where="client" title="Client auf den Bypass ausrichten" expected="Gateway/DNS des Clients sind 192.168.1.2; öffentliche IP und DNS funktionieren.">
+
+```sh
+# Linux example
+ip addr add 192.168.1.100/24 dev eth0
+ip route add default via 192.168.1.2
+echo 'nameserver 192.168.1.2' > /etc/resolv.conf
+ping -c 2 192.168.1.2
+ping -c 2 1.1.1.1
+nslookup openwrt.org 192.168.1.2
+```
+
+Windows: Stellen Sie IP, Gateway und DNS manuell ein; behalten Sie nicht die alte DHCP-Adresse bei.
+
+</Step>
+
+<Step where="client" title="Prüfen, dass DHCP wirklich aus ist" expected="DHCP liefert kein Angebot; die statische Konfiguration funktioniert weiterhin.">
+
+```sh
+# Linux example
+udhcpc -i eth0 -f -q -n -t 3
+```
+
+Im Test wurde `no lease, failing` ausgegeben; die statische Adresse konnte weiterhin pingen und auflösen. Erhalten Sie dennoch eine Lease, existiert ein zweiter DHCP-Server oder `ignore` wurde nicht angewendet.
+
+</Step>
+
+<Step where="client" title="DNS/Gateway als Kontrolle wechseln" expected="DNS-Ausfall und Gateway-Ausfall lassen sich unterscheiden.">
+
+```sh
+# public DNS
+nslookup openwrt.org 1.1.1.1
+# dead gateway
+ip route replace default via 192.168.1.250
+ping -c 2 1.1.1.1
+# restore
+ip route replace default via 192.168.1.2
+```
+
+Im Test: Öffentliches DNS funktionierte; `.250` ergab 100 % Verlust; nach der Wiederherstellung von `.2` war alles wieder erreichbar.
+
+</Step>
+
+## One-Arm-Bypass (E1, hier nicht getestet)
+
+Nur LAN, kein WAN:
+
+- LAN des Bypass `192.168.1.2/24`, Gateway zum Hauptrouter `192.168.1.1`;
+- DHCP des Bypass deaktivieren;
+- Gateway/DNS der Clients `.2`;
+- Weiterleitung aktivieren; der Hauptrouter braucht eine Rückroute, oder der Bypass führt NAT für den LAN-Verkehr durch;
+- die Firewall des Hauptrouters muss die Weiterleitung von Client zu Internet erlauben.
+
+Es stand kein Hauptrouter im Testaufbau zur Verfügung, daher ist dieser Teil **E1** und nicht E2; prüfen Sie ihn gegen Ihren Router und Ihre Firewall.
+
+## Häufige Fehler
+
+### Bypass nach der LAN-Änderung nicht erreichbar
+
+- es wird noch die alte IP verwendet;
+- der Client befindet sich nicht in `192.168.1.0/24`;
+- veralteter ARP-Eintrag: `ip neigh flush dev <iface>`;
+- verwenden Sie die Konsole: `ip -4 addr show br-lan`.
+
+### Client erhält keine Adresse
+
+- der DHCP des Bypass ist aus; das ist erwartet; konfigurieren Sie statisch;
+- wenn Sie DHCP möchten, betreiben Sie genau einen Server (Bypass oder Hauptrouter);
+- prüfen Sie `dhcp.lan.ignore` und einen zweiten DHCP-Server.
+
+### Client hat eine Adresse, aber kein Internet
+
+- Gateway/DNS zeigen nicht auf den Bypass;
+- der Bypass hat keine Standardroute/keinen Upstream;
+- Firewall-Weiterleitung/NAT;
+- dem Hauptrouter fehlt eine Rückroute (One-Arm);
+- Subnetzkonflikt/Double NAT.
+
+### DNS schlägt fehl
+
+- der Client nutzt für DNS noch das alte Gateway;
+- dnsmasq des Bypass lauscht nicht im LAN;
+- Upstream-DNS ist blockiert;
+- DoH/privates DNS auf Anwendungsebene.
+
+## Aufgezeichnete Demo (Testaufbau 009)
+
+<TerminalCast
+  src="/casts/009-bypass.cast"
+  title="Testaufbau 009: Bypass-Gateway, DHCP aus, statisches Gateway/DNS"
+  caption="Echte OpenWrt-25.12.6-VM: LAN .2 + WAN-DHCP, DHCP deaktiviert; der statische Client .100 prüft öffentliche IP/DNS, DNS-Wechsel, Ausfall des Gateways und Wiederherstellung. Der reine One-Arm-Bypass ist in dieser Aufzeichnung nicht enthalten."
+/>
+
+## E2-Testlauf (2026-10-20)
+
+- Umgebung: OpenWrt 25.12.6 x86 VM 200; LAN `192.168.1.2/24`; `DHCP ignore=1`; WAN-DHCP `192.168.50.5/24`; netns-Client `192.168.1.100/24`.
+- DHCP aus: `udhcpc` erhielt kein Angebot (`no lease, failing`); die statische Adresse funktionierte.
+- Statisches Gateway/DNS `.2`: Gateway-Ping, `1.1.1.1` und `nslookup` funktionierten.
+- DNS `1.1.1.1` funktionierte; das ausgefallene Gateway `.250` unterbrach den öffentlichen Zugriff; die Wiederherstellung von `.2` behob das.
+- Nicht getestet: reiner One-Arm-Bypass, Rückroute auf dem Hauptrouter, echte WLAN-/Windows-Clients, IPv6/RA.
+- Aufzeichnung: `public/casts/009-bypass.cast`; Rezept: `tests/recipes/bypass-gateway-25.12.md`.
+
+## Quellen und Review
+
+- Dies ist E2 partiell: Der Bypass mit WAN wurde getestet; der One-Arm-Pfad besteht nur aus E1-Schritten.
+- Es gab keinen unabhängigen Reviewer; die Schlussfolgerungen gelten nur für diese VM-/netns-Umgebung.
+- „Bypass-Gateway“ ist keine einzelne feste Konfiguration; klären Sie, wer DHCP anbietet, wer NAT durchführt und ob die Rückroute existiert.
+
+<TestRecord
+  status="partial"
+  environment="E2 für Bypass mit WAN: LAN 192.168.1.2/24, DHCP aus, WAN 192.168.50.5/24; statischer Client 192.168.1.100; reiner One-Arm-Bypass nicht getestet"
+  recipe="tests/recipes/bypass-gateway-25.12.md"
+  result="E2 partiell: Bei deaktiviertem DHCP erhielt der Client keine Lease; statisches Gateway/DNS .2 ergab funktionierenden öffentlichen Ping und DNS; DNS 1.1.1.1 funktionierte; ein ausgefallenes Gateway .250 unterbrach den öffentlichen Zugriff und die Wiederherstellung von .2 behob das."
+  date="2026-10-20"
+/>
+
+<PageSources />
